@@ -30,6 +30,27 @@ def _created_name_from_ret(ret, fallback=None):
 	return fallback
 
 
+def map_dia_to_AB(dia):
+	"""Mapea diámetro (mm) a (A,B) según tabla aproximada usada en el proyecto."""
+	try:
+		d = int(round(float(dia)))
+	except Exception:
+		return 100, 100
+	mapping = {
+		16: (80, 80),
+		19: (100, 100),
+		22: (100, 100),
+		25: (100, 100),
+		32: (125, 125),
+		38: (150, 150),
+		44: (175, 175),
+		51: (200, 200),
+		57: (225, 225),
+		64: (250, 250),
+	}
+	return mapping.get(d, (100, 100))
+
+
 def create_circle_points(SapModel, radius, num_points=8, z=0.0, cx=0.0, cy=0.0, prefix='P_c'):
 	"""Crea puntos en un círculo centrado en (cx,cy, z). Mantiene compatibilidad con el argumento `z`.
 	Devuelve lista de nombres.
@@ -221,43 +242,56 @@ def create_ring_areas(SapModel, inner_pts, outer_pts, area_name_prefix='A_r'):
 if __name__ == '__main__':
 	# parámetros mínimos para crear los anillos
 	bolt_dia = 25.0
-	# mapeo simple para B (igual que en placabase_std)
-	if bolt_dia == 16:
-		A = 80; B = 80
-	elif bolt_dia == 19:
-		A = 100; B = 100
-	elif bolt_dia == 22:
-		A = 100; B = 100
-	elif bolt_dia == 25:
-		A = 100; B = 100
-	elif bolt_dia == 32:
-		A = 125; B = 125
-	elif bolt_dia == 38:
-		A = 150; B = 150
-	elif bolt_dia == 44:
-		A = 175; B = 175
-	elif bolt_dia == 51:
-		A = 200; B = 200
-	elif bolt_dia == 57:
-		A = 225; B = 225
-	elif bolt_dia == 64:
-		A = 250; B = 250
-	else:
-		A = 100; B = 100
-
-	# Lista de posiciones de centros de pernos: definir aquí (x, y, z) en mm
+	# valores por defecto
 	n_pernos = 4
 	H_col = 300.0
 	B_col = 250.0
-	bolt_centers = [
-        (A/2.0, H_col/2.0, 0.0),
-        (3*A/2.0, H_col/2.0, 0.0),
-        (-A/2.0, H_col/2.0, 0.0),
-        (-3*A/2.0, H_col/2.0, 0.0),
-		(A/2.0, -H_col/2.0, 0.0),
-        (3*A/2.0, -H_col/2.0, 0.0),
-        (-A/2.0, -H_col/2.0, 0.0),
-        (-3*A/2.0, -H_col/2.0, 0.0),
+
+	# Intentar leer configuración externa (archivo JSON) para sobreescribir parámetros
+	try:
+		import os, json
+		cfg_path = os.path.join(os.path.dirname(__file__), 'placabase_ARA_config.json')
+		if os.path.exists(cfg_path):
+			with open(cfg_path, 'r', encoding='utf-8') as fh:
+				cfg = json.load(fh)
+			bolt_dia = float(cfg.get('bolt_dia', bolt_dia))
+			# permitir override de H_col y B_col
+			if 'H_col' in cfg:
+				try:
+					H_col = float(cfg.get('H_col'))
+				except Exception:
+					pass
+			if 'B_col' in cfg:
+				try:
+					B_col = float(cfg.get('B_col'))
+				except Exception:
+					pass
+			# si la config trae bolt_centers, la tomamos (se usará más abajo)
+			if 'bolt_centers' in cfg:
+				try:
+					bolt_centers = [tuple(map(float, c)) for c in cfg['bolt_centers']]
+				except Exception:
+					bolt_centers = None
+		else:
+			bolt_centers = None
+	except Exception as e:
+		print(f"Aviso: no se pudo leer config JSON: {e}")
+		bolt_centers = None
+
+	# Calcular A y B a partir del diámetro (hardcode mapping)
+	A, B = map_dia_to_AB(bolt_dia)
+
+	# Definir bolt_centers por defecto si no vienen desde config
+	if 'bolt_centers' not in locals() or bolt_centers is None:
+		bolt_centers = [
+			(A/2.0,  H_col/2.0, 0.0),
+			(3*A/2.0, H_col/2.0, 0.0),
+			(-A/2.0, H_col/2.0, 0.0),
+			(-3*A/2.0, H_col/2.0, 0.0),
+			(A/2.0, -H_col/2.0, 0.0),
+			(3*A/2.0, -H_col/2.0, 0.0),
+			(-A/2.0, -H_col/2.0, 0.0),
+			(-3*A/2.0, -H_col/2.0, 0.0),
 		]
 
 	all_results = []
