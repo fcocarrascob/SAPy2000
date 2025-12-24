@@ -3,7 +3,7 @@ import time
 
 from PySide6.QtWidgets import QApplication
 
-import app_placabase_gui as gui
+import Placa_Base.app_placabase_gui as gui
 
 
 def main():
