@@ -38,6 +38,8 @@ class MainWindow(QMainWindow):
         # nuevos campos: espesor de ala (flange) y alma (web) en mm
         self.flange_edit = QLineEdit('')
         self.web_edit = QLineEdit('')
+        # espesor de placa base (mm)
+        self.plate_thickness_edit = QLineEdit('20.0')
         self.A_display = QLineEdit('100')
         self.A_display.setReadOnly(True)
         self.B_display = QLineEdit('100')
@@ -72,8 +74,8 @@ class MainWindow(QMainWindow):
         # fila para espesores
         row_th = QHBoxLayout(); row_th.addWidget(QLabel('Espesor ala (mm):')); row_th.addWidget(self.flange_edit)
         row_th.addWidget(QLabel('Espesor alma (mm):')); row_th.addWidget(self.web_edit)
+        row_th.addWidget(QLabel('Espesor placa (mm):')); row_th.addWidget(self.plate_thickness_edit)
         form_layout.addLayout(row_th)
-        form_layout.addLayout(row3)
         form_layout.addLayout(row3)
         form_layout.addWidget(QLabel('Centros de pernos (tabla X,Y,Z en mm):'))
         form_layout.addWidget(self.centers_table)
@@ -133,6 +135,11 @@ class MainWindow(QMainWindow):
                         self.web_edit.setText(str(cfg.get('web_thickness', '')))
                     except Exception:
                         pass
+                if 'plate_thickness' in cfg:
+                    try:
+                        self.plate_thickness_edit.setText(str(cfg.get('plate_thickness', '20.0')))
+                    except Exception:
+                        pass
                 centers = cfg.get('bolt_centers')
                 if centers:
                     # llenar tabla
@@ -166,6 +173,9 @@ class MainWindow(QMainWindow):
                 self.flange_edit.setText(str(max(1.0, round(0.12 * H, 3))))
             if not self.web_edit.text().strip():
                 self.web_edit.setText(str(max(1.0, round(0.08 * B, 3))))
+            # si campo placa vacío, asignar valor estimado
+            if not self.plate_thickness_edit.text().strip():
+                self.plate_thickness_edit.setText(str(max(1.0, round(0.06 * B, 3))))
         update_thickness_defaults()
 
         # conectar cambio de selección del combo para actualizar A/B y refrescar preview
@@ -183,6 +193,7 @@ class MainWindow(QMainWindow):
         # conectar cambios en los campos de espesor para refrescar preview
         self.flange_edit.textChanged.connect(lambda *_: self.preview.update())
         self.web_edit.textChanged.connect(lambda *_: self.preview.update())
+        self.plate_thickness_edit.textChanged.connect(lambda *_: self.preview.update())
         # conectar cambios en la tabla (itemChanged y cellChanged por seguridad)
         self.centers_table.itemChanged.connect(lambda *_: self.preview.update())
         self.centers_table.cellChanged.connect(lambda r, c: self.preview.update())
@@ -224,6 +235,8 @@ class MainWindow(QMainWindow):
             'bolt_centers': centers,
             'flange_thickness': float(self.flange_edit.text()) if self.flange_edit.text().strip() != '' else None,
             'web_thickness': float(self.web_edit.text()) if self.web_edit.text().strip() != '' else None
+            ,
+            'plate_thickness': float(self.plate_thickness_edit.text()) if self.plate_thickness_edit.text().strip() != '' else None
         }
         try:
             with open(CONFIG_PATH, 'w', encoding='utf-8') as fh:

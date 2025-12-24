@@ -45,5 +45,6 @@
     ]
   ],
   "flange_thickness": 20.0,
-  "web_thickness": 8.0
+  "web_thickness": 8.0,
+  "plate_thickness": 20.0
 }

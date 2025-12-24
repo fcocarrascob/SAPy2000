@@ -30,6 +30,79 @@ def _created_name_from_ret(ret, fallback=None):
 	return fallback
 
 
+def _ret_code(ret):
+	"""Return the integer return code from a comtypes call result.
+	Handles cases where the call returns a sequence with the code as last element,
+	or returns a plain integer.
+	"""
+	try:
+		if ret is None:
+			return None
+		# sequences (but not strings/bytes)
+		if hasattr(ret, '__len__') and not isinstance(ret, (str, bytes)):
+			try:
+				return int(ret[-1])
+			except Exception:
+				pass
+		# fallback: if it's already an int-like
+		if isinstance(ret, (int,)):
+			return int(ret)
+	except Exception:
+		pass
+	return None
+
+
+def proparea_exists(SapModel, name):
+	try:
+		try:
+			ret = SapModel.PropArea.GetNameList()
+		except Exception:
+			ret = SapModel.PropArea.GetNameList(0, [])
+	except Exception:
+		return False
+	rc = _ret_code(ret)
+	if rc is not None and rc != 0:
+		return False
+	# ret may be [NumberNames, NameArray, RetCode]
+	try:
+		names = ret[1]
+		if names is None:
+			return False
+		return any(str(n) == str(name) for n in names)
+	except Exception:
+		return False
+
+
+def ensure_plate_prop(SapModel, plate_prop_name, plate_thickness):
+	# Try several possible API signatures until one succeeds.
+	attempts = []
+	# Variant: SetShell(Name, ShellType, MatProp, MatAng, Thickness, Bending)
+	# Use ShellType=1 (Shell - thin)
+	attempts.append(lambda: SapModel.PropArea.SetShell(plate_prop_name, 1, "", 0.0, plate_thickness, plate_thickness))
+	# Variant: SetShell(Name, ShellType, IncludeDrillingDOF, MatProp, MatAng, Thickness, Bending)
+	attempts.append(lambda: SapModel.PropArea.SetShell(plate_prop_name, 1, True, "", 0.0, plate_thickness, plate_thickness))
+	# Try SetShell_1 variants if available
+	try:
+		getattr(SapModel.PropArea, 'SetShell_1')
+		attempts.append(lambda: SapModel.PropArea.SetShell_1(plate_prop_name, 1, True, "", 0.0, plate_thickness, plate_thickness))
+		attempts.append(lambda: SapModel.PropArea.SetShell_1(plate_prop_name, 1, "", 0.0, plate_thickness, plate_thickness))
+	except Exception:
+		pass
+
+	for fn in attempts:
+		try:
+			ret = fn()
+			rc = _ret_code(ret)
+			if rc == 0:
+				return True
+		except Exception:
+			# ignore and try next
+			continue
+
+	# final check: does the property exist in the model?
+	return proparea_exists(SapModel, plate_prop_name)
+
+
 def map_dia_to_AB(dia):
 	"""Mapea diámetro (mm) a (A,B) según tabla aproximada usada en el proyecto."""
 	try:
@@ -152,25 +225,41 @@ def sort_points_by_angle(SapModel, point_names, center=None):
 	return [p[0] for p in pts]
 
 
-def create_area_by_point_names(SapModel, point_name_list, area_user_name=''):
+def create_area_by_point_names(SapModel, point_name_list, area_user_name='', prop_name=None):
+	"""Create an area by point names. If `prop_name` is provided, pass it to AddByPoint so
+	the property is assigned at creation time (API supports PropName parameter).
+	Returns (ok, created_name, raw_ret).
+	"""
 	try:
-		ret = SapModel.AreaObj.AddByPoint(len(point_name_list), point_name_list, area_user_name)
+		if prop_name is None:
+			ret = SapModel.AreaObj.AddByPoint(len(point_name_list), point_name_list, area_user_name)
+		else:
+			ret = SapModel.AreaObj.AddByPoint(len(point_name_list), point_name_list, area_user_name, prop_name)
 	except Exception:
 		try:
-			ret = SapModel.AreaObj.AddByPoint(len(point_name_list), point_name_list, area_user_name)
+			if prop_name is None:
+				ret = SapModel.AreaObj.AddByPoint(len(point_name_list), point_name_list, area_user_name)
+			else:
+				ret = SapModel.AreaObj.AddByPoint(len(point_name_list), point_name_list, area_user_name, prop_name)
 		except Exception as e:
 			print(f"Error llamando AreaObj.AddByPoint: {e}")
 			return False, None, None
 	ok = _ret_ok(ret)
 	created_name = None
 	if ok:
-		created_name = _created_name_from_ret(ret, fallback=area_user_name)
+		# Prefer the user-supplied area name when creation succeeded. Some COM returns
+		# may include unrelated names (e.g. point lists) as first element; using the
+		# requested `area_user_name` avoids mixing point names into area name checks.
+		if area_user_name:
+			created_name = area_user_name
+		else:
+			created_name = _created_name_from_ret(ret, fallback=area_user_name)
 	else:
-		print(f"Error creando área con puntos {point_name_list}: código {ret[-1] if ret else 'N/A'}")
+		print(f"Error creando área con puntos {point_name_list}: retorno completo={ret}")
 	return ok, created_name, ret
 
 
-def create_ring_areas(SapModel, inner_pts, outer_pts, area_name_prefix='A_r'):
+def create_ring_areas(SapModel, inner_pts, outer_pts, area_name_prefix='A_r', prop_name=None):
 	if len(inner_pts) != len(outer_pts):
 		print("Error: inner_pts y outer_pts deben tener la misma cantidad de puntos.")
 		return []
@@ -234,7 +323,7 @@ def create_ring_areas(SapModel, inner_pts, outer_pts, area_name_prefix='A_r'):
 		p4 = outer_sorted[i]
 		area_pts = [p1, p2, p3, p4]
 		area_name = f"{area_name_prefix}_{i+1}"
-		ok, created_name, ret = create_area_by_point_names(SapModel, area_pts, area_name)
+		ok, created_name, ret = create_area_by_point_names(SapModel, area_pts, area_name, prop_name=prop_name)
 		results.append((created_name or area_name, ok))
 	return results
 
@@ -278,8 +367,43 @@ if __name__ == '__main__':
 		print(f"Aviso: no se pudo leer config JSON: {e}")
 		bolt_centers = None
 
+	# obtener espesor de placa desde config si viene
+	plate_thickness = None
+	try:
+		if 'cfg' in locals() and isinstance(cfg, dict):
+			pt = cfg.get('plate_thickness')
+			if pt is not None:
+				plate_thickness = float(pt)
+	except Exception:
+		plate_thickness = None
+
 	# Calcular A y B a partir del diámetro (hardcode mapping)
 	A, B = map_dia_to_AB(bolt_dia)
+
+	# Si se definió espesor de placa, crear propiedad de área para placas
+	plate_prop_name = None
+	if plate_thickness is not None:
+		plate_prop_name = 'PLACA_BASE'
+		try:
+			ok = ensure_plate_prop(SapModel, plate_prop_name, plate_thickness)
+			if not ok:
+				print(f"Advertencia: no se pudo crear propiedad de área '{plate_prop_name}' con los intentos disponibles.")
+		except Exception as e:
+			print(f"Advertencia: excepción creando propiedad de área para placa: {e}")
+		# Imprimir lista exacta de propiedades de área existentes (diagnóstico)
+		try:
+			ret_names = None
+			try:
+				ret_names = SapModel.PropArea.GetNameList()
+			except Exception:
+				ret_names = SapModel.PropArea.GetNameList(0, [])
+			rc = _ret_code(ret_names)
+			if rc == 0 and ret_names is not None and len(ret_names) > 1:
+				print(f"Propiedades de área en el modelo (GetNameList): {list(ret_names[1])}")
+			else:
+				print(f"Advertencia: no se pudo obtener lista de propiedades de área: codigo {rc if rc is not None else 'N/A'}")
+		except Exception:
+			pass
 
 	# Definir bolt_centers por defecto si no vienen desde config
 	if 'bolt_centers' not in locals() or bolt_centers is None:
@@ -322,10 +446,30 @@ if __name__ == '__main__':
 		inner_square_point_ids = create_square_points(SapModel, inner_side, z=cz, cx=cx, cy=cy, prefix=f'P_s_inner{idx}_')
 		print(f"[{idx}] Puntos del cuadrado interior creados en ({cx},{cy}):", inner_square_point_ids)
 
-		ring_inner = create_ring_areas(SapModel, circle_point_ids, inner_square_point_ids, area_name_prefix=f'A_ring_in{idx}')
+		ring_inner = create_ring_areas(SapModel, circle_point_ids, inner_square_point_ids, area_name_prefix=f'A_ring_in{idx}', prop_name=plate_prop_name)
 		print(f"[{idx}] Resultado creación áreas anillo interno:", ring_inner)
-		ring_outer = create_ring_areas(SapModel, inner_square_point_ids, square_point_ids, area_name_prefix=f'A_ring_out{idx}')
+		# Verificar que las áreas fueron creadas (usar GetNameList para evitar errores de GetProperty)
+		if plate_prop_name is not None:
+			try:
+				try:
+					ret_names = SapModel.AreaObj.GetNameList()
+				except Exception:
+					ret_names = SapModel.AreaObj.GetNameList(0, [])
+				rc_names = _ret_code(ret_names)
+				existing_areas = list(ret_names[1]) if rc_names == 0 and ret_names is not None and len(ret_names) > 1 else []
+			except Exception:
+				existing_areas = []
+			for nm, ok in ring_inner:
+				if ok and nm:
+					if nm in existing_areas:
+						print(f"Área {nm} creada y presente en el modelo.")
+		ring_outer = create_ring_areas(SapModel, inner_square_point_ids, square_point_ids, area_name_prefix=f'A_ring_out{idx}', prop_name=plate_prop_name)
 		print(f"[{idx}] Resultado creación áreas anillo externo:", ring_outer)
+		if plate_prop_name is not None:
+			for nm, ok in ring_outer:
+				if ok and nm:
+					if nm in existing_areas:
+						print(f"Área {nm} creada y presente en el modelo.")
 
 		all_results.append({'center': (cx, cy, cz), 'ring_inner': ring_inner, 'ring_outer': ring_outer})
 
