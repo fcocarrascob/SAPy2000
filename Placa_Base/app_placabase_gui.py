@@ -54,6 +54,13 @@ class MainWindow(QMainWindow):
         self.add_row_btn.clicked.connect(self.add_row)
         self.remove_row_btn.clicked.connect(self.remove_selected_row)
 
+        # Preset generator: número de pernos por fila y botón generar
+        self.per_row_combo = QComboBox()
+        for n in (2, 3, 4, 5):
+            self.per_row_combo.addItem(str(n), n)
+        self.generate_preset_btn = QPushButton('Generar posiciones (preset)')
+        self.generate_preset_btn.clicked.connect(self.generate_preset_positions)
+
         self.log = QTextEdit()
         self.log.setReadOnly(True)
 
@@ -81,6 +88,10 @@ class MainWindow(QMainWindow):
         form_layout.addWidget(self.centers_table)
         row_btns = QHBoxLayout(); row_btns.addWidget(self.add_row_btn); row_btns.addWidget(self.remove_row_btn)
         form_layout.addLayout(row_btns)
+        # fila para preset
+        preset_row = QHBoxLayout(); preset_row.addWidget(QLabel('Pernos por fila:')); preset_row.addWidget(self.per_row_combo)
+        preset_row.addWidget(self.generate_preset_btn)
+        form_layout.addLayout(preset_row)
 
         btn_row = QHBoxLayout(); btn_row.addWidget(self.save_btn); btn_row.addWidget(self.run_btn)
         form_layout.addLayout(btn_row)
@@ -301,6 +312,52 @@ class MainWindow(QMainWindow):
         rows = sorted([s.row() for s in sel], reverse=True)
         for r in rows:
             self.centers_table.removeRow(r)
+        self.preview.update()
+
+    def generate_preset_positions(self):
+        """Genera posiciones de pernos usando el preset seleccionado (n per fila).
+        Coloca dos filas (y = +H/2, y = -H/2) con `n` posiciones equiespaciadas en X
+        separadas por `A` (respeta alineación central: si n impar incluye 0).
+        """
+
+        try:
+            n = int(self.per_row_combo.currentData())
+        except Exception:
+            QMessageBox.warning(self, 'Error', 'Seleccione número válido de pernos por fila')
+            return
+
+        # obtener diámetro seleccionado y mapear a A,B usando el helper del MainWindow
+        try:
+            dia = float(self.bolt_combo.currentData())
+        except Exception:
+            import re
+            m = re.search(r"(\d+(?:\.\d+)?)", self.bolt_combo.currentText())
+            dia = float(m.group(1)) if m else 25.0
+
+        A, B = self.get_A_B_from_dia(dia)
+
+        try:
+            H = float(self.hcol_edit.text())
+        except Exception:
+            H = 300.0
+
+        # compute x positions centered at 0 with spacing A
+        start = -((n - 1) / 2.0) * A
+        x_positions = [start + i * A for i in range(n)]
+
+        # rows at +H/2 + B/2 and -H/2 - B/2 (B is from bolt diameter mapping)
+        ys = [H / 2.0 + B / 2.0, -H / 2.0 - B / 2.0]
+
+        # populate table
+        self.centers_table.setRowCount(0)
+        for y in ys:
+            for x in x_positions:
+                r = self.centers_table.rowCount()
+                self.centers_table.insertRow(r)
+                self.centers_table.setItem(r, 0, QTableWidgetItem(str(round(x, 6))))
+                self.centers_table.setItem(r, 1, QTableWidgetItem(str(round(y, 6))))
+                self.centers_table.setItem(r, 2, QTableWidgetItem('0.0'))
+
         self.preview.update()
 
     def get_A_B_from_dia(self, dia):

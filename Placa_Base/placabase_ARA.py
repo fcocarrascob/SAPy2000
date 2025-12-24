@@ -230,20 +230,35 @@ def create_area_by_point_names(SapModel, point_name_list, area_user_name='', pro
 	the property is assigned at creation time (API supports PropName parameter).
 	Returns (ok, created_name, raw_ret).
 	"""
-	try:
-		if prop_name is None:
-			ret = SapModel.AreaObj.AddByPoint(len(point_name_list), point_name_list, area_user_name)
-		else:
-			ret = SapModel.AreaObj.AddByPoint(len(point_name_list), point_name_list, area_user_name, prop_name)
-	except Exception:
+	# Try several AddByPoint signatures to ensure we can pass a UserName (5th arg)
+	tried = []
+	def _attempt_call(args):
 		try:
-			if prop_name is None:
-				ret = SapModel.AreaObj.AddByPoint(len(point_name_list), point_name_list, area_user_name)
-			else:
-				ret = SapModel.AreaObj.AddByPoint(len(point_name_list), point_name_list, area_user_name, prop_name)
+			r = getattr(SapModel.AreaObj, 'AddByPoint')(*args)
+			return r
 		except Exception as e:
-			print(f"Error llamando AreaObj.AddByPoint: {e}")
-			return False, None, None
+			tried.append((args, str(e)))
+			return None
+
+	# Common variants to try (NumberPoints, PointList, Name(ByRef), PropName, UserName)
+	attempts = []
+	# Preferred: pass empty Name (will be returned), PropName and UserName explicitly
+	prop_arg = prop_name if prop_name is not None else "Default"
+	attempts.append((len(point_name_list), point_name_list, "", prop_arg, area_user_name))
+	# Some older bindings accept (NumberPoints, PointList, Name, UserName)
+	attempts.append((len(point_name_list), point_name_list, "", area_user_name))
+	# Fallback: original call with Name only
+	attempts.append((len(point_name_list), point_name_list, area_user_name))
+
+	ret = None
+	for args in attempts:
+		ret = _attempt_call(args)
+		if ret is not None:
+			break
+	if ret is None:
+		# all attempts failed
+		print(f"Error llamando AreaObj.AddByPoint (intentos: {len(attempts)}): {tried}")
+		return False, None, None
 	ok = _ret_ok(ret)
 	created_name = None
 	if ok:
@@ -421,6 +436,10 @@ if __name__ == '__main__':
 	all_results = []
 	circle_radius = bolt_dia / 2.0
 	outer_half = float(B) / 2.0
+	total_inner_present = 0
+	total_outer_present = 0
+	total_inner_attempted = 0
+	total_outer_attempted = 0
 	for idx, (cx, cy, cz) in enumerate(bolt_centers, start=1):
 		# crear punto marcador del centro (etiqueta para identificar)
 		center_name = None
@@ -448,7 +467,7 @@ if __name__ == '__main__':
 
 		ring_inner = create_ring_areas(SapModel, circle_point_ids, inner_square_point_ids, area_name_prefix=f'A_ring_in{idx}', prop_name=plate_prop_name)
 		print(f"[{idx}] Resultado creación áreas anillo interno:", ring_inner)
-		# Verificar que las áreas fueron creadas (usar GetNameList para evitar errores de GetProperty)
+		# Contabilizar creación de áreas interiores (evitar mensajes por cada área)
 		if plate_prop_name is not None:
 			try:
 				try:
@@ -461,15 +480,27 @@ if __name__ == '__main__':
 				existing_areas = []
 			for nm, ok in ring_inner:
 				if ok and nm:
+					total_inner_attempted += 1
 					if nm in existing_areas:
-						print(f"Área {nm} creada y presente en el modelo.")
+						total_inner_present += 1
 		ring_outer = create_ring_areas(SapModel, inner_square_point_ids, square_point_ids, area_name_prefix=f'A_ring_out{idx}', prop_name=plate_prop_name)
 		print(f"[{idx}] Resultado creación áreas anillo externo:", ring_outer)
+		# Actualizar lista de áreas existentes y contabilizar exteriores
 		if plate_prop_name is not None:
+			try:
+				try:
+					ret_names = SapModel.AreaObj.GetNameList()
+				except Exception:
+					ret_names = SapModel.AreaObj.GetNameList(0, [])
+				rc_names = _ret_code(ret_names)
+				existing_areas = list(ret_names[1]) if rc_names == 0 and ret_names is not None and len(ret_names) > 1 else []
+			except Exception:
+				existing_areas = []
 			for nm, ok in ring_outer:
 				if ok and nm:
+					total_outer_attempted += 1
 					if nm in existing_areas:
-						print(f"Área {nm} creada y presente en el modelo.")
+						total_outer_present += 1
 
 		all_results.append({'center': (cx, cy, cz), 'ring_inner': ring_inner, 'ring_outer': ring_outer})
 
@@ -478,4 +509,17 @@ if __name__ == '__main__':
 		SapModel.View.RefreshWindow()
 	except Exception:
 		pass
+
+# Resumen global al final
+try:
+	total_centers = len(all_results)
+	total_inner = sum(len(r['ring_inner']) for r in all_results)
+	total_outer = sum(len(r['ring_outer']) for r in all_results)
+	print('\nResumen global:')
+	print(f'  Centros procesados: {total_centers}')
+	print(f'  Áreas interiores creadas (intentos): {total_inner_attempted}  presentes en modelo: {total_inner_present}')
+	print(f'  Áreas exteriores creadas (intentos): {total_outer_attempted}  presentes en modelo: {total_outer_present}')
+	print(f'  Total áreas (anillos interiores+exteriores): {total_inner + total_outer}')
+except Exception:
+	pass
 
