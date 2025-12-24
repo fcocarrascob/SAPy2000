@@ -246,11 +246,19 @@ if __name__ == '__main__':
 		A = 100; B = 100
 
 	# Lista de posiciones de centros de pernos: definir aquí (x, y, z) en mm
+	n_pernos = 4
+	H_col = 300.0
+	B_col = 250.0
 	bolt_centers = [
-		(0.0, 0.0, 0.0),
-		(150.0, 0.0, 0.0),
-		(0.0, 150.0, 0.0),
-	]
+        (A/2.0, H_col/2.0, 0.0),
+        (3*A/2.0, H_col/2.0, 0.0),
+        (-A/2.0, H_col/2.0, 0.0),
+        (-3*A/2.0, H_col/2.0, 0.0),
+		(A/2.0, -H_col/2.0, 0.0),
+        (3*A/2.0, -H_col/2.0, 0.0),
+        (-A/2.0, -H_col/2.0, 0.0),
+        (-3*A/2.0, -H_col/2.0, 0.0),
+		]
 
 	all_results = []
 	circle_radius = bolt_dia / 2.0
