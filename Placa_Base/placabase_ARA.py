@@ -96,15 +96,36 @@ def get_point_coord(SapModel, point_name):
 	return True, (ret[0], ret[1], ret[2])
 
 
-def sort_points_by_angle(SapModel, point_names):
-	pts = []
+def sort_points_by_angle(SapModel, point_names, center=None):
+	"""Ordena `point_names` por ángulo polar respecto a `center`.
+	Si `center` es None, se calcula como la media de las coordenadas válidas.
+	"""
+	coords = []
 	for pn in point_names:
 		ok, coord = get_point_coord(SapModel, pn)
-		if not ok:
+		if ok:
+			coords.append((pn, coord[0], coord[1]))
+		else:
+			coords.append((pn, None, None))
+
+	# calcular centro si no se entrega
+	if center is None:
+		xs = [c[1] for c in coords if c[1] is not None]
+		ys = [c[2] for c in coords if c[2] is not None]
+		if xs and ys:
+			cx = sum(xs) / len(xs)
+			cy = sum(ys) / len(ys)
+		else:
+			cx, cy = 0.0, 0.0
+	else:
+		cx, cy = float(center[0]), float(center[1])
+
+	pts = []
+	for pn, x, y in coords:
+		if x is None:
 			pts.append((pn, float('-inf')))
 		else:
-			x, y, _ = coord
-			ang = math.atan2(y, x)
+			ang = math.atan2(y - cy, x - cx)
 			pts.append((pn, ang))
 	pts.sort(key=lambda t: t[1])
 	return [p[0] for p in pts]
@@ -132,8 +153,57 @@ def create_ring_areas(SapModel, inner_pts, outer_pts, area_name_prefix='A_r'):
 	if len(inner_pts) != len(outer_pts):
 		print("Error: inner_pts y outer_pts deben tener la misma cantidad de puntos.")
 		return []
-	inner_sorted = sort_points_by_angle(SapModel, inner_pts)
-	outer_sorted = sort_points_by_angle(SapModel, outer_pts)
+	# Calcular centro promedio común para ordenar ambos anillos coherentemente
+	xs = []
+	ys = []
+	for pn in inner_pts + outer_pts:
+		ok, coord = get_point_coord(SapModel, pn)
+		if ok:
+			xs.append(coord[0])
+			ys.append(coord[1])
+	if xs and ys:
+		center = (sum(xs) / len(xs), sum(ys) / len(ys))
+	else:
+		center = (0.0, 0.0)
+
+	inner_sorted = sort_points_by_angle(SapModel, inner_pts, center=center)
+	outer_sorted = sort_points_by_angle(SapModel, outer_pts, center=center)
+
+	# Alineamiento rotacional: rotar outer_sorted para minimizar la diferencia angular
+	def _angles_for(point_list):
+		angs = []
+		for pn in point_list:
+			ok, coord = get_point_coord(SapModel, pn)
+			if not ok:
+				angs.append(None)
+			else:
+				angs.append(math.atan2(coord[1] - center[1], coord[0] - center[0]))
+		return angs
+
+	inner_angles = _angles_for(inner_sorted)
+	outer_angles = _angles_for(outer_sorted)
+	n = len(inner_angles)
+	# función de diferencia angular mínima
+	def ang_diff(a, b):
+		d = abs(a - b) % (2 * math.pi)
+		return min(d, 2 * math.pi - d)
+
+	best_shift = 0
+	best_score = float('inf')
+	for shift in range(n):
+		score = 0.0
+		for i in range(n):
+			a = inner_angles[i]
+			b = outer_angles[(i + shift) % n]
+			if a is None or b is None:
+				score += 1e6
+			else:
+				score += ang_diff(a, b)
+		if score < best_score:
+			best_score = score
+			best_shift = shift
+	if best_shift != 0:
+		outer_sorted = outer_sorted[best_shift:] + outer_sorted[:best_shift]
 	n = len(inner_sorted)
 	results = []
 	for i in range(n):
@@ -175,23 +245,47 @@ if __name__ == '__main__':
 	else:
 		A = 100; B = 100
 
+	# Lista de posiciones de centros de pernos: definir aquí (x, y, z) en mm
+	bolt_centers = [
+		(0.0, 0.0, 0.0),
+		(150.0, 0.0, 0.0),
+		(0.0, 150.0, 0.0),
+	]
+
+	all_results = []
 	circle_radius = bolt_dia / 2.0
-	circle_point_ids = create_circle_points(SapModel, circle_radius, num_points=8, z=0.0, prefix='P_c')
-	print("Puntos del círculo creados:", circle_point_ids)
-
 	outer_half = float(B) / 2.0
-	square_point_ids = create_square_points(SapModel, B, z=0.0, prefix='P_s_outer')
-	print("Puntos del cuadrado exterior creados:", square_point_ids)
+	for idx, (cx, cy, cz) in enumerate(bolt_centers, start=1):
+		# crear punto marcador del centro (etiqueta para identificar)
+		center_name = None
+		try:
+			retc = SapModel.PointObj.AddCartesian(cx, cy, cz, "", f'CENTER_{idx}')
+		except Exception:
+			retc = SapModel.PointObj.AddCartesian(cx, cy, cz)
+		if _ret_ok(retc):
+			center_name = _created_name_from_ret(retc, fallback=f'CENTER_{idx}')
+			print(f"[{idx}] Punto centro creado: {center_name} @ ({cx},{cy},{cz})")
+		else:
+			print(f"[{idx}] Error creando punto centro: codigo {retc[-1] if retc else 'N/A'}")
 
-	inner_half = (circle_radius + outer_half) / 2.0
-	inner_side = inner_half * 2.0
-	inner_square_point_ids = create_square_points(SapModel, inner_side, z=0.0, prefix='P_s_inner')
-	print("Puntos del cuadrado interior creados:", inner_square_point_ids)
+		# crear círculo y cuadrados centrados en (cx,cy,cz)
+		circle_point_ids = create_circle_points(SapModel, circle_radius, num_points=8, z=cz, cx=cx, cy=cy, prefix=f'P_c{idx}_')
+		print(f"[{idx}] Puntos del círculo creados en ({cx},{cy}):", circle_point_ids)
 
-	ring_inner = create_ring_areas(SapModel, circle_point_ids, inner_square_point_ids, area_name_prefix='A_ring_in')
-	print("Resultado creación áreas anillo interno:", ring_inner)
-	ring_outer = create_ring_areas(SapModel, inner_square_point_ids, square_point_ids, area_name_prefix='A_ring_out')
-	print("Resultado creación áreas anillo externo:", ring_outer)
+		square_point_ids = create_square_points(SapModel, B, z=cz, cx=cx, cy=cy, prefix=f'P_s_outer{idx}_')
+		print(f"[{idx}] Puntos del cuadrado exterior creados en ({cx},{cy}):", square_point_ids)
+
+		inner_half = (circle_radius + outer_half) / 2.0
+		inner_side = inner_half * 2.0
+		inner_square_point_ids = create_square_points(SapModel, inner_side, z=cz, cx=cx, cy=cy, prefix=f'P_s_inner{idx}_')
+		print(f"[{idx}] Puntos del cuadrado interior creados en ({cx},{cy}):", inner_square_point_ids)
+
+		ring_inner = create_ring_areas(SapModel, circle_point_ids, inner_square_point_ids, area_name_prefix=f'A_ring_in{idx}')
+		print(f"[{idx}] Resultado creación áreas anillo interno:", ring_inner)
+		ring_outer = create_ring_areas(SapModel, inner_square_point_ids, square_point_ids, area_name_prefix=f'A_ring_out{idx}')
+		print(f"[{idx}] Resultado creación áreas anillo externo:", ring_outer)
+
+		all_results.append({'center': (cx, cy, cz), 'ring_inner': ring_inner, 'ring_outer': ring_outer})
 
 	try:
 		SapModel.View.RefreshView(0, False)
