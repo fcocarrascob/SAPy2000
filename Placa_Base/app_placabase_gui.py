@@ -151,6 +151,20 @@ class MainWindow(QMainWindow):
                         self.plate_thickness_edit.setText(str(cfg.get('plate_thickness', '20.0')))
                     except Exception:
                         pass
+                # restaurar per-row (n_pernos) si existe en config
+                try:
+                    cfg_n = cfg.get('n_pernos')
+                    if cfg_n is not None:
+                        # buscar índice con userData == cfg_n
+                        found_idx = -1
+                        for i in range(self.per_row_combo.count()):
+                            if int(self.per_row_combo.itemData(i)) == int(cfg_n):
+                                found_idx = i
+                                break
+                        if found_idx >= 0:
+                            self.per_row_combo.setCurrentIndex(found_idx)
+                except Exception:
+                    pass
                 centers = cfg.get('bolt_centers')
                 if centers:
                     # llenar tabla
@@ -243,6 +257,7 @@ class MainWindow(QMainWindow):
             'bolt_dia': bolt_dia,
             'H_col': H_col,
             'B_col': B_col,
+            'n_pernos': int(self.per_row_combo.currentData()),
             'bolt_centers': centers,
             'flange_thickness': float(self.flange_edit.text()) if self.flange_edit.text().strip() != '' else None,
             'web_thickness': float(self.web_edit.text()) if self.web_edit.text().strip() != '' else None

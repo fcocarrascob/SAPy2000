@@ -89,6 +89,55 @@ def ensure_plate_prop(SapModel, plate_prop_name, plate_thickness):
 	except Exception:
 		pass
 
+	# Crear áreas por coordenadas para simular las alas y alma de la columna usando H_col/B_col
+	try:
+		# asegurarse de tener H_col y B_col
+		H = float(H_col) if 'H_col' in locals() else float(H_col)
+		B = float(B_col) if 'B_col' in locals() else float(B_col)
+		z_col = 2.0 * H
+		# espesores con fallback a estimaciones si no vienen
+		try:
+			ft = float(flange_thickness)
+		except Exception:
+			ft = max(1.0, round(0.12 * H, 3))
+		try:
+			wt = float(web_thickness)
+		except Exception:
+			wt = max(1.0, round(0.08 * B, 3))
+
+		# TOP flange (ALA)
+		np = 4
+		x_top = (-B / 2.0, B / 2.0, B / 2.0, -B / 2.0)
+		y_top = (H / 2.0, H / 2.0, H / 2.0, H / 2.0)
+		z_top = (0.0, 0.0, z_col, z_col)
+		ok, name, ret = add_area_by_coord(SapModel, x_top, y_top, z_top, area_user_name='ALA_top', prop_name='ALA', user_name='COL_FLANGE_TOP')
+		if ok:
+			print(f"Área 'ALA_top' creada.")
+		else:
+			print(f"No se creó 'ALA_top': {ret}")
+
+		# BOTTOM flange (ALA)
+		x_bot = (-B / 2.0, B / 2.0, B / 2.0, -B / 2.0)
+		y_bot = (-H / 2.0, -H / 2.0, -H / 2.0, -H / 2.0)
+		z_bot = (0.0, 0.0, z_col, z_col)
+		ok, name, ret = add_area_by_coord(SapModel, x_bot, y_bot, z_bot, area_user_name='ALA_bot', prop_name='ALA', user_name='COL_FLANGE_BOTTOM')
+		if ok:
+			print(f"Área 'ALA_bot' creada.")
+		else:
+			print(f"No se creó 'ALA_bot': {ret}")
+
+		# WEB (ALMA) — coordenadas solicitadas: x=(0,0,0,0); y=(h_col/2,-h_col/2,-h_col/2,h_col/2); z=(0,0,z_col,z_col)
+		x_web = (0.0, 0.0, 0.0, 0.0)
+		y_web = (H / 2.0, -H / 2.0, -H / 2.0, H / 2.0)
+		z_web = (0.0, 0.0, z_col, z_col)
+		ok, name, ret = add_area_by_coord(SapModel, x_web, y_web, z_web, area_user_name='ALMA_web', prop_name='ALMA', user_name='COL_WEB')
+		if ok:
+			print(f"Área 'ALMA_web' creada.")
+		else:
+			print(f"No se creó 'ALMA_web': {ret}")
+
+	except Exception as e:
+		print(f"Excepción creando áreas de alas/alma: {e}")
 	for fn in attempts:
 		try:
 			ret = fn()
@@ -361,6 +410,51 @@ def create_ring_areas(SapModel, inner_pts, outer_pts, area_name_prefix='A_r', pr
 	return results
 
 
+def add_area_by_coord(SapModel, xs, ys, zs, area_user_name='', prop_name=None, user_name=None, coord_sys='Global'):
+	"""Wrapper that tries several AddByCoord signatures.
+	xs, ys, zs: sequences of coordinates (NumberPoints must match)
+	Returns (ok, created_name, raw_ret)
+	"""
+	np = len(xs)
+	tried = []
+	def _call(args):
+		try:
+			r = getattr(SapModel.AreaObj, 'AddByCoord')(*args)
+			return r
+		except Exception as e:
+			tried.append((args, str(e)))
+			return None
+
+	attempts = []
+	# Full signature: (NumberPoints, X, Y, Z, Name, PropName, UserName, CoordSys)
+	attempts.append((np, xs, ys, zs, area_user_name or "", prop_name or "", user_name or "", coord_sys))
+	# Without CoordSys
+	attempts.append((np, xs, ys, zs, area_user_name or "", prop_name or "", user_name or ""))
+	# Minimal: (NumberPoints, X, Y, Z, Name, PropName)
+	attempts.append((np, xs, ys, zs, area_user_name or "", prop_name or ""))
+	# Fallback: no Name, pass PropName only
+	attempts.append((np, xs, ys, zs, prop_name or ""))
+
+	ret = None
+	for a in attempts:
+		ret = _call(a)
+		if ret is not None:
+			break
+	if ret is None:
+		print(f"Error llamando AreaObj.AddByCoord (intentos: {len(attempts)}): {tried}")
+		return False, None, None
+	ok = _ret_ok(ret)
+	created = None
+	if ok:
+		if area_user_name:
+			created = area_user_name
+		else:
+			created = _created_name_from_ret(ret, fallback=area_user_name)
+	else:
+		print(f"Error AddByCoord: retorno completo={ret}")
+	return ok, created, ret
+
+
 if __name__ == '__main__':
 	# parámetros mínimos para crear los anillos
 	bolt_dia = 25.0
@@ -394,6 +488,18 @@ if __name__ == '__main__':
 					bolt_centers = [tuple(map(float, c)) for c in cfg['bolt_centers']]
 				except Exception:
 					bolt_centers = None
+
+			# leer espesores de ala y alma si vienen en la config
+			try:
+				flange_thickness = cfg.get('flange_thickness') if isinstance(cfg, dict) else None
+				web_thickness = cfg.get('web_thickness') if isinstance(cfg, dict) else None
+				if flange_thickness is not None:
+					flange_thickness = float(flange_thickness)
+				if web_thickness is not None:
+					web_thickness = float(web_thickness)
+			except Exception:
+				flange_thickness = None
+				web_thickness = None
 		else:
 			bolt_centers = None
 	except Exception as e:
@@ -409,6 +515,14 @@ if __name__ == '__main__':
 				plate_thickness = float(pt)
 	except Exception:
 		plate_thickness = None
+
+	# leer número de pernos por fila si viene en la config (n_pernos)
+	try:
+		if 'cfg' in locals() and isinstance(cfg, dict) and 'n_pernos' in cfg:
+			n_pernos = int(cfg.get('n_pernos'))
+	except Exception:
+		# mantener valor por defecto si falla
+		pass
 
 	# Calcular A y B a partir del diámetro (hardcode mapping)
 	A, B = map_dia_to_AB(bolt_dia)
@@ -438,6 +552,53 @@ if __name__ == '__main__':
 		except Exception:
 			pass
 
+	# Crear propiedades de área para ala y alma si el usuario especificó espesores
+	# Preferimos usar SetShell_1 con material A992Fy50 (si está disponible), con fallback a SetShell
+	try:
+		mat_name = "A992Fy50"
+		# Ala (flange)
+		if 'flange_thickness' in locals() and flange_thickness is not None:
+			ft = float(flange_thickness)
+			created = False
+			try:
+				if getattr(SapModel.PropArea, 'SetShell_1', None):
+					ret = SapModel.PropArea.SetShell_1("ALA", 1, True, mat_name, 0, ft, ft)
+				else:
+					ret = SapModel.PropArea.SetShell("ALA", 1, True, mat_name, 0, ft, ft)
+				if _ret_ok(ret):
+					print(f"Propiedad de área 'ALA' creada con espesor {ft} mm.")
+					created = True
+			except Exception as e_ala:
+				# intento alternativo sin IncludeDrillingDOF param
+				try:
+					ret = SapModel.PropArea.SetShell("ALA", 1, "", 0.0, ft, ft)
+					if _ret_ok(ret):
+						print(f"Propiedad de área 'ALA' creada (fallback) con espesor {ft} mm.")
+						created = True
+				except Exception:
+					print(f"No se pudo crear propiedad 'ALA': {e_ala}")
+
+		# Alma (web)
+		if 'web_thickness' in locals() and web_thickness is not None:
+			wt = float(web_thickness)
+			try:
+				if getattr(SapModel.PropArea, 'SetShell_1', None):
+					ret = SapModel.PropArea.SetShell_1("ALMA", 1, True, mat_name, 0, wt, wt)
+				else:
+					ret = SapModel.PropArea.SetShell("ALMA", 1, True, mat_name, 0, wt, wt)
+				if _ret_ok(ret):
+					print(f"Propiedad de área 'ALMA' creada con espesor {wt} mm.")
+			except Exception as e_alma:
+				try:
+					ret = SapModel.PropArea.SetShell("ALMA", 1, "", 0.0, wt, wt)
+					if _ret_ok(ret):
+						print(f"Propiedad de área 'ALMA' creada (fallback) con espesor {wt} mm.")
+				except Exception:
+					print(f"No se pudo crear propiedad 'ALMA': {e_alma}")
+
+	except Exception:
+		pass
+
 	# Definir bolt_centers por defecto si no vienen desde config
 	if 'bolt_centers' not in locals() or bolt_centers is None:
 		bolt_centers = [
@@ -452,6 +613,7 @@ if __name__ == '__main__':
 		]
 
 	all_results = []
+	outer_square_points_by_center = []
 	circle_radius = bolt_dia / 2.0
 	outer_half = float(B) / 2.0
 	total_inner_present = 0
@@ -477,6 +639,8 @@ if __name__ == '__main__':
 
 		square_point_ids = create_square_points(SapModel, B, z=cz, cx=cx, cy=cy, prefix=f'P_s_outer{idx}_')
 		print(f"[{idx}] Puntos del cuadrado exterior creados en ({cx},{cy}):", square_point_ids)
+		# guardar lista de puntos exteriores para referencia posterior
+		outer_square_points_by_center.append(square_point_ids)
 
 		inner_half = (circle_radius + outer_half) / 2.0
 		inner_side = inner_half * 2.0
@@ -522,11 +686,66 @@ if __name__ == '__main__':
 
 		all_results.append({'center': (cx, cy, cz), 'ring_inner': ring_inner, 'ring_outer': ring_outer})
 
+# Crear un área que una puntos exteriores específicos si tenemos la disposición en dos filas
+try:
 	try:
-		SapModel.View.RefreshView(0, False)
-		SapModel.View.RefreshWindow()
+		total_centers = len(bolt_centers)
 	except Exception:
-		pass
+		total_centers = 0
+	# necesitamos al menos 4 centros para definir N y 2N
+	if total_centers >= 4 and len(outer_square_points_by_center) == total_centers:
+		N = total_centers // 2
+		# índices de centros (1-based): 1, N, 2N, N+1
+		idx1 = 1
+		idxN = N
+		idx2N = 2 * N
+		idxNp1 = N + 1
+		try:
+			p1 = outer_square_points_by_center[idx1 - 1][12]  # P_s_outer1_13 (13º)
+			p2 = outer_square_points_by_center[idxN - 1][8]   # P_s_outerN_9 (9º)
+			p3 = outer_square_points_by_center[idx2N - 1][4]  # P_s_outer2N_5 (5º)
+			p4 = outer_square_points_by_center[idxNp1 - 1][0] # P_s_outer(N+1)_1 (1º)
+			special_pts = [p1, p2, p3, p4]
+			if all(special_pts):
+				ok, created_name, ret = create_area_by_point_names(SapModel, special_pts, area_user_name='A_outer_link', prop_name=plate_prop_name)
+				if ok:
+					print(f"Área 'A_outer_link' creada conectando puntos: {special_pts}")
+					# Intentar dividir el área creada usando n_pernos (número de pernos por fila)
+					try:
+						area_name_to_divide = created_name or 'A_outer_link'
+						# Llamada típica: EditArea.Divide(AreaName, NumberPoint, PointName, PointList, NumDivisions, DivisionType)
+						# Usamos la firma solicitada: (area, 1, 0, [], 4*n_pernos, 10)
+						try:
+							ret_div = SapModel.EditArea.Divide(area_name_to_divide, 1, 0, [], 4 * n_pernos, 10)
+						except Exception:
+							# intentar sin pasar lista vacía explícita (algunas bindings requieren fewer args)
+							try:
+								ret_div = SapModel.EditArea.Divide(area_name_to_divide, 1, 0, 4 * n_pernos, 10)
+							except Exception as e_div:
+								ret_div = None
+								print(f"Excepción llamando EditArea.Divide: {e_div}")
+						if ret_div is not None:
+							if _ret_ok(ret_div):
+								print(f"Área '{area_name_to_divide}' dividida correctamente (4*n_pernos={4 * n_pernos}).")
+							else:
+								print(f"EditArea.Divide retornó código: {_ret_code(ret_div)}; retorno completo={ret_div}")
+					except Exception as e:
+						print(f"Error al dividir área 'A_outer_link': {e}")
+				else:
+					print(f"No se pudo crear área 'A_outer_link': retorno={ret}")
+			else:
+				print("No se creará área 'A_outer_link' porque faltan puntos requeridos.")
+		except Exception as e:
+			print(f"Excepción creando área 'A_outer_link': {e}")
+
+except Exception:
+	pass
+
+try:
+	SapModel.View.RefreshView(0, False)
+	SapModel.View.RefreshWindow()
+except Exception:
+	pass
 
 # Resumen global al final
 try:
