@@ -20,7 +20,7 @@ flowchart TD
   RingInner["create_ring_areas<br/>inner=circle, outer=inner_square<br/>AreaObj.AddByPoint o AddByCoord"]
   RingOuter["create_ring_areas<br/>inner=inner_square, outer=outer_square<br/>AreaObj.AddByPoint o AddByCoord"]
   LinkArea["Crear área especial A_outer_link<br/>si hay suficientes centros"]
-  DivideArea["EditArea.Divide<br/>intento con varias firmas"]
+  DivideArea["EditArea.Divide('A_outer_link', 1, 0, [], n_pernos*4, 10)"]
   REF["View.RefreshView o RefreshWindow"]
   Summary["Imprimir resumen y contadores"]
   End([Fin])
@@ -30,16 +30,6 @@ flowchart TD
   CreateInnerSquare --> RingInner --> RingOuter
   RingOuter --> LOOP
   LOOP --> LinkArea --> DivideArea --> REF --> Summary --> End
-
-  subgraph Fallbacks["Gestión de firmas y reintentos"]
-    F1["Intentar firma principal<br/>por ejemplo SetShell_1"]
-    F2["Si falla intentar SetShell"]
-    F3["Si falla intentar otras variantes<br/>argumentos distintos"]
-    DoneF["Éxito o continuar"]
-    F1 -->|ok| DoneF
-    F1 -->|error| F2 -->|error| F3 --> DoneF
-  end
-  PROP --> Fallbacks
 
   subgraph CheckRet["Verificación de retorno COM"]
     C1["Comprobar retorno<br/>_ret_code o _ret_ok"]
