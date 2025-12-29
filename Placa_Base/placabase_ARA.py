@@ -124,9 +124,9 @@ def map_dia_to_AB(dia):
 	return mapping.get(d, (100, 100))
 
 
-def create_circle_points(SapModel, radius, num_points=8, z=0.0, cx=0.0, cy=0.0, prefix='P_c'):
-	"""Crea puntos en un círculo centrado en (cx,cy, z). Mantiene compatibilidad con el argumento `z`.
-	Devuelve lista de nombres.
+def create_circle_points(SapModel, radius, num_points=16, z=0.0, cx=0.0, cy=0.0, prefix='P_c'):
+	"""Crea puntos en un círculo centrado en (cx,cy, z).
+	Ahora por defecto genera 16 puntos (antes 8). Devuelve lista de nombres.
 	"""
 	point_names = []
 	for j in range(num_points):
@@ -147,26 +147,44 @@ def create_circle_points(SapModel, radius, num_points=8, z=0.0, cx=0.0, cy=0.0, 
 	return point_names
 
 
-def create_square_points(SapModel, side_length, z=0.0, cx=0.0, cy=0.0, prefix='P_s'):
-	"""Crea 8 puntos de un cuadrado centrado en (cx,cy) a altura `z`.
-	Orden: arriba-izq, arriba-centro, arriba-der, derecha-centro, abajo-der, abajo-centro, abajo-izq, izquierda-centro
+def create_square_points(SapModel, side_length, z=0.0, cx=0.0, cy=0.0, prefix='P_s', num_points=16):
+	"""Crea `num_points` puntos distribuidos uniformemente a lo largo del perímetro
+	de un cuadrado centrado en (cx,cy) a altura `z`.
+	Por defecto `num_points=16` (doble de los 8 originales).
+	El orden comienza en la esquina superior izquierda y avanza en sentido horario.
 	"""
 	half = float(side_length) / 2.0
-	coords = [
-		(-half,  half),
-		( 0.0,   half),
-		( half,  half),
-		( half,  0.0),
-		( half, -half),
-		( 0.0,  -half),
-		(-half, -half),
-		(-half,  0.0),
-	]
+	if num_points < 4:
+		num_points = 4
+	perimeter = 4.0 * float(side_length)
 	point_names = []
-	for i, (dx, dy) in enumerate(coords, start=1):
-		x = float(cx) + float(dx)
-		y = float(cy) + float(dy)
-		suggested = f"{prefix}{i}"
+	for i in range(num_points):
+		# distancia a lo largo del perímetro [0, perimeter)
+		s = (i * perimeter) / num_points
+		# determinar qué lado corresponde
+		side_len = float(side_length)
+		if s < side_len:
+			# Top edge: from (-half, half) to (half, half)
+			x = -half + s
+			y = half
+		elif s < 2 * side_len:
+			# Right edge: from (half, half) to (half, -half)
+			s2 = s - side_len
+			x = half
+			y = half - s2
+		elif s < 3 * side_len:
+			# Bottom edge: from (half, -half) to (-half, -half)
+			s2 = s - 2 * side_len
+			x = half - s2
+			y = -half
+		else:
+			# Left edge: from (-half, -half) to (-half, half)
+			s2 = s - 3 * side_len
+			x = -half
+			y = -half + s2
+		x = float(cx) + float(x)
+		y = float(cy) + float(y)
+		suggested = f"{prefix}{i+1}"
 		try:
 			ret = SapModel.PointObj.AddCartesian(x, y, z, "", suggested)
 		except Exception:
@@ -176,7 +194,7 @@ def create_square_points(SapModel, side_length, z=0.0, cx=0.0, cy=0.0, prefix='P
 			point_names.append(name)
 		else:
 			point_names.append(None)
-			print(f"Error al crear punto de cuadrado #{i}: código {ret[-1] if ret else 'N/A'}")
+			print(f"Error al crear punto de cuadrado #{i+1}: código {ret[-1] if ret else 'N/A'}")
 	return point_names
 
 
@@ -454,7 +472,7 @@ if __name__ == '__main__':
 			print(f"[{idx}] Error creando punto centro: codigo {retc[-1] if retc else 'N/A'}")
 
 		# crear círculo y cuadrados centrados en (cx,cy,cz)
-		circle_point_ids = create_circle_points(SapModel, circle_radius, num_points=8, z=cz, cx=cx, cy=cy, prefix=f'P_c{idx}_')
+		circle_point_ids = create_circle_points(SapModel, circle_radius, num_points=16, z=cz, cx=cx, cy=cy, prefix=f'P_c{idx}_')
 		print(f"[{idx}] Puntos del círculo creados en ({cx},{cy}):", circle_point_ids)
 
 		square_point_ids = create_square_points(SapModel, B, z=cz, cx=cx, cy=cy, prefix=f'P_s_outer{idx}_')

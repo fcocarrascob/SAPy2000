@@ -444,12 +444,13 @@ class PreviewWidget(QWidget):
         except Exception:
             centers = []
 
-        # compute scale to fit B x H and bolt extents inside widget with margin
+        # compute scale to fit B x H, bolts and their AxA areas inside widget with margin
         w = rect.width()
         h = rect.height()
         margin = 20
         avail_w = max(10, w - 2 * margin)
         avail_h = max(10, h - 2 * margin)
+
         # determine extents from bolt coordinates (mm)
         max_abs_bx = 0.0
         max_abs_by = 0.0
@@ -459,10 +460,26 @@ class PreviewWidget(QWidget):
                 max_abs_by = max(max_abs_by, abs(float(by)))
             except Exception:
                 continue
+
+        # determine A from selected bolt diameter so we include the AxA area extents
+        try:
+            data = parent.bolt_combo.currentData()
+            if data is None:
+                import re
+                m = re.search(r"(\d+(?:\.\d+)?)", parent.bolt_combo.currentText())
+                dia_val = float(m.group(1)) if m else 100.0
+            else:
+                dia_val = float(data)
+        except Exception:
+            dia_val = 100.0
+        A_val, _ = parent.get_A_B_from_dia(dia_val)
+        half_A_mm = A_val / 2.0
+
         # small buffer in mm so bolts near the border remain visible
         buffer_mm = 10.0
-        required_half_w_mm = max(B / 2.0, max_abs_bx + buffer_mm)
-        required_half_h_mm = max(H / 2.0, max_abs_by + buffer_mm)
+        required_half_w_mm = max(B / 2.0, max_abs_bx + half_A_mm + buffer_mm)
+        required_half_h_mm = max(H / 2.0, max_abs_by + half_A_mm + buffer_mm)
+
         # map mm -> pixels: content width = 2 * required_half_mm
         scale = min(avail_w / (2.0 * required_half_w_mm if required_half_w_mm > 0 else 1.0),
                     avail_h / (2.0 * required_half_h_mm if required_half_h_mm > 0 else 1.0))
@@ -518,6 +535,31 @@ class PreviewWidget(QWidget):
             px = cx0 + bx * scale
             py = cy0 - by * scale  # invert y for screen coords
             painter.drawEllipse(px - bolt_radius_px, py - bolt_radius_px, bolt_radius_px * 2, bolt_radius_px * 2)
+
+        # Draw AxA square around each bolt to preview area size created in SAP2000
+        try:
+            # determine current bolt diameter selection
+            data = parent.bolt_combo.currentData()
+            if data is None:
+                import re
+                m = re.search(r"(\d+(?:\.\d+)?)", parent.bolt_combo.currentText())
+                dia_val = float(m.group(1)) if m else 100.0
+            else:
+                dia_val = float(data)
+        except Exception:
+            dia_val = 100.0
+        A_val, _ = parent.get_A_B_from_dia(dia_val)
+        half_A_px = (A_val / 2.0) * scale
+        # semi-transparent pen for area outline
+        area_pen = QPen(QColor(0, 120, 180), max(1.0, scale * 0.5))
+        area_brush = QBrush(QColor(0, 120, 180, 40))
+        painter.setPen(area_pen)
+        painter.setBrush(area_brush)
+        for (bx, by, bz) in centers:
+            px = cx0 + bx * scale
+            py = cy0 - by * scale
+            rect = QRectF(px - half_A_px, py - half_A_px, 2 * half_A_px, 2 * half_A_px)
+            painter.drawRect(rect)
 
 
 if __name__ == '__main__':
