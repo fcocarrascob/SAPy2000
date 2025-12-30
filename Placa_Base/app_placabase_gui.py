@@ -3,7 +3,7 @@ import os
 import json
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QLineEdit,
                                QTextEdit, QPushButton, QVBoxLayout, QHBoxLayout, QMessageBox, QComboBox,
-                               QTableWidget, QTableWidgetItem)
+                               QTableWidget, QTableWidgetItem, QGroupBox, QGridLayout, QFormLayout)
 from PySide6.QtGui import QPainter, QColor, QPen, QBrush
 from PySide6.QtCore import QSize, QRectF
 from PySide6.QtCore import QProcess, Qt
@@ -70,33 +70,78 @@ class MainWindow(QMainWindow):
         self.save_btn.clicked.connect(self.save_config)
         self.run_btn.clicked.connect(self.run_script)
 
-        form_layout = QVBoxLayout()
-        row = QHBoxLayout(); row.addWidget(QLabel('Diámetro perno:')); row.addWidget(self.bolt_combo)
-        row.addWidget(QLabel('  A:')); row.addWidget(self.A_display)
-        row.addWidget(QLabel('B:')); row.addWidget(self.B_display)
-        form_layout.addLayout(row)
-        row2 = QHBoxLayout(); row2.addWidget(QLabel('Alto columna H_col (mm):')); row2.addWidget(self.hcol_edit)
-        form_layout.addLayout(row2)
-        row3 = QHBoxLayout(); row3.addWidget(QLabel('Ancho columna B_col (mm):')); row3.addWidget(self.bcol_edit)
-        # fila para espesores
-        row_th = QHBoxLayout(); row_th.addWidget(QLabel('Espesor ala (mm):')); row_th.addWidget(self.flange_edit)
-        row_th.addWidget(QLabel('Espesor alma (mm):')); row_th.addWidget(self.web_edit)
-        row_th.addWidget(QLabel('Espesor placa (mm):')); row_th.addWidget(self.plate_thickness_edit)
-        form_layout.addLayout(row_th)
-        form_layout.addLayout(row3)
-        form_layout.addWidget(QLabel('Centros de pernos (tabla X,Y,Z en mm):'))
-        form_layout.addWidget(self.centers_table)
-        row_btns = QHBoxLayout(); row_btns.addWidget(self.add_row_btn); row_btns.addWidget(self.remove_row_btn)
-        form_layout.addLayout(row_btns)
-        # fila para preset
-        preset_row = QHBoxLayout(); preset_row.addWidget(QLabel('Pernos por fila:')); preset_row.addWidget(self.per_row_combo)
-        preset_row.addWidget(self.generate_preset_btn)
-        form_layout.addLayout(preset_row)
+        # --- Layout Construction ---
+        main_form_layout = QVBoxLayout()
 
-        btn_row = QHBoxLayout(); btn_row.addWidget(self.save_btn); btn_row.addWidget(self.run_btn)
-        form_layout.addLayout(btn_row)
-        form_layout.addWidget(QLabel('Salida / Log:'))
-        form_layout.addWidget(self.log)
+        # 1. Grupo Perfil Columna
+        grp_col = QGroupBox("1. Perfil Columna")
+        col_layout = QGridLayout()
+        col_layout.addWidget(QLabel("Alto H_col (mm):"), 0, 0)
+        col_layout.addWidget(self.hcol_edit, 0, 1)
+        col_layout.addWidget(QLabel("Ancho B_col (mm):"), 0, 2)
+        col_layout.addWidget(self.bcol_edit, 0, 3)
+        col_layout.addWidget(QLabel("Espesor Ala (mm):"), 1, 0)
+        col_layout.addWidget(self.flange_edit, 1, 1)
+        col_layout.addWidget(QLabel("Espesor Alma (mm):"), 1, 2)
+        col_layout.addWidget(self.web_edit, 1, 3)
+        grp_col.setLayout(col_layout)
+        main_form_layout.addWidget(grp_col)
+
+        # 2. Grupo Placa Base
+        grp_plate = QGroupBox("2. Placa Base")
+        plate_layout = QHBoxLayout()
+        plate_layout.addWidget(QLabel("Espesor Placa (mm):"))
+        plate_layout.addWidget(self.plate_thickness_edit)
+        plate_layout.addStretch()
+        grp_plate.setLayout(plate_layout)
+        main_form_layout.addWidget(grp_plate)
+
+        # 3. Grupo Pernos
+        grp_bolts = QGroupBox("3. Configuración de Pernos")
+        bolts_layout = QVBoxLayout()
+        
+        # 3.1 Selección Diámetro
+        row_dia = QHBoxLayout()
+        row_dia.addWidget(QLabel("Diámetro:"))
+        row_dia.addWidget(self.bolt_combo)
+        row_dia.addWidget(QLabel("A:"))
+        row_dia.addWidget(self.A_display)
+        row_dia.addWidget(QLabel("B:"))
+        row_dia.addWidget(self.B_display)
+        bolts_layout.addLayout(row_dia)
+
+        # 3.2 Tabla Centros
+        bolts_layout.addWidget(QLabel("Centros de pernos (X, Y, Z):"))
+        bolts_layout.addWidget(self.centers_table)
+        
+        # Botones Tabla
+        row_tbl_btns = QHBoxLayout()
+        row_tbl_btns.addWidget(self.add_row_btn)
+        row_tbl_btns.addWidget(self.remove_row_btn)
+        bolts_layout.addLayout(row_tbl_btns)
+
+        # 3.3 Preset
+        row_preset = QHBoxLayout()
+        row_preset.addWidget(QLabel("Pernos por fila:"))
+        row_preset.addWidget(self.per_row_combo)
+        row_preset.addWidget(self.generate_preset_btn)
+        bolts_layout.addLayout(row_preset)
+        
+        grp_bolts.setLayout(bolts_layout)
+        main_form_layout.addWidget(grp_bolts)
+
+        # 4. Salida / Log
+        grp_out = QGroupBox("4. Salida / Log")
+        out_layout = QVBoxLayout()
+        
+        btn_row = QHBoxLayout()
+        btn_row.addWidget(self.save_btn)
+        btn_row.addWidget(self.run_btn)
+        out_layout.addLayout(btn_row)
+        
+        out_layout.addWidget(self.log)
+        grp_out.setLayout(out_layout)
+        main_form_layout.addWidget(grp_out)
 
         container = QWidget()
         # crear preview a la derecha
@@ -104,7 +149,7 @@ class MainWindow(QMainWindow):
 
         main_layout = QHBoxLayout()
         left_widget = QWidget()
-        left_widget.setLayout(form_layout)
+        left_widget.setLayout(main_form_layout)
         main_layout.addWidget(left_widget, 1)
         main_layout.addWidget(self.preview, 1)
 

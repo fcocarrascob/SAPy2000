@@ -207,6 +207,81 @@ class SapPlateGenerator:
         except Exception as e:
             print(f"Error dividiendo área '{area_name}': {e}")
 
+    def coordinate_range(self, xmin, xmax, ymin, ymax, zmin, zmax,
+                         deselect=False, csys="Global", include_intersections=False,
+                         point=True, line=True, area=True, solid=True, link=True):
+        """
+        Wrapper para SapModel.SelectObj.CoordinateRange con manejo de retornos de comtypes.
+        Retorna (ok: bool, ret_raw)
+        """
+        try:
+            ret = self.SapModel.SelectObj.CoordinateRange(
+                float(xmin), float(xmax),
+                float(ymin), float(ymax),
+                float(zmin), float(zmax),
+                bool(deselect),
+                str(csys),
+                bool(include_intersections),
+                bool(point), bool(line), bool(area), bool(solid), bool(link)
+            )
+        except Exception as e:
+            return False, e
+
+        # ret puede ser int o tuple/list cuyo último elemento es RetCode
+        if isinstance(ret, (list, tuple)):
+            rc = int(ret[-1])
+            return (rc == 0), ret
+        else:
+            return (int(ret) == 0), ret
+
+    def divide_area_by_selection(self, area_name: str) -> List[str]:
+        """
+        Divide `area_name` usando puntos seleccionados en los bordes (MeshType=3).
+        Retorna la lista de nombres de las nuevas áreas creadas.
+        """
+        try:
+            # Firma: Divide(Name, MeshType, NumberAreas, AreaName(), n1, n2, ...)
+            # Retorna tupla: (NumberAreas, AreaName_tuple, RetCode) o similar dependiendo de comtypes
+            ret = self.SapModel.EditArea.Divide(
+                str(area_name), 3, 0, [], 0, 0, 0.0, 0.0, 
+                False, False, True
+            )
+            
+            # Check success
+            if self._check_ret(ret, f"Área '{area_name}' dividida por puntos seleccionados."):
+                # Extract new area names. 
+                # ret structure is typically (NumberAreas, (Name1, Name2, ...), RetCode)
+                # or sometimes just (NumberAreas, (Name1, Name2, ...)) if RetCode is separate?
+                # Based on standard comtypes behavior for ByRef arrays:
+                if len(ret) >= 2:
+                    # ret[1] should be the tuple of names
+                    names = ret[1]
+                    if isinstance(names, (list, tuple)):
+                        return list(names)
+            
+        except Exception as e:
+            print(f"Error dividiendo área '{area_name}' por selección: {e}")
+        return []
+
+    def subdivide_areas(self, area_names: List[str], n1: int = 2, n2: int = 2):
+        """Subdivides a list of areas into n1 x n2 grids."""
+        if not area_names:
+            return
+        
+        print(f"Subdividiendo {len(area_names)} áreas en grilla {n1}x{n2}...")
+        for name in area_names:
+            self.divide_area(name, n1) # divide_area uses n1 for both or we need to update it?
+            # My existing divide_area takes 'n_divisions' and passes it as n1, and hardcodes n2=10?
+            # Let's check existing divide_area implementation.
+            # It was: ret = self.SapModel.EditArea.Divide(area_name, 1, 0, [], n_divisions, 10)
+            # That seems specific to the link area logic (n_pernos*4, 10).
+            # I should probably make a more generic divide function or use the API directly here.
+            
+            try:
+                self.SapModel.EditArea.Divide(name, 1, 0, [], n1, n2)
+            except Exception as e:
+                print(f"Error subdividiendo {name}: {e}")
+
     # --- Geometric Logic ---
 
     def create_circle_points(self, cx, cy, z, radius, num_points=16, prefix="P_c") -> List[str]:
@@ -399,6 +474,96 @@ class SapPlateGenerator:
                         self.divide_area(link_area, 4 * cfg.n_pernos)
             except Exception as e:
                 print(f"No se pudo crear el área de enlace: {e}")
+
+        # 5. Divide Flange by Base Points (New Logic)
+        try:
+            # Clear selection first
+            self.SapModel.SelectObj.ClearSelection()
+            
+            # Select points at the base of the top flange
+            # Flange is at y = H/2, from x = -B/2 to B/2. z = 0.
+            h_col = cfg.H_col
+            b_col = cfg.B_col
+            z_target = 0.0 # Base
+            
+            ok, ret = self.coordinate_range(
+                -b_col/2, b_col/2,    # Xmin, Xmax
+                h_col/2, h_col/2,     # Ymin, Ymax (Top Flange Plane)
+                z_target, z_target,   # Zmin, Zmax (Base)
+                deselect=False,
+                csys="Global",
+                include_intersections=True,
+                point=True, line=False, area=False, solid=False, link=False
+            )
+            
+            if ok:
+                print(f"Puntos seleccionados en la base del ala superior (z={z_target}).")
+                new_areas = self.divide_area_by_selection("COL_FLANGE_TOP")
+                self.subdivide_areas(new_areas, 1, 2)
+            else:
+                print("Fallo la selección de puntos para dividir el ala.")
+
+            # --- Bottom Flange Logic ---
+            self.SapModel.SelectObj.ClearSelection()
+            ok_bot, ret_bot = self.coordinate_range(
+                -b_col/2, b_col/2,    # Xmin, Xmax
+                -h_col/2, -h_col/2,   # Ymin, Ymax (Bottom Flange Plane is at -H/2)
+                z_target, z_target,   # Zmin, Zmax (Base)
+                deselect=False,
+                csys="Global",
+                include_intersections=True,
+                point=True, line=False, area=False, solid=False, link=False
+            )
+            
+            if ok_bot:
+                print(f"Puntos seleccionados en la base del ala inferior (z={z_target}).")
+                new_areas = self.divide_area_by_selection("COL_FLANGE_BOTTOM")
+                self.subdivide_areas(new_areas, 1, 2)
+            else:
+                print("Fallo la selección de puntos para dividir el ala inferior.")
+
+            # --- A_outer_link Division Logic (Top Flange Line) ---
+            self.SapModel.SelectObj.ClearSelection()
+            x_limit = A * cfg.n_pernos / 2.0
+            
+            ok_link, ret_link = self.coordinate_range(
+                -x_limit, x_limit,    # Xmin, Xmax
+                h_col/2, h_col/2,     # Ymin, Ymax (Top Flange Line)
+                z_target, z_target,   # Zmin, Zmax (Base)
+                deselect=False,
+                csys="Global",
+                include_intersections=True,
+                point=True, line=False, area=False, solid=False, link=False
+            )
+            
+            if ok_link:
+                print(f"Puntos seleccionados para dividir A_outer_link en y={h_col/2}.")
+                new_areas = self.divide_area_by_selection("A_outer_link")
+                self.subdivide_areas(new_areas, 1, 2)
+            else:
+                print("Fallo la selección de puntos para dividir A_outer_link.")
+
+            # --- Web Division Logic ---
+            self.SapModel.SelectObj.ClearSelection()
+            ok_web, ret_web = self.coordinate_range(
+                0.0, 0.0,             # Xmin, Xmax (Web Plane)
+                -h_col/2, h_col/2,    # Ymin, Ymax
+                z_target, z_target,   # Zmin, Zmax (Base)
+                deselect=False,
+                csys="Global",
+                include_intersections=True,
+                point=True, line=False, area=False, solid=False, link=False
+            )
+            
+            if ok_web:
+                print(f"Puntos seleccionados en la base del alma (z={z_target}).")
+                new_areas = self.divide_area_by_selection("COL_WEB")
+                self.subdivide_areas(new_areas, 1, 2)
+            else:
+                print("Fallo la selección de puntos para dividir el alma.")
+                
+        except Exception as e:
+            print(f"Error en la lógica de división final: {e}")
 
         # Refresh View
         try:
