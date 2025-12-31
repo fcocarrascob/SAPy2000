@@ -53,8 +53,8 @@ class CombosWidget(QWidget):
         
         # --- Table ---
         self.table = QTableWidget()
-        self.table.setColumnCount(2) # Inicialmente solo Nombre y Tipo
-        self.table.setHorizontalHeaderLabels(["Nombre Combinación", "Tipo"])
+        self.table.setColumnCount(3) # Inicialmente Nombre, Tipo, ASD/LRFD
+        self.table.setHorizontalHeaderLabels(["Nombre Combinación", "Tipo", "ASD/LRFD"])
         self.table.horizontalHeader().setSectionResizeMode(QHeaderView.ResizeToContents)
         layout.addWidget(self.table)
         
@@ -72,8 +72,8 @@ class CombosWidget(QWidget):
             
         self.load_cases = cases
         
-        # Configurar columnas: Nombre, Tipo, [Case1, Case2, ...]
-        headers = ["Nombre Combinación", "Tipo"] + cases
+        # Configurar columnas: Nombre, Tipo, ASD/LRFD, [Case1, Case2, ...]
+        headers = ["Nombre Combinación", "Tipo", "ASD/LRFD"] + cases
         self.table.setColumnCount(len(headers))
         self.table.setHorizontalHeaderLabels(headers)
         
@@ -111,9 +111,16 @@ class CombosWidget(QWidget):
             combo_type.setCurrentIndex(c_type)
         self.table.setCellWidget(row, 1, combo_type)
         
-        # Col 2+: Factores
+        # Col 2: ASD/LRFD (ComboBox)
+        combo_design = QComboBox()
+        design_opts = ["ASD", "LRFD", ""]
+        combo_design.addItems(design_opts)
+        combo_design.setCurrentIndex(2) # Default ""
+        self.table.setCellWidget(row, 2, combo_design)
+
+        # Col 3+: Factores
         for i, case_name in enumerate(self.load_cases):
-            col_idx = 2 + i
+            col_idx = 3 + i
             factor = items.get(case_name, "")
             if factor != "":
                 factor = str(factor)
@@ -143,7 +150,7 @@ class CombosWidget(QWidget):
             # Items (Factores)
             items = {}
             for i, case_name in enumerate(self.load_cases):
-                col_idx = 2 + i
+                col_idx = 3 + i
                 item_factor = self.table.item(r, col_idx)
                 text = item_factor.text() if item_factor else ""
                 
@@ -166,7 +173,7 @@ class CombosWidget(QWidget):
             return
             
         count = self.backend.push_combinations(data_to_send)
-        QMessageBox.success(self, "Éxito", f"Se procesaron {count} combinaciones en SAP2000.")
+        QMessageBox.information(self, "Éxito", f"Se procesaron {count} combinaciones en SAP2000.")
 
 class MainWindow(QMainWindow):
     def __init__(self):

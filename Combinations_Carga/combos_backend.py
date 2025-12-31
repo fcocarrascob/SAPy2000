@@ -99,6 +99,35 @@ class ComboBackend:
             print(f"Error obteniendo combinaciones: {e}")
         return combos
 
+    def _clear_combo_items(self, name):
+        """Elimina todos los casos de carga de una combinación existente."""
+        try:
+            # GetCaseList(Name) -> (NumberItems, CType[], CName[], SF[], Ret)
+            ret_list = self.SapModel.RespCombo.GetCaseList(name)
+            
+            if ret_list[-1] == 0 and ret_list[0] > 0:
+                # Orden correcto según API: (NumberItems, CType, CName, SF, RetCode)
+                c_types = ret_list[1]
+                c_names = ret_list[2]
+                
+                if not isinstance(c_names, (list, tuple)): c_names = [c_names]
+                if not isinstance(c_types, (list, tuple)): c_types = [c_types]
+                
+                count = min(len(c_names), len(c_types), ret_list[0])
+                
+                # Eliminar uno por uno
+                for i in range(count):
+                    try:
+                        # DeleteCase(Name, CType, CName)
+                        # Usamos strip() para asegurar que el nombre esté limpio
+                        self.SapModel.RespCombo.DeleteCase(name, int(c_types[i]), str(c_names[i]).strip())
+                    except Exception:
+                        # Ignoramos errores puntuales al borrar (puede que ya no exista o esté bloqueado)
+                        # De todas formas SetCaseList se encargará de actualizar/agregar
+                        pass
+        except Exception as e:
+            print(f"Aviso limpiando combinación {name}: {e}")
+
     def push_combinations(self, combos_data):
         """
         Envía las combinaciones a SAP2000.
@@ -116,31 +145,46 @@ class ComboBackend:
             pass
 
         for combo in combos_data:
-            name = combo['name']
-            ctype = combo['type']
+            name = str(combo['name']).strip()
+            ctype = int(combo['type'])
             items = combo['items']
             
             if not name: continue
 
-            # Estrategia: Borrar y Recrear para asegurar limpieza
-            # Delete retorna error si no existe, no importa
-            self.SapModel.RespCombo.Delete(name)
+            # Estrategia Robusta: Intentar Agregar, si falla, Actualizar.
             
-            # Crear nueva combinación
-            # Add(Name, Type)
+            # 1. Intentar crear nueva
             ret_add = self.SapModel.RespCombo.Add(name, ctype)
+            # Manejo de retorno flexible por si Add retorna tupla (debido a parámetros ByRef implícitos)
+            if isinstance(ret_add, (list, tuple)): ret_add = ret_add[-1]
+            
             if ret_add != 0:
-                print(f"Error creando combinación '{name}'. Código: {ret_add}")
-                continue
+                # Si falla (probablemente ya existe), actualizamos el tipo
+                # SetTypeOAPI(Name, Type)
+                self.SapModel.RespCombo.SetTypeOAPI(name, ctype)
                 
-            # Agregar casos
+                # Y limpiamos los items existentes para empezar de cero
+                self._clear_combo_items(name)
+            
+            # 2. Agregar/Actualizar casos
             for case_name, factor in items.items():
-                if factor != 0:
-                    # SetCaseList(Name, CNameType, CName, SF)
-                    # CNameType: 0 = LoadCase
-                    ret_case = self.SapModel.RespCombo.SetCaseList(name, 0, case_name, factor)
-                    if ret_case != 0:
-                        print(f"Error agregando caso '{case_name}' a '{name}'")
+                try:
+                    case_name_clean = str(case_name).strip()
+                    val = float(factor)
+                    if val != 0:
+                        # SetCaseList(Name, CNameType, CName, SF)
+                        # CNameType: 0 = LoadCase
+                        # IMPORTANTE: CNameType es ByRef en la API, por lo que comtypes retorna (InputVal, RetCode)
+                        ret_case = self.SapModel.RespCombo.SetCaseList(name, 0, case_name_clean, val)
+                        
+                        ret_code = ret_case
+                        if isinstance(ret_case, (list, tuple)):
+                            ret_code = ret_case[-1]
+
+                        if ret_code != 0:
+                            print(f"Advertencia: No se pudo asignar '{case_name_clean}' a '{name}' (Código {ret_case})")
+                except Exception as e:
+                    print(f"Error procesando factor para {case_name}: {e}")
             
             success_count += 1
             
