@@ -33,6 +33,68 @@ class PreviewWidget(QWidget):
         self.data = {'os': os, 'od': od, 'is': is_, 'id': id_, 'na': na, 'nr': nr}
         self.update()
 
+    def draw_dimension(self, painter, p1, p2, text, offset=20):
+        """Dibuja una cota minimalista |---| entre p1 y p2 con texto."""
+        x1, y1 = p1
+        x2, y2 = p2
+        
+        # Vector dirección
+        dx = x2 - x1
+        dy = y2 - y1
+        length = math.sqrt(dx*dx + dy*dy)
+        if length == 0: return
+        
+        # Normal unitaria (dirección del offset)
+        # Si vamos de Izq->Der, normal apunta Abajo (Y+)
+        nx = -dy / length
+        ny = dx / length
+        
+        # Puntos de la línea de cota
+        cx1 = x1 + nx * offset
+        cy1 = y1 + ny * offset
+        cx2 = x2 + nx * offset
+        cy2 = y2 + ny * offset
+        
+        painter.setPen(QPen(Qt.darkGray, 1))
+        
+        # Líneas de proyección (del objeto a la cota)
+        painter.drawLine(x1, y1, cx1, cy1)
+        painter.drawLine(x2, y2, cx2, cy2)
+        
+        # Línea de cota
+        painter.drawLine(cx1, cy1, cx2, cy2)
+        
+        # Ticks minimalistas (pequeña línea perpendicular a la cota en los extremos)
+        tick_size = 4
+        # Vector perpendicular a la cota es el vector director original normalizado
+        ux = dx / length * tick_size
+        uy = dy / length * tick_size
+        
+        painter.setPen(QPen(Qt.black, 2))
+        painter.drawLine(cx1 - ux, cy1 - uy, cx1 + ux, cy1 + uy) # Tick 1
+        painter.drawLine(cx2 - ux, cy2 - uy, cx2 + ux, cy2 + uy) # Tick 2
+        
+        # Texto
+        painter.setPen(QPen(Qt.black, 1))
+        
+        mid_x = (cx1 + cx2) / 2
+        mid_y = (cy1 + cy2) / 2
+        
+        painter.save()
+        painter.translate(mid_x, mid_y)
+        
+        angle = math.degrees(math.atan2(dy, dx))
+        # Ajustar ángulo para lectura cómoda (evitar texto de cabeza)
+        if 90 < angle <= 270 or -270 <= angle < -90:
+             angle += 180
+        
+        painter.rotate(angle)
+        # Dibujar texto centrado sobre la línea (desplazado un poco en Y local negativo para estar "encima" si rotación es 0)
+        # Pero como usamos offset, queremos que esté del lado "afuera".
+        # Ajustamos rectángulo de texto
+        painter.drawText(-150, -25, 300, 20, Qt.AlignCenter, text)
+        painter.restore()
+
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
@@ -60,7 +122,7 @@ class PreviewWidget(QWidget):
         if W_real <= 0 or L_real <= 0: return
 
         # Scale
-        scale = min(w_px / W_real, h_px / L_real) * 0.8
+        scale = min(w_px / W_real, h_px / L_real) * 0.6 # Reducir escala para dar espacio a cotas
         
         rw = W_real * scale
         rh = L_real * scale
@@ -88,6 +150,17 @@ class PreviewWidget(QWidget):
         painter.setPen(QPen(Qt.blue, 2))
         painter.drawRect(x0, y0, rw, rh)
 
+        # --- Cotas ---
+        # Horizontal (Abajo): Izquierda -> Derecha
+        dx_val = W_real / nx if nx > 0 else W_real
+        text_w = f"{nx} @ {dx_val:.2f} = {W_real:.2f}"
+        self.draw_dimension(painter, (x0, y0 + rh), (x0 + rw, y0 + rh), text_w, offset=25)
+        
+        # Vertical (Izquierda): Arriba -> Abajo (Normal apunta a Izquierda)
+        dy_val = L_real / ny if ny > 0 else L_real
+        text_h = f"{ny} @ {dy_val:.2f} = {L_real:.2f}"
+        self.draw_dimension(painter, (x0, y0), (x0, y0 + rh), text_h, offset=25)
+
     def draw_hole(self, painter, cx, cy, w_px, h_px):
         d = self.data
         outer_s = d.get('os', 'Cuadrado')
@@ -99,7 +172,7 @@ class PreviewWidget(QWidget):
         
         if outer_d <= 0: return
         
-        scale = (min(w_px, h_px) / outer_d) * 0.8
+        scale = (min(w_px, h_px) / outer_d) * 0.6 # Reducir escala para cotas
         
         # Helper to get coords
         def get_coords(shape, dim, n):
@@ -170,6 +243,24 @@ class PreviewWidget(QWidget):
                     py2 = cy - v2 * scale
                     
                     painter.drawLine(px1, py1, px2, py2)
+
+        # --- Cotas ---
+        r_out_px = (outer_d * scale) / 2
+        r_in_px = (inner_d * scale) / 2
+        
+        # Cota Externa (Arriba): Derecha -> Izquierda (Normal apunta Arriba)
+        # Usamos el borde superior del bounding box
+        self.draw_dimension(painter, 
+                            (cx + r_out_px, cy - r_out_px), 
+                            (cx - r_out_px, cy - r_out_px), 
+                            f"Ext: {outer_d:.2f} ({outer_s})", offset=30)
+                            
+        # Cota Interna (Abajo): Izquierda -> Derecha (Normal apunta Abajo)
+        # Usamos el borde inferior del bounding box interno
+        self.draw_dimension(painter, 
+                            (cx - r_in_px, cy + r_in_px), 
+                            (cx + r_in_px, cy + r_in_px),
+                            f"Int: {inner_d:.2f} ({inner_s})", offset=30)
 
 class BaseMeshWidget(QWidget):
     """Clase base para widgets de generación de malla."""
