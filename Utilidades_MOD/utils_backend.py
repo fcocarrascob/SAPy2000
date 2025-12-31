@@ -233,6 +233,24 @@ class SapUtils:
         center_u = outer_dim / 2.0
         center_v = outer_dim / 2.0
         
+        # Crear nodo en el centro
+        if plane.upper() == "XY":
+            cx = origin_x + center_u
+            cy = origin_y + center_v
+            cz = origin_z
+        elif plane.upper() == "XZ":
+            cx = origin_x + center_u
+            cy = origin_y
+            cz = origin_z + center_v
+        elif plane.upper() == "YZ":
+            cx = origin_x
+            cy = origin_y + center_u
+            cz = origin_z + center_v
+        else:
+            cx, cy, cz = origin_x, origin_y, origin_z
+            
+        self.create_point(cx, cy, cz)
+        
         # 2. Generar coordenadas locales 2D para anillo interno y externo
         inner_coords = self._get_shape_coords_2d(inner_shape, center_u, center_v, inner_dim, num_angular)
         outer_coords = self._get_shape_coords_2d(outer_shape, center_u, center_v, outer_dim, num_angular)
