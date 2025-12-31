@@ -40,3 +40,15 @@ Los arrays retornados por `comtypes` suelen ser tuplas inmutables. Si necesitas 
 
 ### 4. Conexión
 Prefiere siempre conectarte a una instancia activa usando `comtypes.client.GetActiveObject("CSI.SAP2000.API.SapObject")` en lugar de iniciar una nueva, a menos que se especifique lo contrario.
+ 
+### 5. Organización actual del proyecto
+
+Trabajamos por módulos; cada módulo tiene su propia GUI y su backend (interfaz y lógica separados). Este patrón permite desarrollar, probar y mantener cada parte de forma independiente.
+
+Mantén las reglas anteriores (manejo de retornos, listas/arrays y conexión) al implementar cada módulo.
+
+**Futuro:** se planea integrar todos los módulos en una sola ventana con pestañas para una experiencia de usuario unificada. Diseñar cada módulo con clara separación GUI/backend facilita migrar a esa interfaz con pestañas.
+
+### 6. Documentación de la API
+
+La documentación y ejemplos de la API de SAP2000 están disponibles en la carpeta `API` del repositorio (ver [API](API) para más detalles).
