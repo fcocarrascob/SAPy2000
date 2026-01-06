@@ -3,9 +3,10 @@ import os
 import math
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QLineEdit,
                                QTextEdit, QPushButton, QVBoxLayout, QHBoxLayout, 
-                               QComboBox, QGroupBox, QGridLayout, QFormLayout, QTabWidget)
+                               QComboBox, QGroupBox, QGridLayout, QFormLayout, QTabWidget,
+                               QTextBrowser)
 from PySide6.QtGui import QPainter, QPen, QColor, QBrush
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QUrl
 
 # Importar backend
 try:
@@ -653,22 +654,74 @@ class HoleMeshWidget(BaseMeshWidget):
             self.log(f"❌ Error inesperado: {e}")
 
 
+class NotesWidget(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.init_ui()
+        
+    def init_ui(self):
+        layout = QVBoxLayout()
+        
+        # Toolbar
+        toolbar = QHBoxLayout()
+        self.btn_refresh = QPushButton("Recargar Notas")
+        self.btn_refresh.clicked.connect(self.load_notes)
+        toolbar.addStretch()
+        toolbar.addWidget(self.btn_refresh)
+        
+        layout.addLayout(toolbar)
+        
+        # Markdown Viewer
+        self.viewer = QTextBrowser()
+        self.viewer.setOpenExternalLinks(True)
+        layout.addWidget(self.viewer)
+        
+        self.setLayout(layout)
+        
+        self.load_notes()
+        
+    def load_notes(self):
+        # Buscar el archivo Notas.md en la carpeta Notas/ relativa al script
+        base_dir = os.path.dirname(__file__)
+        notes_dir = os.path.join(base_dir, "Notas")
+        notes_file = os.path.join(notes_dir, "Notas.md")
+        
+        if os.path.exists(notes_file):
+            try:
+                with open(notes_file, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                
+                # Configurar BaseUrl para que las imágenes relativas funcionen
+                # Debe ser una URL de archivo (file://...)
+                base_url = QUrl.fromLocalFile(notes_dir + os.sep)
+                self.viewer.document().setBaseUrl(base_url)
+                
+                self.viewer.setMarkdown(content)
+            except Exception as e:
+                self.viewer.setMarkdown(f"# Error al cargar notas\n\n{str(e)}")
+        else:
+            self.viewer.setMarkdown(f"# Archivo no encontrado\n\nNo se encontró `{notes_file}`.")
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Utilidades SAP2000 - Modelado")
-        self.resize(600, 700)
+        self.resize(800, 700) # Increased width slightly for better reading
         
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
         
         self.rect_mesh_widget = RectangularMeshWidget()
         self.hole_mesh_widget = HoleMeshWidget()
+        self.notes_widget = NotesWidget()
         
         self.tabs.addTab(self.rect_mesh_widget, "Malla Rectangular")
         self.tabs.addTab(self.hole_mesh_widget, "Malla con Orificio")
+        self.tabs.addTab(self.notes_widget, "Notas y Recomendaciones")
 
 if __name__ == "__main__":
+
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()
