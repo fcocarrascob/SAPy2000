@@ -178,21 +178,34 @@ class PreviewWidget(QWidget):
         def get_coords(shape, dim, n):
             coords = []
             rad = dim / 2.0
+            
+            # Pre-calc for square
+            perimeter = 4.0 * dim
+            step = perimeter / float(n) if n > 0 else 0
+            
             for i in range(n):
-                ang = 2 * math.pi * i / n
                 if shape.lower() == "círculo":
+                    ang = 2 * math.pi * i / n
                     u = rad * math.cos(ang)
                     v = rad * math.sin(ang)
+                    coords.append((u, v))
                 else: # Cuadrado
-                    cos_a = math.cos(ang)
-                    sin_a = math.sin(ang)
-                    abs_cos = abs(cos_a)
-                    abs_sin = abs(sin_a)
-                    if abs_cos > abs_sin: r = rad / abs_cos
-                    else: r = rad / abs_sin
-                    u = r * cos_a
-                    v = r * sin_a
-                coords.append((u, v))
+                    # Equidistant walking along perimeter matching backend logic
+                    current_dist = i * step
+                    u, v = 0.0, 0.0
+                    
+                    if current_dist < rad:
+                        u, v = rad, current_dist
+                    elif current_dist < rad + dim:
+                        u, v = rad - (current_dist - rad), rad
+                    elif current_dist < rad + 2*dim:
+                        u, v = -rad, rad - (current_dist - (rad + dim))
+                    elif current_dist < rad + 3*dim:
+                        u, v = -rad + (current_dist - (rad + 2*dim)), -rad
+                    else:
+                        u, v = rad, -rad + (current_dist - (rad + 3*dim))
+                        
+                    coords.append((u, v))
             return coords
 
         inner_pts = get_coords(inner_s, inner_d, na)
@@ -366,22 +379,27 @@ class RectangularMeshWidget(BaseMeshWidget):
         self.start_y = QLineEdit("0.0")
         self.start_z = QLineEdit("0.0")
         
+        # Columna Izquierda: Origen
         loc_layout.addWidget(QLabel("Origen X:"), 0, 0)
         loc_layout.addWidget(self.start_x, 0, 1)
-        loc_layout.addWidget(QLabel("Origen Y:"), 0, 2)
-        loc_layout.addWidget(self.start_y, 0, 3)
-        loc_layout.addWidget(QLabel("Origen Z:"), 1, 0)
-        loc_layout.addWidget(self.start_z, 1, 1)
+        loc_layout.addWidget(QLabel("Origen Y:"), 1, 0)
+        loc_layout.addWidget(self.start_y, 1, 1)
+        loc_layout.addWidget(QLabel("Origen Z:"), 2, 0)
+        loc_layout.addWidget(self.start_z, 2, 1)
         
+        # Columna Derecha: Propiedades y Utilidades
+        self.prop_edit = QLineEdit("Default")
         self.plane_combo = QComboBox()
         self.plane_combo.addItems(["XY", "XZ", "YZ"])
         
-        self.prop_edit = QLineEdit("Default")
+        self.btn_get_coords = QPushButton("Obtener Coordenadas")
+        self.btn_get_coords.clicked.connect(self.fetch_coords)
         
+        loc_layout.addWidget(QLabel("Propiedad Área:"), 0, 2)
+        loc_layout.addWidget(self.prop_edit, 0, 3)
         loc_layout.addWidget(QLabel("Plano:"), 1, 2)
         loc_layout.addWidget(self.plane_combo, 1, 3)
-        loc_layout.addWidget(QLabel("Propiedad Área:"), 2, 0)
-        loc_layout.addWidget(self.prop_edit, 2, 1)
+        loc_layout.addWidget(self.btn_get_coords, 2, 2, 1, 2) # Span 2 columns
         
         grp_loc.setLayout(loc_layout)
         params_layout.addWidget(grp_loc)
@@ -414,6 +432,21 @@ class RectangularMeshWidget(BaseMeshWidget):
             self.preview.update_rect(w, l, nx, ny)
         except ValueError:
             pass
+
+    def fetch_coords(self):
+        if not self.ensure_connection():
+            return
+
+        self.log("Obteniendo coordenadas de punto seleccionado...")
+        coords = self.backend.get_selected_point_coords()
+        
+        if coords:
+            self.start_x.setText(f"{coords['x']:.4f}")
+            self.start_y.setText(f"{coords['y']:.4f}")
+            self.start_z.setText(f"{coords['z']:.4f}")
+            self.log(f"Coordenadas actualizadas desde punto '{coords['name']}'")
+        else:
+            self.log("No se encontró ningún punto seleccionado.")
 
     def generate_mesh(self):
         if not self.ensure_connection():
@@ -491,7 +524,9 @@ class HoleMeshWidget(BaseMeshWidget):
         grp_mesh = QGroupBox("Configuración de Malla")
         mesh_layout = QFormLayout()
         
-        self.num_angular = QLineEdit("16")
+        self.num_angular = QComboBox()
+        self.num_angular.addItems(["8", "16", "32"])
+        self.num_angular.setCurrentText("16")
         self.num_radial = QLineEdit("2")
         
         mesh_layout.addRow("Divisiones Angulares (Puntos por anillo):", self.num_angular)
@@ -508,22 +543,27 @@ class HoleMeshWidget(BaseMeshWidget):
         self.start_y = QLineEdit("0.0")
         self.start_z = QLineEdit("0.0")
         
+        # Columna Izquierda: Origen
         loc_layout.addWidget(QLabel("Origen X (Esquina):"), 0, 0)
         loc_layout.addWidget(self.start_x, 0, 1)
-        loc_layout.addWidget(QLabel("Origen Y (Esquina):"), 0, 2)
-        loc_layout.addWidget(self.start_y, 0, 3)
-        loc_layout.addWidget(QLabel("Origen Z (Esquina):"), 1, 0)
-        loc_layout.addWidget(self.start_z, 1, 1)
+        loc_layout.addWidget(QLabel("Origen Y (Esquina):"), 1, 0)
+        loc_layout.addWidget(self.start_y, 1, 1)
+        loc_layout.addWidget(QLabel("Origen Z (Esquina):"), 2, 0)
+        loc_layout.addWidget(self.start_z, 2, 1)
         
+        # Columna Derecha: Propiedades y Utilidades
+        self.prop_edit = QLineEdit("Default")
         self.plane_combo = QComboBox()
         self.plane_combo.addItems(["XY", "XZ", "YZ"])
         
-        self.prop_edit = QLineEdit("Default")
+        self.btn_get_coords = QPushButton("Obtener Coordenadas")
+        self.btn_get_coords.clicked.connect(self.fetch_coords)
         
+        loc_layout.addWidget(QLabel("Propiedad Área:"), 0, 2)
+        loc_layout.addWidget(self.prop_edit, 0, 3)
         loc_layout.addWidget(QLabel("Plano:"), 1, 2)
         loc_layout.addWidget(self.plane_combo, 1, 3)
-        loc_layout.addWidget(QLabel("Propiedad Área:"), 2, 0)
-        loc_layout.addWidget(self.prop_edit, 2, 1)
+        loc_layout.addWidget(self.btn_get_coords, 2, 2, 1, 2)
         
         grp_loc.setLayout(loc_layout)
         params_layout.addWidget(grp_loc)
@@ -542,9 +582,9 @@ class HoleMeshWidget(BaseMeshWidget):
         self.setLayout(main_layout)
         
         # Connect signals
-        for w in [self.outer_dim, self.inner_dim, self.num_angular, self.num_radial]:
+        for w in [self.outer_dim, self.inner_dim, self.num_radial]:
             w.textChanged.connect(self.update_preview)
-        for w in [self.outer_shape, self.inner_shape]:
+        for w in [self.outer_shape, self.inner_shape, self.num_angular]:
             w.currentIndexChanged.connect(self.update_preview)
             
         self.update_preview()
@@ -555,12 +595,27 @@ class HoleMeshWidget(BaseMeshWidget):
             outer_d = float(self.outer_dim.text())
             inner_s = self.inner_shape.currentText()
             inner_d = float(self.inner_dim.text())
-            n_ang = int(self.num_angular.text())
+            n_ang = int(self.num_angular.currentText())
             n_rad = int(self.num_radial.text())
             
             self.preview.update_hole(outer_s, outer_d, inner_s, inner_d, n_ang, n_rad)
         except ValueError:
             pass
+
+    def fetch_coords(self):
+        if not self.ensure_connection():
+            return
+
+        self.log("Obteniendo coordenadas de punto seleccionado...")
+        coords = self.backend.get_selected_point_coords()
+        
+        if coords:
+            self.start_x.setText(f"{coords['x']:.4f}")
+            self.start_y.setText(f"{coords['y']:.4f}")
+            self.start_z.setText(f"{coords['z']:.4f}")
+            self.log(f"Coordenadas actualizadas desde punto '{coords['name']}'")
+        else:
+            self.log("No se encontró ningún punto seleccionado.")
 
     def generate_mesh(self):
         if not self.ensure_connection():
@@ -572,7 +627,7 @@ class HoleMeshWidget(BaseMeshWidget):
             inner_s = self.inner_shape.currentText()
             inner_d = float(self.inner_dim.text())
             
-            n_ang = int(self.num_angular.text())
+            n_ang = int(self.num_angular.currentText())
             n_rad = int(self.num_radial.text())
             
             sx = float(self.start_x.text())
