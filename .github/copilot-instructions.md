@@ -1,6 +1,6 @@
 # Instrucciones para GitHub Copilot - SAP2000 API con comtypes
 
-Estás trabajando en un proyecto de Python que interactúa con la API de SAP2000 (CSI OAPI) utilizando la librería `comtypes`.
+Estás trabajando en un proyecto de Python que interactúa con la API de SAP2000 (CSI OAPI) utilizando la librería `comtypes`. La aplicación se ha migrado a una arquitectura unificada y modular.
 
 ## Reglas Críticas de Implementación
 
@@ -15,7 +15,7 @@ La API de SAP2000 está diseñada para lenguajes que soportan parámetros `ByRef
 
 **Incorrecto (Estilo VBA/C#):**
 ```python
-# NO HACER ESTO: Asumir que ret es solo el código de error
+# NO HACER ESTO
 ret = SapModel.Func(param_in, param_out)
 if ret != 0: ...
 ```
@@ -23,32 +23,55 @@ if ret != 0: ...
 **Correcto (Estilo Python comtypes):**
 ```python
 # HACER ESTO: Desempaquetar o acceder por índice
-# La firma en Python suele requerir pasar argumentos dummy para los parámetros de salida
 ret = SapModel.Func(param_in, 0, []) 
 
 # ret es [ValorSalida1, ValorSalida2, ..., RetCode]
 
 if ret[-1] == 0: # Verificar éxito (último elemento)
     resultado_1 = ret[0]
-    resultado_2 = ret[1]
 else:
     print(f"Error en la función, código: {ret[-1]}")
 ```
 
-### 3. Listas y Arrays
-Los arrays retornados por `comtypes` suelen ser tuplas inmutables. Si necesitas modificarlos, conviértelos a lista explícitamente: `list(ret[0])`.
+### 3. Conexión y Arquitectura (NUEVO)
+**No utilices GetActiveObject dentro de los módulos individuales.** La aplicación utiliza una arquitectura de **Inyección de Dependencias**.
 
-### 4. Conexión
-Prefiere siempre conectarte a una instancia activa usando `comtypes.client.GetActiveObject("CSI.SAP2000.API.SapObject")` en lugar de iniciar una nueva, a menos que se especifique lo contrario.
- 
-### 5. Organización actual del proyecto
+#### Backends
+*   Deben ser clases que reciban `sap_model` en su `__init__`.
+*   No deben depender de librerías GUI (PySide6).
 
-Trabajamos por módulos; cada módulo tiene su propia GUI y su backend (interfaz y lógica separados). Este patrón permite desarrollar, probar y mantener cada parte de forma independiente.
+```python
+class MiModuloBackend:
+    def __init__(self, sap_model):
+        self.SapModel = sap_model
 
-Mantén las reglas anteriores (manejo de retornos, listas/arrays y conexión) al implementar cada módulo.
+    def ejecutar_tarea(self):
+        if not self.SapModel: return
+        # Lógica OAPI...
+```
 
-**Futuro:** se planea integrar todos los módulos en una sola ventana con pestañas para una experiencia de usuario unificada. Diseñar cada módulo con clara separación GUI/backend facilita migrar a esa interfaz con pestañas.
+#### Frontend (GUI)
+*   Deben ser Widgets (`QWidget`) que reciban `sap_interface` en su `__init__`.
+*   Usan `sap_interface.sap_model` para instanciar el backend.
 
-### 6. Documentación de la API
+```python
+class MiModuloWidget(QWidget):
+    def __init__(self, parent=None, sap_interface=None):
+        super().__init__(parent)
+        self.sap_interface = sap_interface
 
-La documentación y ejemplos de la API de SAP2000 están disponibles en la carpeta `API` del repositorio (ver [API] (API) para más detalles).
+    def on_button_click(self):
+        model = self.sap_interface.sap_model
+        backend = MiModuloBackend(model)
+        backend.ejecutar_tarea()
+```
+
+### 4. Estructura de Módulos
+Para crear una nueva herramienta:
+1.  Crea una carpeta nueva con `__init__.py`.
+2.  Crea un archivo `backend.py` con la lógica agnóstica.
+3.  Crea un archivo `gui.py` con la interfaz visual.
+4.  Registra el widget en `main_app.py`.
+
+### 5. Documentación de la API
+La documentación y ejemplos de la API de SAP2000 están disponibles en la carpeta `API` del repositorio.

@@ -5,16 +5,18 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QLine
                                QTextEdit, QPushButton, QVBoxLayout, QHBoxLayout, QMessageBox, QComboBox,
                                QTableWidget, QTableWidgetItem, QGroupBox, QGridLayout, QFormLayout)
 from PySide6.QtGui import QPainter, QColor, QPen, QBrush
-from PySide6.QtCore import QSize, QRectF
-from PySide6.QtCore import QProcess, Qt
+from PySide6.QtCore import QSize, QRectF, Qt
 
-SCRIPT_PATH = os.path.join(os.path.dirname(__file__), 'placabase_ARA.py')
+# Import backend
+from .placabase_backend import BasePlateBackend
+
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'placabase_ARA_config.json')
 
-class MainWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
+class BasePlateWidget(QWidget):
+    def __init__(self, parent=None, sap_interface=None):
+        super().__init__(parent)
         self.setWindowTitle('Placa Base - GUI (placabase_ARA)')
+        self.sap_interface = sap_interface
 
         # ComboBox con diámetros comunes y su equivalente en pulgadas
         self.bolt_combo = QComboBox()
@@ -143,7 +145,6 @@ class MainWindow(QMainWindow):
         grp_out.setLayout(out_layout)
         main_form_layout.addWidget(grp_out)
 
-        container = QWidget()
         # crear preview a la derecha
         self.preview = PreviewWidget(self)
 
@@ -153,10 +154,7 @@ class MainWindow(QMainWindow):
         main_layout.addWidget(left_widget, 1)
         main_layout.addWidget(self.preview, 1)
 
-        container.setLayout(main_layout)
-        self.setCentralWidget(container)
-
-        self.process = None
+        self.setLayout(main_layout)
 
         # load existing config if present
         if os.path.exists(CONFIG_PATH):
@@ -325,34 +323,25 @@ class MainWindow(QMainWindow):
         ok = self.save_config()
         if not ok:
             return
-        if not os.path.exists(SCRIPT_PATH):
-            QMessageBox.critical(self, 'Error', f'No se encontró {SCRIPT_PATH}')
-            return
+        
+        self.log.append('Iniciando ejecución de Placa Base...')
+        try:
+            # Check connection
+            if self.sap_interface and self.sap_interface.sap_model:
+                model = self.sap_interface.sap_model
+            else:
+                self.log.append("No hay conexión activa en sap_interface. Intentando conectar en backend...")
+                model = None # Backend will try to connect if None
 
-        if self.process is not None and self.process.state() != QProcess.NotRunning:
-            QMessageBox.information(self, 'Info', 'Ya hay un proceso en ejecución.')
-            return
+            backend = BasePlateBackend(sap_model=model)
+            backend.load_config_from_file(CONFIG_PATH)
+            backend.run_process()
+            self.log.append("Ejecución finalizada correctamente.")
 
-        self.log.append('Iniciando placabase_ARA.py...')
-        self.process = QProcess(self)
-        self.process.setProgram(sys.executable)
-        self.process.setArguments([SCRIPT_PATH])
-        self.process.setWorkingDirectory(os.path.dirname(SCRIPT_PATH))
-        self.process.readyReadStandardOutput.connect(self._read_stdout)
-        self.process.readyReadStandardError.connect(self._read_stderr)
-        self.process.finished.connect(self._on_finished)
-        self.process.start()
-
-    def _read_stdout(self):
-        data = bytes(self.process.readAllStandardOutput()).decode('utf-8', errors='replace')
-        self.log.append(data)
-
-    def _read_stderr(self):
-        data = bytes(self.process.readAllStandardError()).decode('utf-8', errors='replace')
-        self.log.append(data)
-
-    def _on_finished(self, exitCode, exitStatus):
-        self.log.append(f'Proceso terminado (exit {exitCode})')
+        except Exception as e:
+            self.log.append(f"Error durante la ejecución: {str(e)}")
+            import traceback
+            self.log.append(traceback.format_exc())
 
     def add_row(self):
         r = self.centers_table.rowCount()
@@ -621,6 +610,12 @@ class PreviewWidget(QWidget):
             rect = QRectF(px - half_A_px, py - half_A_px, 2 * half_A_px, 2 * half_A_px)
             painter.drawRect(rect)
 
+
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setCentralWidget(BasePlateWidget())
+        self.setWindowTitle('Placa Base - GUI (placabase_ARA)')
 
 if __name__ == '__main__':
     app = QApplication(sys.argv)

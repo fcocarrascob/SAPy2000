@@ -7,17 +7,41 @@ from PySide6.QtCore import Qt
 
 # Importar backend
 try:
-    from combos_backend import ComboBackend
+    # Intento de import relativo (cuando funciona como paquete)
+    from .combos_backend import ComboBackend
 except ImportError:
-    sys.path.append(os.path.dirname(__file__))
-    from combos_backend import ComboBackend
+    # Fallback para ejecución directa
+    try:
+        from combos_backend import ComboBackend
+    except ImportError:
+        sys.path.append(os.path.dirname(__file__))
+        from combos_backend import ComboBackend
 
 class CombosWidget(QWidget):
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, sap_interface=None):
         super().__init__(parent)
-        self.backend = ComboBackend()
+        self.sap_interface = sap_interface
+        
+        # Si nos pasan la interfaz, usamos su modelo (puede ser None)
+        # Si no, el backend intentará conectar por su cuenta
+        model = self.sap_interface.SapModel if self.sap_interface else None
+        self.backend = ComboBackend(sap_model=model)
+        
+        # Conectar señal si existe
+        if self.sap_interface:
+            self.sap_interface.connectionChanged.connect(self.on_connection_changed)
+            
         self.load_cases = [] # Lista de nombres de columnas dinámicas
         self.init_ui()
+
+    def on_connection_changed(self, connected):
+        """Actualizar el modelo del backend cuando la conexión global cambia."""
+        if connected:
+            self.backend.SapModel = self.sap_interface.SapModel
+            self.lbl_info.setText("Conexión global recibida.")
+        else:
+            self.backend.SapModel = None
+            self.lbl_info.setText("Conexión perdida.")
         
     def init_ui(self):
         layout = QVBoxLayout()

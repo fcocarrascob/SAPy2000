@@ -1,9 +1,16 @@
 import comtypes.client
 
 class ComboBackend:
-    def __init__(self):
-        self.SapModel = None
-        self._connect()
+    def __init__(self, sap_model=None):
+        """
+        Inicializa el backend.
+        
+        Args:
+            sap_model: Objeto SapModel opcional ya conectado. Si es None, intentará conectar.
+        """
+        self.SapModel = sap_model
+        if self.SapModel is None:
+            self._connect()
 
     def _connect(self):
         try:

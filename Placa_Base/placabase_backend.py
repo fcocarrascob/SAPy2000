@@ -72,39 +72,63 @@ class PlateConfig:
         return mapping.get(d, (100.0, 100.0))
 
 
-class SapPlateGenerator:
-    def __init__(self):
-        self.SapModel = self._connect_to_sap()
+class BasePlateBackend:
+    def __init__(self, sap_model=None):
+        self.SapModel = sap_model
         self.config = PlateConfig()
+        
+        # Conectar si no hay modelo proporcionado
+        if self.SapModel is None:
+            self._connect_to_sap()
 
     def _connect_to_sap(self):
         try:
-            helper = comtypes.client.CreateObject('SAP2000v1.Helper')
-            helper = helper.QueryInterface(comtypes.gen.SAP2000v1.cHelper)
-            mySapObject = helper.GetObject("CSI.SAP2000.API.SapObject")
-            model = mySapObject.SapModel
+            # Intentar usar el Helper oficial o GetActiveObject
+            try:
+                helper = comtypes.client.CreateObject('SAP2000v1.Helper')
+                helper = helper.QueryInterface(comtypes.gen.SAP2000v1.cHelper)
+                mySapObject = helper.GetObject("CSI.SAP2000.API.SapObject")
+            except:
+                mySapObject = comtypes.client.GetActiveObject("CSI.SAP2000.API.SapObject")
+                
+            self.SapModel = mySapObject.SapModel
             print("Conexión exitosa a la instancia abierta de SAP2000.")
-            return model
         except Exception as e:
-            raise RuntimeError("No se encontró ninguna instancia de SAP2000 ejecutándose.") from e
+            print(f"Aviso: Backend iniciado sin conexión a SAP2000. ({e})")
+            self.SapModel = None
 
-    def load_config(self, json_path: str):
+    def load_config_from_file(self, json_path: str):
         self.config = PlateConfig.from_json(json_path)
-        print(f"Configuración cargada: {self.config}")
-
-    def _check_ret(self, ret, success_msg=None, error_msg=None) -> bool:
-        """Helper to check the return code (last element of tuple/list)."""
-        if ret is None:
-            return False
+        print(f"Configuración cargada desde archivo: {self.config}")
         
-        # Handle cases where ret is just an int (some older APIs or specific calls)
+    def run_process(self):
+        """Método principal para ejecutar la generación de la placa base."""
+        if not self.SapModel:
+            # Reintentar conexión si se perdió
+            self._connect_to_sap()
+            if not self.SapModel:
+                raise RuntimeError("No hay conexión con SAP2000.")
+
+        print("Iniciando generación de placa base...")
+        self.apply_config()
+        print("Proceso finalizado.")
+
+    # [Aquí irían los métodos apply_config y la lógica de modelado refactorizada]
+    # Por ahora mantendremos el código existente de SapPlateGenerator adaptado
+    # Importante: En la implementación real, copiaríamos el resto de métodos de SapPlateGenerator
+    # y los adaptaríamos para usar self.SapModel que ya puede venir inyectado.
+
+
+    def apply_config(self):
+        self.run()
+
+    def _check_ret(self, ret, success_msg="", error_msg="") -> bool:
+        code = -1
         if isinstance(ret, int):
             code = ret
         elif hasattr(ret, '__getitem__') and len(ret) > 0:
             code = ret[-1]
-        else:
-            code = -1
-
+        
         if code == 0:
             if success_msg:
                 print(success_msg)
@@ -574,14 +598,17 @@ class SapPlateGenerator:
 
 if __name__ == "__main__":
     try:
-        generator = SapPlateGenerator()
+        # Standalone testing of backend
+        backend = BasePlateBackend()
         
         # Load config if exists
         config_path = os.path.join(os.path.dirname(__file__), 'placabase_ARA_config.json')
-        generator.load_config(config_path)
-        
-        generator.run()
-        print("\nProceso finalizado correctamente.")
+        if os.path.exists(config_path):
+            backend.load_config_from_file(config_path)
+            backend.run_process()
+            print("\nProceso finalizado correctamente.")
+        else:
+            print(f"No se encontró archivo de configuración en {config_path}")
         
     except Exception as e:
         print(f"\nError fatal: {e}")
