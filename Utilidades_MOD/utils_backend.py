@@ -169,35 +169,57 @@ class SapUtils:
         coords = []
         radius = dim / 2.0
         
+        # Pre-calculation for square (equidistant spacing)
+        # Perimeter = 4 * dim
+        # Step = Perimeter / num_points
+        perimeter = 4.0 * dim
+        step = perimeter / float(num_points) if num_points > 0 else 0
+        
         for i in range(num_points):
-            # Ángulo en radianes
-            angle = 2 * math.pi * i / num_points
-            
             if shape_type.lower() == "círculo":
+                # Ángulo en radianes
+                angle = 2 * math.pi * i / num_points
                 u = center_u + radius * math.cos(angle)
                 v = center_v + radius * math.sin(angle)
                 coords.append((u, v))
                 
             elif shape_type.lower() == "cuadrado":
-                # Proyectar el ángulo sobre el perímetro del cuadrado
-                # Esto asegura que los puntos se correspondan angularmente con el círculo
-                cos_a = math.cos(angle)
-                sin_a = math.sin(angle)
+                # Equidistant walking along perimeter
+                # Start at Angle 0 (Right Middle) -> (radius, 0) relative to center
+                # CCW direction: Up -> Left -> Down -> Right -> Up
                 
-                # Distancia del centro al borde en la dirección del ángulo
-                # max(|u|, |v|) = radius
-                abs_cos = abs(cos_a)
-                abs_sin = abs(sin_a)
+                current_dist = i * step
                 
-                if abs_cos > abs_sin:
-                    # Intersecta lados verticales (Izquierda/Derecha)
-                    r = radius / abs_cos
+                u_local = 0.0
+                v_local = 0.0
+                
+                # Phase 1: Right edge, moving UP (from 0 to radius)
+                if current_dist < radius:
+                    u_local = radius
+                    v_local = current_dist
+                # Phase 2: Top edge, moving LEFT
+                elif current_dist < radius + dim:
+                    rem = current_dist - radius
+                    u_local = radius - rem
+                    v_local = radius
+                # Phase 3: Left edge, moving DOWN
+                elif current_dist < radius + 2*dim:
+                    rem = current_dist - (radius + dim)
+                    u_local = -radius
+                    v_local = radius - rem
+                # Phase 4: Bottom edge, moving RIGHT
+                elif current_dist < radius + 3*dim:
+                    rem = current_dist - (radius + 2*dim)
+                    u_local = -radius + rem
+                    v_local = -radius
+                # Phase 5: Right edge, moving UP (from -radius to 0)
                 else:
-                    # Intersecta lados horizontales (Arriba/Abajo)
-                    r = radius / abs_sin
+                    rem = current_dist - (radius + 3*dim)
+                    u_local = radius
+                    v_local = -radius + rem
                 
-                u = center_u + r * cos_a
-                v = center_v + r * sin_a
+                u = center_u + u_local
+                v = center_v + v_local
                 coords.append((u, v))
                 
         return coords
@@ -232,6 +254,24 @@ class SapUtils:
         # Asumimos que el origen es la esquina inferior izquierda del bounding box externo
         center_u = outer_dim / 2.0
         center_v = outer_dim / 2.0
+        
+        # Crear nodo en el centro
+        if plane.upper() == "XY":
+            cx = origin_x + center_u
+            cy = origin_y + center_v
+            cz = origin_z
+        elif plane.upper() == "XZ":
+            cx = origin_x + center_u
+            cy = origin_y
+            cz = origin_z + center_v
+        elif plane.upper() == "YZ":
+            cx = origin_x
+            cy = origin_y + center_u
+            cz = origin_z + center_v
+        else:
+            cx, cy, cz = origin_x, origin_y, origin_z
+            
+        self.create_point(cx, cy, cz)
         
         # 2. Generar coordenadas locales 2D para anillo interno y externo
         inner_coords = self._get_shape_coords_2d(inner_shape, center_u, center_v, inner_dim, num_angular)
@@ -315,3 +355,58 @@ class SapUtils:
             pass
             
         return created_areas
+
+    def get_selected_point_coords(self):
+        """
+        Retorna las coordenadas (x, y, z) del primer punto seleccionado.
+        Retorna None si no hay conexión o no hay puntos seleccionados.
+        """
+        if self.SapModel is None:
+            if self._connect_to_sap() is None:
+                return None
+        
+        # 1. Obtener objetos seleccionados
+        # GetSelected(NumberItems, ObjectTypes, ObjectNames)
+        try:
+            ret_sel = self.SapModel.SelectObj.GetSelected(0, [], [])
+            # ret_sel[-1] es RetCode
+            if ret_sel[-1] != 0: 
+                return None
+            
+            num_items = ret_sel[0]
+            if num_items == 0: 
+                return None
+            
+            # Los arrays suelen venir en ret_sel[1] y ret_sel[2]
+            obj_types = ret_sel[1]
+            obj_names = ret_sel[2]
+            
+            point_name = None
+            
+            # Buscar el primer objeto de tipo 1 (PointObject)
+            for i in range(num_items):
+                # Asegurar que sea entero, a veces viene como int, a veces smallint
+                if int(obj_types[i]) == 1:
+                    point_name = obj_names[i]
+                    break
+            
+            if not point_name:
+                return None
+                
+            # 2. Obtener coordenadas
+            # GetCoordCartesian(Name, x, y, z, CSys)
+            ret_coord = self.SapModel.PointObj.GetCoordCartesian(point_name, 0.0, 0.0, 0.0, "Global")
+            
+            if ret_coord[-1] == 0:
+                # Retorna [x, y, z, RetCode]
+                return {
+                    "name": point_name,
+                    "x": ret_coord[0],
+                    "y": ret_coord[1],
+                    "z": ret_coord[2]
+                }
+                
+        except Exception as e:
+            print(f"Error obteniendo selección: {e}")
+            
+        return None

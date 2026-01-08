@@ -3,9 +3,10 @@ import os
 import math
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QLineEdit,
                                QTextEdit, QPushButton, QVBoxLayout, QHBoxLayout, 
-                               QComboBox, QGroupBox, QGridLayout, QFormLayout, QTabWidget)
+                               QComboBox, QGroupBox, QGridLayout, QFormLayout, QTabWidget,
+                               QTextBrowser)
 from PySide6.QtGui import QPainter, QPen, QColor, QBrush
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QUrl
 
 # Importar backend
 try:
@@ -32,6 +33,68 @@ class PreviewWidget(QWidget):
         self.mode = "hole"
         self.data = {'os': os, 'od': od, 'is': is_, 'id': id_, 'na': na, 'nr': nr}
         self.update()
+
+    def draw_dimension(self, painter, p1, p2, text, offset=20):
+        """Dibuja una cota minimalista |---| entre p1 y p2 con texto."""
+        x1, y1 = p1
+        x2, y2 = p2
+        
+        # Vector dirección
+        dx = x2 - x1
+        dy = y2 - y1
+        length = math.sqrt(dx*dx + dy*dy)
+        if length == 0: return
+        
+        # Normal unitaria (dirección del offset)
+        # Si vamos de Izq->Der, normal apunta Abajo (Y+)
+        nx = -dy / length
+        ny = dx / length
+        
+        # Puntos de la línea de cota
+        cx1 = x1 + nx * offset
+        cy1 = y1 + ny * offset
+        cx2 = x2 + nx * offset
+        cy2 = y2 + ny * offset
+        
+        painter.setPen(QPen(Qt.darkGray, 1))
+        
+        # Líneas de proyección (del objeto a la cota)
+        painter.drawLine(x1, y1, cx1, cy1)
+        painter.drawLine(x2, y2, cx2, cy2)
+        
+        # Línea de cota
+        painter.drawLine(cx1, cy1, cx2, cy2)
+        
+        # Ticks minimalistas (pequeña línea perpendicular a la cota en los extremos)
+        tick_size = 4
+        # Vector perpendicular a la cota es el vector director original normalizado
+        ux = dx / length * tick_size
+        uy = dy / length * tick_size
+        
+        painter.setPen(QPen(Qt.black, 2))
+        painter.drawLine(cx1 - ux, cy1 - uy, cx1 + ux, cy1 + uy) # Tick 1
+        painter.drawLine(cx2 - ux, cy2 - uy, cx2 + ux, cy2 + uy) # Tick 2
+        
+        # Texto
+        painter.setPen(QPen(Qt.black, 1))
+        
+        mid_x = (cx1 + cx2) / 2
+        mid_y = (cy1 + cy2) / 2
+        
+        painter.save()
+        painter.translate(mid_x, mid_y)
+        
+        angle = math.degrees(math.atan2(dy, dx))
+        # Ajustar ángulo para lectura cómoda (evitar texto de cabeza)
+        if 90 < angle <= 270 or -270 <= angle < -90:
+             angle += 180
+        
+        painter.rotate(angle)
+        # Dibujar texto centrado sobre la línea (desplazado un poco en Y local negativo para estar "encima" si rotación es 0)
+        # Pero como usamos offset, queremos que esté del lado "afuera".
+        # Ajustamos rectángulo de texto
+        painter.drawText(-150, -25, 300, 20, Qt.AlignCenter, text)
+        painter.restore()
 
     def paintEvent(self, event):
         painter = QPainter(self)
@@ -60,7 +123,7 @@ class PreviewWidget(QWidget):
         if W_real <= 0 or L_real <= 0: return
 
         # Scale
-        scale = min(w_px / W_real, h_px / L_real) * 0.8
+        scale = min(w_px / W_real, h_px / L_real) * 0.6 # Reducir escala para dar espacio a cotas
         
         rw = W_real * scale
         rh = L_real * scale
@@ -88,6 +151,17 @@ class PreviewWidget(QWidget):
         painter.setPen(QPen(Qt.blue, 2))
         painter.drawRect(x0, y0, rw, rh)
 
+        # --- Cotas ---
+        # Horizontal (Abajo): Izquierda -> Derecha
+        dx_val = W_real / nx if nx > 0 else W_real
+        text_w = f"{nx} @ {dx_val:.2f} = {W_real:.2f}"
+        self.draw_dimension(painter, (x0, y0 + rh), (x0 + rw, y0 + rh), text_w, offset=25)
+        
+        # Vertical (Izquierda): Arriba -> Abajo (Normal apunta a Izquierda)
+        dy_val = L_real / ny if ny > 0 else L_real
+        text_h = f"{ny} @ {dy_val:.2f} = {L_real:.2f}"
+        self.draw_dimension(painter, (x0, y0), (x0, y0 + rh), text_h, offset=25)
+
     def draw_hole(self, painter, cx, cy, w_px, h_px):
         d = self.data
         outer_s = d.get('os', 'Cuadrado')
@@ -99,27 +173,40 @@ class PreviewWidget(QWidget):
         
         if outer_d <= 0: return
         
-        scale = (min(w_px, h_px) / outer_d) * 0.8
+        scale = (min(w_px, h_px) / outer_d) * 0.6 # Reducir escala para cotas
         
         # Helper to get coords
         def get_coords(shape, dim, n):
             coords = []
             rad = dim / 2.0
+            
+            # Pre-calc for square
+            perimeter = 4.0 * dim
+            step = perimeter / float(n) if n > 0 else 0
+            
             for i in range(n):
-                ang = 2 * math.pi * i / n
                 if shape.lower() == "círculo":
+                    ang = 2 * math.pi * i / n
                     u = rad * math.cos(ang)
                     v = rad * math.sin(ang)
+                    coords.append((u, v))
                 else: # Cuadrado
-                    cos_a = math.cos(ang)
-                    sin_a = math.sin(ang)
-                    abs_cos = abs(cos_a)
-                    abs_sin = abs(sin_a)
-                    if abs_cos > abs_sin: r = rad / abs_cos
-                    else: r = rad / abs_sin
-                    u = r * cos_a
-                    v = r * sin_a
-                coords.append((u, v))
+                    # Equidistant walking along perimeter matching backend logic
+                    current_dist = i * step
+                    u, v = 0.0, 0.0
+                    
+                    if current_dist < rad:
+                        u, v = rad, current_dist
+                    elif current_dist < rad + dim:
+                        u, v = rad - (current_dist - rad), rad
+                    elif current_dist < rad + 2*dim:
+                        u, v = -rad, rad - (current_dist - (rad + dim))
+                    elif current_dist < rad + 3*dim:
+                        u, v = -rad + (current_dist - (rad + 2*dim)), -rad
+                    else:
+                        u, v = rad, -rad + (current_dist - (rad + 3*dim))
+                        
+                    coords.append((u, v))
             return coords
 
         inner_pts = get_coords(inner_s, inner_d, na)
@@ -170,6 +257,24 @@ class PreviewWidget(QWidget):
                     py2 = cy - v2 * scale
                     
                     painter.drawLine(px1, py1, px2, py2)
+
+        # --- Cotas ---
+        r_out_px = (outer_d * scale) / 2
+        r_in_px = (inner_d * scale) / 2
+        
+        # Cota Externa (Arriba): Derecha -> Izquierda (Normal apunta Arriba)
+        # Usamos el borde superior del bounding box
+        self.draw_dimension(painter, 
+                            (cx + r_out_px, cy - r_out_px), 
+                            (cx - r_out_px, cy - r_out_px), 
+                            f"Ext: {outer_d:.2f} ({outer_s})", offset=30)
+                            
+        # Cota Interna (Abajo): Izquierda -> Derecha (Normal apunta Abajo)
+        # Usamos el borde inferior del bounding box interno
+        self.draw_dimension(painter, 
+                            (cx - r_in_px, cy + r_in_px), 
+                            (cx + r_in_px, cy + r_in_px),
+                            f"Int: {inner_d:.2f} ({inner_s})", offset=30)
 
 class BaseMeshWidget(QWidget):
     """Clase base para widgets de generación de malla."""
@@ -275,22 +380,27 @@ class RectangularMeshWidget(BaseMeshWidget):
         self.start_y = QLineEdit("0.0")
         self.start_z = QLineEdit("0.0")
         
+        # Columna Izquierda: Origen
         loc_layout.addWidget(QLabel("Origen X:"), 0, 0)
         loc_layout.addWidget(self.start_x, 0, 1)
-        loc_layout.addWidget(QLabel("Origen Y:"), 0, 2)
-        loc_layout.addWidget(self.start_y, 0, 3)
-        loc_layout.addWidget(QLabel("Origen Z:"), 1, 0)
-        loc_layout.addWidget(self.start_z, 1, 1)
+        loc_layout.addWidget(QLabel("Origen Y:"), 1, 0)
+        loc_layout.addWidget(self.start_y, 1, 1)
+        loc_layout.addWidget(QLabel("Origen Z:"), 2, 0)
+        loc_layout.addWidget(self.start_z, 2, 1)
         
+        # Columna Derecha: Propiedades y Utilidades
+        self.prop_edit = QLineEdit("Default")
         self.plane_combo = QComboBox()
         self.plane_combo.addItems(["XY", "XZ", "YZ"])
         
-        self.prop_edit = QLineEdit("Default")
+        self.btn_get_coords = QPushButton("Obtener Coordenadas")
+        self.btn_get_coords.clicked.connect(self.fetch_coords)
         
+        loc_layout.addWidget(QLabel("Propiedad Área:"), 0, 2)
+        loc_layout.addWidget(self.prop_edit, 0, 3)
         loc_layout.addWidget(QLabel("Plano:"), 1, 2)
         loc_layout.addWidget(self.plane_combo, 1, 3)
-        loc_layout.addWidget(QLabel("Propiedad Área:"), 2, 0)
-        loc_layout.addWidget(self.prop_edit, 2, 1)
+        loc_layout.addWidget(self.btn_get_coords, 2, 2, 1, 2) # Span 2 columns
         
         grp_loc.setLayout(loc_layout)
         params_layout.addWidget(grp_loc)
@@ -323,6 +433,21 @@ class RectangularMeshWidget(BaseMeshWidget):
             self.preview.update_rect(w, l, nx, ny)
         except ValueError:
             pass
+
+    def fetch_coords(self):
+        if not self.ensure_connection():
+            return
+
+        self.log("Obteniendo coordenadas de punto seleccionado...")
+        coords = self.backend.get_selected_point_coords()
+        
+        if coords:
+            self.start_x.setText(f"{coords['x']:.4f}")
+            self.start_y.setText(f"{coords['y']:.4f}")
+            self.start_z.setText(f"{coords['z']:.4f}")
+            self.log(f"Coordenadas actualizadas desde punto '{coords['name']}'")
+        else:
+            self.log("No se encontró ningún punto seleccionado.")
 
     def generate_mesh(self):
         if not self.ensure_connection():
@@ -400,7 +525,9 @@ class HoleMeshWidget(BaseMeshWidget):
         grp_mesh = QGroupBox("Configuración de Malla")
         mesh_layout = QFormLayout()
         
-        self.num_angular = QLineEdit("16")
+        self.num_angular = QComboBox()
+        self.num_angular.addItems(["8", "16", "32"])
+        self.num_angular.setCurrentText("16")
         self.num_radial = QLineEdit("2")
         
         mesh_layout.addRow("Divisiones Angulares (Puntos por anillo):", self.num_angular)
@@ -417,22 +544,27 @@ class HoleMeshWidget(BaseMeshWidget):
         self.start_y = QLineEdit("0.0")
         self.start_z = QLineEdit("0.0")
         
+        # Columna Izquierda: Origen
         loc_layout.addWidget(QLabel("Origen X (Esquina):"), 0, 0)
         loc_layout.addWidget(self.start_x, 0, 1)
-        loc_layout.addWidget(QLabel("Origen Y (Esquina):"), 0, 2)
-        loc_layout.addWidget(self.start_y, 0, 3)
-        loc_layout.addWidget(QLabel("Origen Z (Esquina):"), 1, 0)
-        loc_layout.addWidget(self.start_z, 1, 1)
+        loc_layout.addWidget(QLabel("Origen Y (Esquina):"), 1, 0)
+        loc_layout.addWidget(self.start_y, 1, 1)
+        loc_layout.addWidget(QLabel("Origen Z (Esquina):"), 2, 0)
+        loc_layout.addWidget(self.start_z, 2, 1)
         
+        # Columna Derecha: Propiedades y Utilidades
+        self.prop_edit = QLineEdit("Default")
         self.plane_combo = QComboBox()
         self.plane_combo.addItems(["XY", "XZ", "YZ"])
         
-        self.prop_edit = QLineEdit("Default")
+        self.btn_get_coords = QPushButton("Obtener Coordenadas")
+        self.btn_get_coords.clicked.connect(self.fetch_coords)
         
+        loc_layout.addWidget(QLabel("Propiedad Área:"), 0, 2)
+        loc_layout.addWidget(self.prop_edit, 0, 3)
         loc_layout.addWidget(QLabel("Plano:"), 1, 2)
         loc_layout.addWidget(self.plane_combo, 1, 3)
-        loc_layout.addWidget(QLabel("Propiedad Área:"), 2, 0)
-        loc_layout.addWidget(self.prop_edit, 2, 1)
+        loc_layout.addWidget(self.btn_get_coords, 2, 2, 1, 2)
         
         grp_loc.setLayout(loc_layout)
         params_layout.addWidget(grp_loc)
@@ -451,9 +583,9 @@ class HoleMeshWidget(BaseMeshWidget):
         self.setLayout(main_layout)
         
         # Connect signals
-        for w in [self.outer_dim, self.inner_dim, self.num_angular, self.num_radial]:
+        for w in [self.outer_dim, self.inner_dim, self.num_radial]:
             w.textChanged.connect(self.update_preview)
-        for w in [self.outer_shape, self.inner_shape]:
+        for w in [self.outer_shape, self.inner_shape, self.num_angular]:
             w.currentIndexChanged.connect(self.update_preview)
             
         self.update_preview()
@@ -464,12 +596,27 @@ class HoleMeshWidget(BaseMeshWidget):
             outer_d = float(self.outer_dim.text())
             inner_s = self.inner_shape.currentText()
             inner_d = float(self.inner_dim.text())
-            n_ang = int(self.num_angular.text())
+            n_ang = int(self.num_angular.currentText())
             n_rad = int(self.num_radial.text())
             
             self.preview.update_hole(outer_s, outer_d, inner_s, inner_d, n_ang, n_rad)
         except ValueError:
             pass
+
+    def fetch_coords(self):
+        if not self.ensure_connection():
+            return
+
+        self.log("Obteniendo coordenadas de punto seleccionado...")
+        coords = self.backend.get_selected_point_coords()
+        
+        if coords:
+            self.start_x.setText(f"{coords['x']:.4f}")
+            self.start_y.setText(f"{coords['y']:.4f}")
+            self.start_z.setText(f"{coords['z']:.4f}")
+            self.log(f"Coordenadas actualizadas desde punto '{coords['name']}'")
+        else:
+            self.log("No se encontró ningún punto seleccionado.")
 
     def generate_mesh(self):
         if not self.ensure_connection():
@@ -481,7 +628,7 @@ class HoleMeshWidget(BaseMeshWidget):
             inner_s = self.inner_shape.currentText()
             inner_d = float(self.inner_dim.text())
             
-            n_ang = int(self.num_angular.text())
+            n_ang = int(self.num_angular.currentText())
             n_rad = int(self.num_radial.text())
             
             sx = float(self.start_x.text())
@@ -507,22 +654,74 @@ class HoleMeshWidget(BaseMeshWidget):
             self.log(f"❌ Error inesperado: {e}")
 
 
+class NotesWidget(QWidget):
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.init_ui()
+        
+    def init_ui(self):
+        layout = QVBoxLayout()
+        
+        # Toolbar
+        toolbar = QHBoxLayout()
+        self.btn_refresh = QPushButton("Recargar Notas")
+        self.btn_refresh.clicked.connect(self.load_notes)
+        toolbar.addStretch()
+        toolbar.addWidget(self.btn_refresh)
+        
+        layout.addLayout(toolbar)
+        
+        # Markdown Viewer
+        self.viewer = QTextBrowser()
+        self.viewer.setOpenExternalLinks(True)
+        layout.addWidget(self.viewer)
+        
+        self.setLayout(layout)
+        
+        self.load_notes()
+        
+    def load_notes(self):
+        # Buscar el archivo Notas.md en la carpeta Notas/ relativa al script
+        base_dir = os.path.dirname(__file__)
+        notes_dir = os.path.join(base_dir, "Notas")
+        notes_file = os.path.join(notes_dir, "Notas.md")
+        
+        if os.path.exists(notes_file):
+            try:
+                with open(notes_file, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                
+                # Configurar BaseUrl para que las imágenes relativas funcionen
+                # Debe ser una URL de archivo (file://...)
+                base_url = QUrl.fromLocalFile(notes_dir + os.sep)
+                self.viewer.document().setBaseUrl(base_url)
+                
+                self.viewer.setMarkdown(content)
+            except Exception as e:
+                self.viewer.setMarkdown(f"# Error al cargar notas\n\n{str(e)}")
+        else:
+            self.viewer.setMarkdown(f"# Archivo no encontrado\n\nNo se encontró `{notes_file}`.")
+
+
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Utilidades SAP2000 - Modelado")
-        self.resize(600, 700)
+        self.resize(800, 700) # Increased width slightly for better reading
         
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
         
         self.rect_mesh_widget = RectangularMeshWidget()
         self.hole_mesh_widget = HoleMeshWidget()
+        self.notes_widget = NotesWidget()
         
         self.tabs.addTab(self.rect_mesh_widget, "Malla Rectangular")
         self.tabs.addTab(self.hole_mesh_widget, "Malla con Orificio")
+        self.tabs.addTab(self.notes_widget, "Notas y Recomendaciones")
 
 if __name__ == "__main__":
+
     app = QApplication(sys.argv)
     window = MainWindow()
     window.show()

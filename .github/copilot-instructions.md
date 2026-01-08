@@ -51,4 +51,4 @@ Mantén las reglas anteriores (manejo de retornos, listas/arrays y conexión) al
 
 ### 6. Documentación de la API
 
-La documentación y ejemplos de la API de SAP2000 están disponibles en la carpeta `API` del repositorio (ver [API](API) para más detalles).
+La documentación y ejemplos de la API de SAP2000 están disponibles en la carpeta `API` del repositorio (ver [API] (API) para más detalles).
