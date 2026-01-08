@@ -1,59 +1,59 @@
-# SAP2000 Automation Tools
+# Herramientas de Automatización para SAP2000
 
-This project provides a set of Python tools to automate tasks in CSI SAP2000 using the OAPI (Open Application Programming Interface) via the `comtypes` library. The application is structured in independent modules with graphical user interfaces (GUI) built with PySide6.
+Este proyecto proporciona un conjunto de herramientas en Python para automatizar tareas en CSI SAP2000 utilizando la OAPI (Open Application Programming Interface) a través de la librería `comtypes`. La aplicación está estructurada en módulos independientes con interfaces gráficas de usuario (GUI) construidas con PySide6.
 
-## Project Structure
+## Estructura del Proyecto
 
-The project is organized into modular components, each addressing specific engineering workflows:
+El proyecto está organizado en componentes modulares, cada uno abordando flujos de trabajo de ingeniería específicos:
 
-### 1. Load Combinations Manager (`Combinations_Carga`)
-An Excel-like interface to manage load combinations efficiently.
-- **Functionality**:
-    - Read existing load cases and combinations from the active SAP2000 model.
-    - Add, modify, or delete combinations using a grid view.
-    - Support for different combination types (Linear Additive, Envelope, etc.).
-    - Design type selection (ASD/LRFD).
-    - Robust update logic ("Upsert") to modify combinations without breaking model dependencies.
-- **Entry Point**: `Combinations_Carga/app_combos_gui.py`
+### 1. Gestor de Combinaciones de Carga (`Combinations_Carga`)
+Una interfaz tipo Excel para gestionar combinaciones de carga de manera eficiente.
+- **Funcionalidad**:
+    - Leer casos de carga y combinaciones existentes del modelo activo de SAP2000.
+    - Agregar, modificar o eliminar combinaciones utilizando una vista de cuadrícula.
+    - Soporte para diferentes tipos de combinación (Aditiva Lineal, Envolvente, etc.).
+    - Selección del tipo de diseño (ASD/LRFD).
+    - Lógica de actualización robusta ("Upsert") para modificar combinaciones sin romper dependencias del modelo.
+- **Punto de Entrada**: `Combinations_Carga/app_combos_gui.py`
 
-### 2. Mesh Utilities (`Utilidades_MOD`)
-Tools for generating and modifying finite element meshes.
-- **Functionality**:
-    - **Rectangular Mesh**: Generate rectangular area elements with specific subdivisions.
-    - **Hole Generation**: Create circular openings within existing area elements.
-    - **Preview**: Real-time visual preview of the geometry before sending it to SAP2000.
-- **Entry Point**: `Utilidades_MOD/app_utils_gui.py`
+### 2. Utilidades de Mallado (`Utilidades_MOD`)
+Herramientas para generar y modificar mallas de elementos finitos.
+- **Funcionalidad**:
+    - **Malla Rectangular**: Generar elementos de área rectangulares con subdivisiones específicas.
+    - **Generación de Huecos**: Crear aberturas circulares dentro de elementos de área existentes.
+    - **Vista Previa**: Visualización en tiempo real de la geometría antes de enviarla a SAP2000.
+- **Punto de Entrada**: `Utilidades_MOD/app_utils_gui.py`
 
-### 3. Base Plate Analysis (`Placa_Base`)
-Module dedicated to the analysis and design of base plates.
-- **Entry Point**: `Placa_Base/app_placabase_gui.py`
+### 3. Análisis de Placa Base (`Placa_Base`)
+Módulo dedicado al análisis y diseño de placas base.
+- **Punto de Entrada**: `Placa_Base/app_placabase_gui.py`
 
-## Requirements
+## Requisitos
 
 - **Software**: CSI SAP2000.
-- **Python**: Version 3.13 or compatible.
-- **Libraries**:
-    - `comtypes`: For COM interface communication with SAP2000.
-    - `PySide6`: For the Graphical User Interface.
+- **Python**: Versión 3.13 o compatible.
+- **Librerías**:
+    - `comtypes`: Para la comunicación de interfaz COM con SAP2000.
+    - `PySide6`: Para la Interfaz Gráfica de Usuario.
 
-## Usage
+## Uso
 
-1. Open SAP2000 and load your model.
-2. Run the desired module script using Python.
-3. The GUI will attempt to connect to the active SAP2000 instance.
+1. Abra SAP2000 y cargue su modelo.
+2. Ejecute el script del módulo deseado usando Python.
+3. La GUI intentará conectarse a la instancia activa de SAP2000.
 
-Example:
+Ejemplo:
 ```bash
 python Combinations_Carga/app_combos_gui.py
 ```
 
-## Architecture
+## Arquitectura
 
-The project follows a modular pattern separating the interface from the logic:
-- **GUI (*_gui.py)**: Handles user interaction and display using PySide6.
-- **Backend (*_backend.py)**: Manages the logic and direct communication with the SAP2000 API.
+El proyecto sigue un patrón modular separando la interfaz de la lógica:
+- **GUI (*_gui.py)**: Maneja la interacción del usuario y la visualización usando PySide6.
+- **Backend (*_backend.py)**: Gestiona la lógica y la comunicación directa con la API de SAP2000.
 
-## API Interaction
+## Interacción con la API
 
-- The interaction relies on `comtypes.client.GetActiveObject("CSI.SAP2000.API.SapObject")`.
-- Parameter handling is specifically adjusted for Python's `comtypes` behavior, particularly regarding `ByRef` return values which are returned as tuples.
+- La interacción se basa en `comtypes.client.GetActiveObject("CSI.SAP2000.API.SapObject")`.
+- El manejo de parámetros está ajustado específicamente para el comportamiento de `comtypes` en Python, particularmente con respecto a los valores de retorno `ByRef` que se devuelven como tuplas.
