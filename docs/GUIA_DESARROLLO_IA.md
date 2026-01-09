@@ -71,7 +71,7 @@ if __name__ == "__main__":
 La GUI debe ser un `QWidget`. Debe aceptar `sap_interface` para coordinarse con la app principal, pero manejar el caso `None` para pruebas aisladas.
 
 **Prompt para la IA:**
-> "Crea el archivo `gui.py` con una clase `[Nombre]Widget(QWidget)`. En `__init__` acepta `sap_interface`. Conecta un botón al backend. Asegúrate de que el backend se instancie usando `self.sap_interface.sap_model` si existe. Incluye un bloque `if __name__` para lanzar la ventana sola."
+> "Crea el archivo `gui.py` con una clase `[Nombre]Widget(QWidget)`. En `__init__` acepta `sap_interface`. Conecta un botón al backend. Asegúrate de que el backend se instancie usando `self.sap_interface.SapModel` si existe. Incluye un bloque `if __name__` para lanzar la ventana sola."
 
 **Plantilla de Código:**
 
@@ -100,8 +100,8 @@ class NuevoModuloWidget(QWidget):
     def run_logic(self):
         # Resolver el modelo: Integrado vs Standalone
         model = None
-        if self.sap_interface and self.sap_interface.sap_model:
-            model = self.sap_interface.sap_model
+        if self.sap_interface and self.sap_interface.SapModel:
+            model = self.sap_interface.SapModel
         
         # Instanciar backend (si model es None, el backend intentará conectar solo)
         backend = NuevoModuloBackend(sap_model=model)

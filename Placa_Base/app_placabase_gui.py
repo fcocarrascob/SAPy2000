@@ -327,8 +327,8 @@ class BasePlateWidget(QWidget):
         self.log.append('Iniciando ejecución de Placa Base...')
         try:
             # Check connection
-            if self.sap_interface and self.sap_interface.sap_model:
-                model = self.sap_interface.sap_model
+            if self.sap_interface and self.sap_interface.SapModel:
+                model = self.sap_interface.SapModel
             else:
                 self.log.append("No hay conexión activa en sap_interface. Intentando conectar en backend...")
                 model = None # Backend will try to connect if None

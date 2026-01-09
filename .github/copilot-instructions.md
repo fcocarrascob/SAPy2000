@@ -52,7 +52,7 @@ class MiModuloBackend:
 
 #### Frontend (GUI)
 *   Deben ser Widgets (`QWidget`) que reciban `sap_interface` en su `__init__`.
-*   Usan `sap_interface.sap_model` para instanciar el backend.
+*   Usan `sap_interface.SapModel` para instanciar el backend.
 
 ```python
 class MiModuloWidget(QWidget):
@@ -61,7 +61,7 @@ class MiModuloWidget(QWidget):
         self.sap_interface = sap_interface
 
     def on_button_click(self):
-        model = self.sap_interface.sap_model
+        model = self.sap_interface.SapModel
         backend = MiModuloBackend(model)
         backend.ejecutar_tarea()
 ```
