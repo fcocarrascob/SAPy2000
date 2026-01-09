@@ -7,18 +7,21 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
     QComboBox, QDoubleSpinBox, QPushButton, QGroupBox,
     QMessageBox, QGridLayout, QSpacerItem, QSizePolicy,
-    QFrame, QProgressBar
+    QFrame, QProgressBar, QDialog, QSplitter, QTableWidget, 
+    QTableWidgetItem, QHeaderView, QAbstractItemView
 )
 from PySide6.QtCore import Qt, Signal, QThread
-from PySide6.QtGui import QFont
+from PySide6.QtGui import QFont, QColor
 
 # Importar matplotlib para preview del espectro
 try:
     from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+    from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
     from matplotlib.figure import Figure
     MATPLOTLIB_AVAILABLE = True
 except ImportError:
     MATPLOTLIB_AVAILABLE = False
+
 
 from .modelo_base_backend import BaseModelBackend, BaseModelResult
 from .config import AR_BY_ZONE, SOIL_PARAMS, GRAVITY
@@ -43,6 +46,154 @@ class CreateModelWorker(QThread):
     
     def _report_progress(self, pct: int, msg: str):
         self.progress.emit(pct, msg)
+
+
+class SpectrumPreviewDialog(QDialog):
+    """Diálogo emergente para mostrar gráfico y tabla del espectro."""
+    def __init__(self, parent=None, data_dict=None, params_text=""):
+        super().__init__(parent)
+        self.setWindowTitle("Vista Previa Espectro NCh433")
+        self.resize(1100, 650)
+        self.setModal(True)
+        
+        # data_dict keys: T, Sax, Say, Sav, Rx, Ry, Rv...
+        self.data = data_dict or {}
+        self.params_text = params_text
+        
+        self.init_ui()
+        self.plot_data()
+        self.fill_table()
+
+    def init_ui(self):
+        layout = QVBoxLayout(self)
+        
+        # Splitter principal
+        splitter = QSplitter(Qt.Horizontal)
+        layout.addWidget(splitter)
+        
+        # --- Panel Izquierdo (Tabla y Params) ---
+        left_widget = QWidget()
+        left_layout = QVBoxLayout(left_widget)
+        
+        # Grupo Parámetros
+        grp_params = QGroupBox("Parámetros Definidos")
+        grp_layout = QVBoxLayout(grp_params)
+        lbl_params = QLabel(self.params_text)
+        lbl_params.setWordWrap(True)
+        lbl_params.setStyleSheet("font-family: Consolas; font-size: 11px;")
+        grp_layout.addWidget(lbl_params)
+        left_layout.addWidget(grp_params)
+        
+        # Tabla
+        self.table = QTableWidget()
+        self.table.setColumnCount(4)
+        self.table.setHorizontalHeaderLabels(["T [s]", "Sa X [g]", "Sa Y [g]", "Sa V [g]"])
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.Stretch)
+        self.table.setAlternatingRowColors(True)
+        self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        left_layout.addWidget(self.table)
+        
+        splitter.addWidget(left_widget)
+        
+        # --- Panel Derecho (Gráfico) ---
+        right_widget = QWidget()
+        right_layout = QVBoxLayout(right_widget)
+        
+        if MATPLOTLIB_AVAILABLE:
+            self.figure = Figure(figsize=(6, 5), dpi=100)
+            self.canvas = FigureCanvas(self.figure)
+            self.toolbar = NavigationToolbar(self.canvas, self)
+            
+            right_layout.addWidget(self.toolbar)
+            right_layout.addWidget(self.canvas)
+        else:
+            right_layout.addWidget(QLabel("Matplotlib no instalado."))
+            
+        splitter.addWidget(right_widget)
+        
+        # Set splitter proportions (35% left, 65% right)
+        splitter.setSizes([350, 650])
+        
+        # Botón Cerrar
+        btn_close = QPushButton("Cerrar")
+        btn_close.clicked.connect(self.close)
+        btn_close.setStyleSheet("padding: 5px 20px;")
+        
+        btn_layout = QHBoxLayout()
+        btn_layout.addStretch()
+        btn_layout.addWidget(btn_close)
+        
+        layout.addLayout(btn_layout)
+
+    def plot_data(self):
+        if not MATPLOTLIB_AVAILABLE or not self.data:
+            return
+            
+        T = self.data.get('T', [])
+        Sax = self.data.get('Sax', [])
+        Say = self.data.get('Say', [])
+        Sav = self.data.get('Sav', [])
+        
+        ax = self.figure.add_subplot(111)
+        ax.grid(True, linestyle='--', alpha=0.6)
+        
+        if Sax:
+            ax.plot(T, Sax, 'b-', linewidth=1.5, label=f"Horizontal X (R={self.data.get('Rx',0)})")
+        if Say:
+            # Check if different from X to avoid clutter, or just plot if exists
+            # Logic handled by caller passed data
+            if self.data.get('has_y', False):
+                ax.plot(T, Say, 'g-.', linewidth=1.5, label=f"Horizontal Y (R={self.data.get('Ry',0)})")
+        if Sav:
+            ax.plot(T, Sav, 'r--', linewidth=1.5, label=f"Vertical (R={self.data.get('Rv',0)})")
+            
+        ax.set_xlabel("Period $T$ [s]")
+        ax.set_ylabel("Spectral Acceleration $S_a$ [g]")
+        ax.set_title("Espectro de Diseño NCh433 Ref.")
+        ax.legend()
+        
+        self.canvas.draw()
+
+    def fill_table(self):
+        T = self.data.get('T', [])
+        if len(T) == 0:
+            return
+            
+        Sax = self.data.get('Sax', [])
+        Say = self.data.get('Say', [])
+        Sav = self.data.get('Sav', [])
+        
+        rows = len(T)
+        self.table.setRowCount(rows)
+        self.table.setUpdatesEnabled(False) # Optimization
+        
+        try:
+            for i in range(rows):
+                # T
+                item_t = QTableWidgetItem(f"{T[i]:.3f}")
+                item_t.setTextAlignment(Qt.AlignCenter)
+                self.table.setItem(i, 0, item_t)
+                
+                # Sax
+                val_x = Sax[i] if i < len(Sax) else 0.0
+                item_x = QTableWidgetItem(f"{val_x:.4f}")
+                item_x.setTextAlignment(Qt.AlignCenter)
+                self.table.setItem(i, 1, item_x)
+                
+                # Say
+                val_y = Say[i] if i < len(Say) else 0.0
+                item_y = QTableWidgetItem(f"{val_y:.4f}")
+                item_y.setTextAlignment(Qt.AlignCenter)
+                self.table.setItem(i, 2, item_y)
+                
+                # Sav
+                val_v = Sav[i] if i < len(Sav) else 0.0
+                item_v = QTableWidgetItem(f"{val_v:.4f}")
+                item_v.setTextAlignment(Qt.AlignCenter)
+                self.table.setItem(i, 3, item_v)
+        finally:
+            self.table.setUpdatesEnabled(True)
 
 
 class ModeloBaseWidget(QWidget):
@@ -100,53 +251,71 @@ class ModeloBaseWidget(QWidget):
         self.lbl_horiz_title.setAlignment(Qt.AlignCenter)
         grid.addWidget(self.lbl_horiz_title, 3, 0, 1, 2)
 
-        # -- Fila 4: Amortiguamiento Horizontal --
-        self.lbl_damp = QLabel("Amortiguamiento (ξ):")
-        self.spin_damp = QDoubleSpinBox()
-        self.spin_damp.setDecimals(3)
-        self.spin_damp.setRange(0.001, 0.2)
-        self.spin_damp.setSingleStep(0.001)
-        self.spin_damp.setValue(0.050) # Usualmente 0.05, referencia dice 0.03 default
-        # Ajustamos al valor de referencia
-        self.spin_damp.setValue(0.050) 
-        grid.addWidget(self.lbl_damp, 4, 0)
-        grid.addWidget(self.spin_damp, 4, 1)
+        # -- Fila 4: Amortiguamiento X --
+        self.lbl_damp_x = QLabel("Amortiguamiento X (ξx):")
+        self.spin_damp_x = QDoubleSpinBox()
+        self.spin_damp_x.setDecimals(3)
+        self.spin_damp_x.setRange(0.001, 0.2)
+        self.spin_damp_x.setSingleStep(0.001)
+        self.spin_damp_x.setValue(0.03)
+        grid.addWidget(self.lbl_damp_x, 4, 0)
+        grid.addWidget(self.spin_damp_x, 4, 1)
 
-        # -- Fila 5: R Horizontal --
-        self.lbl_R = QLabel("Factor R (Horizontal):")
-        self.spin_R = QDoubleSpinBox()
-        self.spin_R.setDecimals(2)
-        self.spin_R.setRange(1.0, 12.0)
-        self.spin_R.setSingleStep(0.1)
-        self.spin_R.setValue(7.0) # Valor típico, referencia dice 3.0? Ajustamos a 7 (acero)
-        grid.addWidget(self.lbl_R, 5, 0)
-        grid.addWidget(self.spin_R, 5, 1)
+        # -- Fila 5: Factor Rx --
+        self.lbl_R_x = QLabel("Factor Rx:")
+        self.spin_R_x = QDoubleSpinBox()
+        self.spin_R_x.setDecimals(2)
+        self.spin_R_x.setRange(1.0, 12.0)
+        self.spin_R_x.setSingleStep(0.1)
+        self.spin_R_x.setValue(3.0)
+        grid.addWidget(self.lbl_R_x, 5, 0)
+        grid.addWidget(self.spin_R_x, 5, 1)
 
-        # -- Fila 6: Separador / Título Vertical --
+        # -- Fila 6: Amortiguamiento Y --
+        self.lbl_damp_y = QLabel("Amortiguamiento Y (ξy):")
+        self.spin_damp_y = QDoubleSpinBox()
+        self.spin_damp_y.setDecimals(3)
+        self.spin_damp_y.setRange(0.001, 0.2)
+        self.spin_damp_y.setSingleStep(0.001)
+        self.spin_damp_y.setValue(0.03)
+        grid.addWidget(self.lbl_damp_y, 6, 0)
+        grid.addWidget(self.spin_damp_y, 6, 1)
+
+        # -- Fila 7: Factor Ry --
+        self.lbl_R_y = QLabel("Factor Ry:")
+        self.spin_R_y = QDoubleSpinBox()
+        self.spin_R_y.setDecimals(2)
+        self.spin_R_y.setRange(1.0, 12.0)
+        self.spin_R_y.setSingleStep(0.1)
+        self.spin_R_y.setValue(3.0)
+        grid.addWidget(self.lbl_R_y, 7, 0)
+        grid.addWidget(self.spin_R_y, 7, 1)
+
+        # -- Fila 8: Separador / Título Vertical --
         self.lbl_vert_title = QLabel("--- Parámetros Verticales ---")
         self.lbl_vert_title.setFont(font_bold)
         self.lbl_vert_title.setAlignment(Qt.AlignCenter)
-        grid.addWidget(self.lbl_vert_title, 6, 0, 1, 2)
+        grid.addWidget(self.lbl_vert_title, 8, 0, 1, 2)
 
-        # -- Fila 7: Amortiguamiento Vertical --
+        # -- Fila 9: Amortiguamiento Vertical --
         self.lbl_vert_damp = QLabel("Amortiguamiento Vertical (ξv):")
         self.spin_vert_damp = QDoubleSpinBox()
         self.spin_vert_damp.setDecimals(3)
         self.spin_vert_damp.setRange(0.001, 0.2)
         self.spin_vert_damp.setSingleStep(0.001)
-        self.spin_vert_damp.setValue(0.050)
-        grid.addWidget(self.lbl_vert_damp, 7, 0)
-        grid.addWidget(self.spin_vert_damp, 7, 1)
+        self.spin_vert_damp.setValue(0.03)
+        grid.addWidget(self.lbl_vert_damp, 9, 0)
+        grid.addWidget(self.spin_vert_damp, 9, 1)
 
-        # -- Fila 8: R Vertical --
+        # -- Fila 10: R Vertical --
         self.lbl_vert_R = QLabel("Factor R (Vertical):")
         self.spin_vert_R = QDoubleSpinBox()
         self.spin_vert_R.setDecimals(2)
         self.spin_vert_R.setRange(1.0, 12.0)
         self.spin_vert_R.setSingleStep(0.1)
-        self.spin_vert_R.setValue(7.0) 
-        grid.addWidget(self.lbl_vert_R, 8, 0)
-        grid.addWidget(self.spin_vert_R, 8, 1)
+        self.spin_vert_R.setValue(2.0) 
+        grid.addWidget(self.lbl_vert_R, 10, 0)
+        grid.addWidget(self.spin_vert_R, 10, 1)
 
         group_layout.addWidget(self.inputs_widget)
 
@@ -183,24 +352,7 @@ class ModeloBaseWidget(QWidget):
         self.lbl_status.setStyleSheet("color: #666; font-style: italic;")
         group_layout.addWidget(self.lbl_status)
         
-        # 5. Placeholder para Gráfico (o Canvas de Matplotlib)
-        self.chart_frame = QFrame()
-        self.chart_frame.setFrameShape(QFrame.StyledPanel)
-        self.chart_frame.setMinimumHeight(250)
-        self.chart_layout = QVBoxLayout(self.chart_frame)
-        
-        if MATPLOTLIB_AVAILABLE:
-            # Canvas de Matplotlib
-            self.figure = Figure(figsize=(5, 3), dpi=100)
-            self.canvas = FigureCanvas(self.figure)
-            self.chart_layout.addWidget(self.canvas)
-        else:
-            self.lbl_chart_placeholder = QLabel("Vista Previa del Espectro (matplotlib no disponible)")
-            self.lbl_chart_placeholder.setAlignment(Qt.AlignCenter)
-            self.lbl_chart_placeholder.setStyleSheet("color: gray; font-style: italic;")
-            self.chart_layout.addWidget(self.lbl_chart_placeholder)
-        
-        group_layout.addWidget(self.chart_frame)
+        # (Gráfico eliminado de la interfaz principal, ahora es un pop-up)
 
         # Spacer final
         main_layout.addWidget(self.base_model_group)
@@ -227,10 +379,11 @@ class ModeloBaseWidget(QWidget):
             params = {
                 "zone": int(self.combo_zone.currentText()),
                 "soil": self.combo_soil.currentText(),
-                "r_x": self.spin_R.value(),
-                "r_y": self.spin_R.value(),  # Usar mismo R para X e Y
+                "r_x": self.spin_R_x.value(),
+                "r_y": self.spin_R_y.value(),
                 "importance": self.spin_importance.value(),
-                "damping": self.spin_damp.value(),
+                "damping": self.spin_damp_x.value(),
+                "damping_y": self.spin_damp_y.value(),
                 "xi_v": self.spin_vert_damp.value(),
                 "r_v": self.spin_vert_R.value(),
             }
@@ -276,7 +429,7 @@ class ModeloBaseWidget(QWidget):
         self.lbl_status.setText("")
 
     def on_preview_spectrum_click(self):
-        """Genera la vista previa del espectro NCh433 con parámetros actuales."""
+        """Genera la vista previa del espectro en una ventana emergente."""
         if not MATPLOTLIB_AVAILABLE:
             return
         
@@ -284,94 +437,128 @@ class ModeloBaseWidget(QWidget):
             # Leer parámetros de la GUI
             zone = int(self.combo_zone.currentText())
             soil = self.combo_soil.currentText()
-            R = self.spin_R.value()
+            R_x = self.spin_R_x.value()
+            R_y = self.spin_R_y.value()
             I = self.spin_importance.value()
-            xi = self.spin_damp.value()
+            xi_x = self.spin_damp_x.value()
+            xi_y = self.spin_damp_y.value()
             R_v = self.spin_vert_R.value()
             xi_v = self.spin_vert_damp.value()
             
             # Calcular espectros
-            T_vals, Sa_horiz, Sa_vert = self._compute_spectrum_preview(
-                zone, soil, R, I, xi, R_v, xi_v
+            T_vals, Sa_x, Sa_y, Sa_vert = self._compute_spectrum_preview(
+                zone, soil, R_x, R_y, I, xi_x, xi_y, R_v, xi_v
             )
             
-            # Dibujar en el canvas
-            self.figure.clear()
-            ax = self.figure.add_subplot(111)
+            # Preparar datos para el diálogo
+            data_dict = {
+                'T': T_vals,
+                'Sax': Sa_x,
+                'Say': Sa_y,
+                'Sav': Sa_vert,
+                'Rx': R_x,
+                'Ry': R_y,
+                'Rv': R_v,
+                'has_y': (abs(R_x - R_y) > 0.01) or (abs(xi_x - xi_y) > 0.001)
+            }
             
-            ax.plot(T_vals, Sa_horiz, 'b-', linewidth=1.5, label=f'Horizontal (R={R:.1f})')
-            ax.plot(T_vals, Sa_vert, 'r--', linewidth=1.5, label=f'Vertical (R_v={R_v:.1f})')
+            # Texto resumen de parámetros
+            params_info = (
+                f"Zona Sísmica: {zone}\n"
+                f"Suelo: {soil}\n"
+                f"I: {I:.2f}\n\n"
+                f"H-X: Rx={R_x}, ξ={xi_x}\n"
+                f"H-Y: Ry={R_y}, ξ={xi_y}\n"
+                f"Vert: Rv={R_v}, ξ={xi_v}"
+            )
             
-            ax.set_xlabel('Período T [s]')
-            ax.set_ylabel('Sa [g]')
-            ax.set_title(f'Espectro NCh433 - Zona {zone}, Suelo {soil}, I={I:.2f}')
-            ax.set_xlim(0, 5.0)
-            ax.set_ylim(0, max(max(Sa_horiz), max(Sa_vert)) * 1.1)
-            ax.grid(True, alpha=0.3)
-            ax.legend(loc='upper right', fontsize=8)
-            
-            self.figure.tight_layout()
-            self.canvas.draw()
+            # Abrir diálogo
+            dlg = SpectrumPreviewDialog(self, data_dict, params_info)
+            dlg.exec()
             
         except Exception as e:
             QMessageBox.warning(self, "Error Preview", f"No se pudo generar el espectro:\n{str(e)}")
 
-    def _compute_spectrum_preview(self, zone: int, soil: str, R: float, I: float, 
-                                   xi: float, R_v: float, xi_v: float):
-        """Calcula el espectro NCh433 para preview (sin SAP2000).
-        
-        Returns:
-            (T_vals, Sa_horizontal, Sa_vertical) - arrays con valores del espectro
-        """
+    def _compute_spectrum_preview(self, zone: int, soil: str, R_x: float, R_y: float, I: float, 
+                                   xi_x: float, xi_y: float, R_v: float, xi_v: float):
+        """Calcula el espectro replicando EXACTAMENTE la lógica del Backend (NCh Unified)."""
         import numpy as np
         
-        # Parámetros de suelo
+        # Parámetros de suelo (Valores deben coincidir con config.py)
         sp = SOIL_PARAMS[soil]
-        A0 = AR_BY_ZONE[zone]
+        s, r, t0, p_exp, q_exp, t1 = sp.S, sp.r, sp.T0, sp.p, sp.q, sp.T1
+        ar = AR_BY_ZONE[zone]
         
         # Generar períodos
         T_vals = np.arange(0.0, 5.01, 0.01)
         
-        Sa_horiz = []
+        Sa_x = []
+        Sa_y = []
         Sa_vert = []
         
         for T in T_vals:
-            # --- Espectro Horizontal NCh433 ---
-            # Factor α según NCh433
-            alpha_h = self._calc_alpha(T, sp.T0, sp.p, sp.q)
-            
-            # R* (factor de reducción modificado por T)
-            if T > 0.10 and T < sp.T1:
-                R_star = 1.0 + (R - 1.0) * (T - 0.10) / (sp.T1 - 0.10)
-            elif T >= sp.T1:
-                R_star = R
+            # --- Common Shape Calculation (Unified Formula) ---
+            # Horizontal Shape Base
+            ratio = (T / t0) if t0 > 0 else 0
+            if T == 0:
+                sah_base = ar * s
             else:
-                R_star = 1.0
-            
-            # Coeficiente (ξ/5)^0.4 para amortiguamiento
-            damp_factor = (xi / 0.05) ** 0.4 if xi != 0.05 else 1.0
-            
-            # Sa horizontal = α * A0 * S * I / R* (en g)
-            Sa_h = alpha_h * A0 * sp.S * I / (R_star * damp_factor)
-            Sa_horiz.append(Sa_h)
-            
-            # --- Espectro Vertical NCh433 ---
-            # Factor α para vertical (sin considerar r)
-            alpha_v = self._calc_alpha_vertical(T, sp.T0, sp.p, sp.q)
-            
-            # Coeficiente vertical según NCh433
-            Cv = 2.0 / 3.0  # Factor vertical típico
-            
-            # Factor de amortiguamiento vertical
-            damp_factor_v = (xi_v / 0.05) ** 0.4 if xi_v != 0.05 else 1.0
-            
-            # Sa vertical = Cv * α * A0 * S * I / R_v (sin R*)
-            Sa_v = Cv * alpha_v * A0 * sp.S * I / (R_v * damp_factor_v)
-            Sa_vert.append(Sa_v)
-        
-        return T_vals, Sa_horiz, Sa_vert
+                num = 1.0 + r * (ratio ** p_exp)
+                den = 1.0 + (ratio ** q_exp)
+                sah_base = ar * s * num / den
 
-    def _calc_alpha(self, T: float, T0: float, p: float, q: float) -> float:
+            # --- R* Calculation Logic (Copied from Backend) ---
+            def get_r_star(R_val, T_val, t1_val):
+                cr = 0.16 * R_val
+                limit = cr * t1_val
+                
+                if limit <= 0:
+                    return R_val
+                elif T_val >= limit:
+                    return R_val
+                else:
+                    # Interpolación lineal 1.5 -> R
+                    ratio_t = T_val / limit
+                    return 1.5 + (R_val - 1.5) * ratio_t
+
+            # --- Horizontal X ---
+            r_star_x = get_r_star(R_x, T, t1)
+            damping_scale_x = (0.05 / xi_x) ** 0.4 if xi_x > 0 else 1.0
+            val_x = I * sah_base * damping_scale_x / r_star_x
+            Sa_x.append(val_x)
+
+            # --- Horizontal Y ---
+            r_star_y = get_r_star(R_y, T, t1)
+            damping_scale_y = (0.05 / xi_y) ** 0.4 if xi_y > 0 else 1.0
+            val_y = I * sah_base * damping_scale_y / r_star_y
+            Sa_y.append(val_y)
+            
+            # --- Vertical Spectrum (Copied from Backend) ---
+            # "La fórmula del espectro vertical usa un período desplazado (1.7×T)
+            # y un factor de escala de 0.7 respecto al horizontal."
+            
+            vertical_factor = 0.7
+            period_shift = 1.7
+            T_shifted = period_shift * T
+            
+            ratio_v = (T_shifted / t0) if t0 > 0 else 0
+            
+            if T == 0:
+                sav_base = vertical_factor * ar * s
+            else:
+                num_v = 1.0 + r * (ratio_v ** p_exp)
+                den_v = 1.0 + (ratio_v ** q_exp)
+                sav_base = vertical_factor * ar * s * num_v / den_v
+            
+            # Vertical NO usa R* (usa reducción directa R_v)
+            damping_scale_v = (0.05 / xi_v) ** 0.4 if xi_v > 0 else 1.0
+            val_v = I * sav_base * damping_scale_v / R_v
+            Sa_vert.append(val_v)
+        
+        return T_vals, Sa_x, Sa_y, Sa_vert
+    
+    # Métodos auxiliares eliminados ya que la lógica está integrada arriba para garantizar paridad.
+
         """Calcula el factor de amplificación α según NCh433."""
         if T <= T0:
             # Rama ascendente: α = 1 + T/T0 * (2.75-1)

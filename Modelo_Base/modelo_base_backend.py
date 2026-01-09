@@ -43,6 +43,7 @@ class BaseModelBackend:
         r_y: float, 
         importance: float, 
         damping: float,
+        damping_y: Optional[float] = None,
         xi_v: float = 0.03,
         r_v: float = 3.0,
         progress_callback: Optional[Callable[[int, str], None]] = None
@@ -55,7 +56,8 @@ class BaseModelBackend:
             r_x: Factor de reducción R en dirección X
             r_y: Factor de reducción R en dirección Y
             importance: Factor de importancia I
-            damping: Amortiguamiento (ej. 0.05 para 5%)
+            damping: Amortiguamiento X (ej. 0.05 para 5%)
+            damping_y: Amortiguamiento Y (opcional, defaults to damping X)
             xi_v: Amortiguamiento vertical (default 0.03)
             r_v: Factor de reducción vertical (default 3.0)
             progress_callback: Función opcional para reportar progreso (percent, message)
@@ -63,6 +65,9 @@ class BaseModelBackend:
         Returns:
             BaseModelResult con resumen de la creación
         """
+        if damping_y is None:
+            damping_y = damping
+
         if not self.SapModel:
             return BaseModelResult(False, "No hay conexión con SAP2000.")
 
@@ -103,7 +108,7 @@ class BaseModelBackend:
             # 5. Seismic Spectrum & Cases (Horizontal + Vertical)
             report(40, "Configurando espectros sísmicos...")
             func_count, case_count = self._setup_seismic_definitions(
-                zone, soil, r_x, r_y, importance, damping, xi_v, r_v
+                zone, soil, r_x, r_y, importance, damping, damping_y, xi_v, r_v
             )
             result.functions_created = func_count
             result.cases_created = case_count
@@ -254,7 +259,7 @@ class BaseModelBackend:
 
     def _setup_seismic_definitions(
         self, zone: int, soil: str, r_x: float, r_y: float, 
-        I: float, damp: float, xi_v: float, r_v: float
+        I: float, damp_x: float, damp_y: float, xi_v: float, r_v: float
     ) -> Tuple[int, int]:
         """Calcula espectros NCh (horizontal y vertical) y define Functions + Load Cases.
         
@@ -264,20 +269,38 @@ class BaseModelBackend:
         func_count = 0
         case_count = 0
         
-        # 1. Espectro Horizontal
-        periods_h, accels_h = self._compute_nch_spectrum(zone, soil, I, 1.0, damp)
+        # 1. Espectros Horizontales (Corregido: Usa R real)
+        # Check if identical (R and Damping)
+        same_r = abs(r_x - r_y) < 1e-6
+        same_damp = abs(damp_x - damp_y) < 1e-6
+        use_single_spectrum = same_r and same_damp
+
+        func_name_x = f"SaH_{zone}{soil}_R{r_x}"
         
-        func_name_h = "NCh_Design_Spectrum_H"
-        if periods_h:
-            ret = self.SapModel.Func.FuncRS.SetUser(func_name_h, len(periods_h), periods_h, accels_h, damp)
+        # Espectro X
+        periods_x, accels_x = self._compute_nch_spectrum(zone, soil, I, r_x, damp_x)
+        if periods_x:
+            ret = self.SapModel.Func.FuncRS.SetUser(func_name_x, len(periods_x), periods_x, accels_x, damp_x)
             rc = ret[-1] if isinstance(ret, (list, tuple)) else ret
             if rc == 0:
                 func_count += 1
+                
+        # Espectro Y
+        if use_single_spectrum:
+            func_name_y = func_name_x
+        else:
+            func_name_y = f"SaH_{zone}{soil}_R{r_y}"
+            periods_y, accels_y = self._compute_nch_spectrum(zone, soil, I, r_y, damp_y)
+            if periods_y:
+                ret = self.SapModel.Func.FuncRS.SetUser(func_name_y, len(periods_y), periods_y, accels_y, damp_y)
+                rc = ret[-1] if isinstance(ret, (list, tuple)) else ret
+                if rc == 0:
+                    func_count += 1
         
         # 2. Espectro Vertical
         periods_v, accels_v = self._compute_vertical_spectrum(zone, soil, I, r_v, xi_v)
         
-        func_name_v = "NCh_Design_Spectrum_V"
+        func_name_v = f"SaV_{zone}{soil}_R{r_v}"
         if periods_v:
             ret = self.SapModel.Func.FuncRS.SetUser(func_name_v, len(periods_v), periods_v, accels_v, xi_v)
             rc = ret[-1] if isinstance(ret, (list, tuple)) else ret
@@ -285,13 +308,13 @@ class BaseModelBackend:
                 func_count += 1
         
         # 3. Load Cases para Response Spectrum
-        # Scale factor = GRAVITY (el factor R ya está aplicado en el espectro)
+        # Scale factor = GRAVITY (el factor R ya está aplicado en el espectro tras la corrección)
         scale = GRAVITY
         
         # Horizontal cases
-        if self._set_rs_case("EQX", func_name_h, "U1", scale, damp):
+        if self._set_rs_case("EQX", func_name_x, "U1", scale, damp_x):
             case_count += 1
-        if self._set_rs_case("EQY", func_name_h, "U2", scale, damp):
+        if self._set_rs_case("EQY", func_name_y, "U2", scale, damp_y):
             case_count += 1
         
         # Vertical case (uses vertical spectrum with its own damping)
