@@ -1,0 +1,107 @@
+{
+  "category": "Cargas Estáticas",
+  "snippets": [
+    {
+      "id": "carga_muerta_pp",
+      "title": "Carga Muerta (D)",
+      "description": "Definición estándar para Peso Propio y Cargas Permanentes.",
+      "content": [
+        {
+          "type": "heading",
+          "content": "Estado de Carga: Peso Propio (D)",
+          "parameters": { "level": 3 }
+        },
+        {
+          "type": "text",
+          "content": "La carga muerta considera el peso propio de los elementos estructurales modelados, así como las cargas permanentes adicionales estimadas.",
+          "parameters": { "style": "Normal" }
+        },
+        {
+          "type": "equation",
+          "content": "D = W_{estructura} + W_{sobrecarga}",
+          "parameters": {}
+        }
+      ]
+    },
+    {
+      "type": "snippet",
+      "id": "carga_viva_l", 
+      "title": "Sobrecarga de Uso (L)",
+      "description": "Definición para cargas variables de uso.",
+      "content": [
+        {
+          "type": "heading",
+          "content": "Estado de Carga: Sobrecarga de Uso (L)",
+          "parameters": { "level": 3 }
+        },
+        {
+          "type": "text",
+          "content": "Se consideran las sobrecargas normativas de acuerdo al uso de la estructura (NCh1537).",
+          "parameters": { "style": "Normal" }
+        },
+        {
+          "type": "equation",
+          "content": "L = 250 [kg/m^2]",
+          "parameters": {}
+        }
+      ]
+    },
+    {
+      "id": "test_ecuaciones_complejas",
+      "title": "🧪 Test Ecuaciones (Raíces, Fracciones)",
+      "description": "Pruebas de renderizado para fórmulas matemáticas complejas.",
+      "content": [
+        {
+          "type": "heading",
+          "content": "Pruebas de Renderizado Matemático",
+          "parameters": { "level": 3 }
+        },
+        {
+          "type": "text",
+          "content": "A continuación se presentan ejemplos de ecuaciones complejas para verificar el motor de Word:",
+          "parameters": { "style": "Normal" }
+        },
+        {
+          "type": "text",
+          "content": "1. Fórmula Cuadrática (Fracción + Raíz + Potencias):",
+          "parameters": { "style": "Normal" }
+        },
+        {
+          "type": "equation",
+          "content": "x = (-b + \\sqrt(b^2 - 4ac))/(2a)",
+          "parameters": {}
+        },
+        {
+          "type": "text",
+          "content": "2. Teorema de Pitágoras (Raíz simple):",
+          "parameters": { "style": "Normal" }
+        },
+        {
+          "type": "equation",
+          "content": "c = \\sqrt(a^2 + b^2)",
+          "parameters": {}
+        },
+        {
+          "type": "text",
+          "content": "3. Esfuerzos (Caracteres Griegos y Subíndices):",
+          "parameters": { "style": "Normal" }
+        },
+        {
+          "type": "equation",
+          "content": "\\sigma_{adm} = 0.60 F_y",
+          "parameters": {}
+        },
+        {
+          "type": "text",
+          "content": "4. Sumatorias e Integrales:",
+          "parameters": { "style": "Normal" }
+        },
+        {
+          "type": "equation",
+          "content": "V = \\int_0^L q(x)dx + \\sum P_i",
+          "parameters": {}
+        }
+      ]
+    }
+  ]
+}

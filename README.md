@@ -28,12 +28,18 @@ Herramientas avanzadas de geometría y mallado.
 ### 4. Diseño de Placa Base (`Placa_Base`)
 Módulo específico para el modelado y generación de geometrías de placas base, pernos y rigidizadores.
 
+### 5. Generador de Memorias y Reportes (`Reportes`)
+Sistema avanzado para la generación automática de memorias de cálculo en Microsoft Word.
+- **Asistente en Vivo**: Inyecta tablas de datos de SAP2000 (Materiales, Cargas, Secciones) directamente en la posición del cursor de Word.
+- **Generación por Templates**: Crea documentos completos basándose en plantillas JSON personalizables.
+- **Librería de Contenido**: Inserción rápida de bloques de texto estándar (e.g., descripciones de carga) y **ecuaciones matemáticas** renderizadas nativamente en Word.
+
 ## Requisitos
 
-- **Software**: CSI SAP2000 (v20+ recomendado).
+- **Software**: CSI SAP2000 (v20+ recomendado) y **Microsoft Word**.
 - **Python**: 3.13+.
 - **Librerías**:
-    - `comtypes`: Interfaz COM.
+    - `comtypes`: Interfaz COM (SAP2000 y Word).
     - `PySide6`: Interfaz Gráfica (Qt).
 
 Instalación de dependencias:
@@ -49,9 +55,42 @@ pip install comtypes PySide6
 ```bash
 python main_app.py
 ```
+3. Navegue por las pestañas para usar las distintas herramientas.
 
-3. Haga clic en **"🔌 Conectar a SAP2000"** en la barra de herramientas.
-4. Navegue por las pestañas para utilizar las diferentes herramientas.
+## Personalización de Reportes
+
+El módulo de Reportes es altamente personalizable mediante archivos JSON.
+
+### Templates de Documento
+Ubicación: `Reportes/templates/`
+Cree un archivo `.json` con la siguiente estructura:
+```json
+{
+  "template_name": "Mi Reporte",
+  "sections": [
+    { "type": "heading", "content": "Título 1", "parameters": { "level": 1 } },
+    { "type": "text", "content": "Párrafo de texto...", "parameters": { "style": "Normal" } },
+    { "type": "page_break" }
+  ]
+}
+```
+
+### Librería y Ecuaciones
+Ubicación: `Reportes/library/`
+Agregue archivos `.json` para categorizar sus snippets. Para las ecuaciones, utilice formato lineal (similar a LaTeX simplificado):
+
+```json
+{
+  "type": "equation",
+  "content": "x = (-b + \\sqrt(b^2 - 4ac))/(2a)"
+}
+```
+**Sintaxis Soportada:**
+*   `\sqrt(x)`: Raíz cuadrada
+*   `a^2`, `a_b`: Potencias y subíndices
+*   `\sigma`, `\alpha`, `\Delta`: Caracteres griegos
+*   `\int`, `\sum`: Integrales y sumatorias
+*   Las fracciones se detectan con `/` (ej: `a/b`).
 
 ## Arquitectura Técnica
 

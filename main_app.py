@@ -10,6 +10,7 @@ try:
     from Utilidades_MOD.app_utils_gui import MeshUtilsWidget
     from Placa_Base.app_placabase_gui import BasePlateWidget
     from Modelo_Base.app_modelo_base_gui import ModeloBaseWidget
+    from Reportes.report_gui import ReportWidget
 except ImportError as e:
     print(f"Error importing modules: {e}")
     # Fallback to empty classes to allow app to start and show error
@@ -17,6 +18,7 @@ except ImportError as e:
     class MeshUtilsWidget(QWidget): pass
     class BasePlateWidget(QWidget): pass
     class ModeloBaseWidget(QWidget): pass
+    class ReportWidget(QWidget): pass
 
 
 class UnifiedApp(QMainWindow):
@@ -84,6 +86,13 @@ class UnifiedApp(QMainWindow):
             self.tabs.addTab(self.base_model_tab, "Modelo Base")
         except Exception as e:
             self.tabs.addTab(QLabel(f"Error loading Base Model: {e}"), "Modelo Base (Error)")
+
+        # Tab 5: Reportes
+        try:
+            self.reports_tab = ReportWidget(sap_interface=self.sap_interface)
+            self.tabs.addTab(self.reports_tab, "Memorias (Word)")
+        except Exception as e:
+            self.tabs.addTab(QLabel(f"Error loading Reports: {e}"), "Reportes (Error)")
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
