@@ -9,29 +9,37 @@
         {
           "type": "heading",
           "content": "Cargas Permanentes [D]",
-          "parameters": { "level": 3 }
+          "parameters": {
+            "level": 3
+          }
         },
         {
           "type": "text",
           "content": "Considera toda carga cuya variación de peso en el tiempo es despreciable en relación con sus valores medios, o aquella para la cual la variación tiende a un límite determinado. En general, se considera el peso propio de la estructura y las cargas asociadas a los elementos permanentes que soporta (cargas permanentes adicionales). Además, se considera el peso de conexiones de elementos de acero, aumentando el peso propio de la superestructura en un 20%. \nRespecto a las cargas permanentes asociadas a elementos o equipos soportados por la superestructura, se tiene lo siguiente",
-          "parameters": { "style": "Normal" }
+          "parameters": {
+            "style": "Normal"
+          }
         }
       ]
     },
     {
-      "id": "Sobrecarga de Uso [L]", 
+      "id": "Sobrecarga de Uso [L]",
       "title": "Sobrecarga de Uso [L]",
       "description": "Definición para cargas variables de uso.",
       "content": [
         {
           "type": "heading",
           "content": "Sobrecarga de Uso [L]",
-          "parameters": { "level": 3 }
+          "parameters": {
+            "level": 3
+          }
         },
         {
           "type": "text",
           "content": "La sobrecarga de uso incluye las cargas debidas al tránsito y/o permanencia de personas que sean o puedan ser variables en el tiempo durante la operación normal o mantenimiento de equipos. Para el análisis se considera una sobrecarga de uso de X kgf/m2, correspondiente para una plataforma para mantención de equipos, según la Tabla 2 de la Referencia 4.1.[2].",
-          "parameters": { "style": "Normal" }
+          "parameters": {
+            "style": "Normal"
+          }
         }
       ]
     },
@@ -41,53 +49,80 @@
       "description": "Pruebas de renderizado para fórmulas matemáticas complejas.",
       "content": [
         {
-          "type": "heading",
           "content": "Pruebas de Renderizado Matemático",
-          "parameters": { "level": 3 }
+          "parameters": {
+            "level": 3
+          },
+          "type": "heading"
         },
         {
-          "type": "text",
           "content": "A continuación se presentan ejemplos de ecuaciones complejas para verificar el motor de Word:",
-          "parameters": { "style": "Normal" }
+          "parameters": {
+            "style": "Normal"
+          },
+          "type": "text"
         },
         {
-          "type": "text",
           "content": "1. Fórmula Cuadrática (Fracción + Raíz + Potencias):",
-          "parameters": { "style": "Normal" }
+          "parameters": {
+            "style": "Normal"
+          },
+          "type": "text"
         },
         {
-          "type": "equation",
-          "content": "x = (-b + \\sqrt(b^2 - 4ac))/(2a)",
-          "parameters": {}
+          "content": "Q_(0,max)=2.75(I⋅A_r⋅S)/(g(R+1))⋅((0.05)/(ξ))^0.4 P",
+          "parameters": {},
+          "type": "equation"
         },
         {
-          "type": "text",
           "content": "2. Teorema de Pitágoras (Raíz simple):",
-          "parameters": { "style": "Normal" }
+          "parameters": {
+            "style": "Normal"
+          },
+          "type": "text"
         },
         {
-          "type": "equation",
-          "content": "c = \\sqrt(a^2 + b^2)",
-          "parameters": {}
+          "content": "(⬚)/(⬚)",
+          "parameters": {},
+          "type": "equation"
         },
         {
-          "type": "text",
           "content": "3. Esfuerzos (Caracteres Griegos y Subíndices):",
-          "parameters": { "style": "Normal" }
+          "parameters": {
+            "style": "Normal"
+          },
+          "type": "text"
         },
         {
-          "type": "equation",
-          "content": "\\sigma_{adm} = 0.60 F_y",
-          "parameters": {}
+          "content": "σ_(adm)=0.60 F_y\nαβγθλμπστφωΔΣΩερ",
+          "parameters": {},
+          "type": "equation"
         },
         {
-          "type": "text",
           "content": "4. Sumatorias e Integrales:",
-          "parameters": { "style": "Normal" }
+          "parameters": {
+            "style": "Normal"
+          },
+          "type": "text"
+        },
+        {
+          "content": "V=∫_0^L q(x)dx+∑ P_i",
+          "parameters": {},
+          "type": "equation"
+        },
+        {
+          "content": "\\matrix(a&b@c&d)V=∫_0^L q(x)dx+∑ P_i",
+          "parameters": {},
+          "type": "equation"
+        },
+        {
+          "content": "f(x)=❴█(v_1&cond_1@v_2&cond_2@v_3&cond_3)",
+          "parameters": {},
+          "type": "equation"
         },
         {
           "type": "equation",
-          "content": "V = \\int_0^L q(x)dx + \\sum P_i",
+          "content": "R = {\\matrix(A & B & C @ C & D & F @ C & D & F @ C & D & F)}",
           "parameters": {}
         }
       ]
@@ -98,129 +133,181 @@
       "description": "Análisis modal espectral para solicitación sísmica NCh2369:2025",
       "content": [
         {
-          "type": "heading",
           "content": "Solicitación Sísmica [E]",
-          "parameters": { "level": 3 }
+          "parameters": {
+            "level": 3
+          },
+          "type": "heading"
         },
         {
-          "type": "text",
           "content": "Para evaluar la solicitación sísmica sobre la estructura analizada, se utiliza un análisis elástico dinámico, mediante el análisis modal espectral de acuerdo con lo señalado en la Sección 5.6 de la NCh2369:2025. La estructura será analizada para las acciones sísmicas actuando en dos direcciones horizontales perpendiculares entre sí. Los elementos serán diseñados para los esfuerzos obtenidos de considerar el 100% de la solicitación sísmica que actúan en direcciones ortogonales de manera independiente. Los espectros de diseño horizontal y vertical se calculan de acuerdo con las siguientes expresiones:",
-          "parameters": { "style": "Normal" }
+          "parameters": {
+            "style": "Normal"
+          },
+          "type": "text"
         },
         {
-          "type": "heading",
           "content": "Horizontal",
-          "parameters": { "level": 4 }
+          "parameters": {
+            "level": 4
+          },
+          "type": "heading"
         },
         {
-          "type": "equation",
-          "content": "S_a(T_h) = (I \u22c5 S_aH(T_h)/R^*) \u22c5 (0.05/\u03be)^{0.4}",
-          "parameters": {}
+          "content": "S_a(T_H)=(I⋅S_(aH)(T_H))/(R^*)⋅((0.05)/(ξ))^0.4",
+          "parameters": {},
+          "type": "equation"
         },
         {
-          "type": "heading",
           "content": "Vertical",
-          "parameters": { "level": 4 }
+          "parameters": {
+            "level": 4
+          },
+          "type": "heading"
         },
         {
-          "type": "equation",
-          "content": "S_a(T_v) = (I \u22c5 S_aV(T_v)/R_v) \u22c5 (0.05/\u03be_v)^{0.4}",
-          "parameters": {}
+          "content": "S_a(T_V)=(I⋅S_(aV)(T_V))/(R_V)⋅((0.05)/(ξ_V))^0.4",
+          "parameters": {},
+          "type": "equation"
         },
         {
-          "type": "text",
           "content": "Donde para el espectro horizontal se define R*, que representa el factor de modificación de la respuesta estructural, calculado para el periodo del modo con mayor masa de traslación equivalente, en la dirección de análisis. Se calcula de la siguiente manera:",
-          "parameters": { "style": "Normal" }
+          "parameters": {
+            "style": "Normal"
+          },
+          "type": "text"
         },
         {
           "type": "equation",
-          "content": "R^*={█(1                  &R=1@R                  &R≠1,  T^*≥C_r T_1@1.5+(R-1.5)(T^*)/(C_r T_1)&R≠1,  T^*<C_r T_1)}",
+          "content": "R^* = {\\matrix(1 & R=1 & @ R & R ≠1 & T^*≥C_r T_1 @ 1.5+(R-1.5)(T/(C_r T_1)) & R≠1 & T^* <C_r T_1)}",
           "parameters": {}
         },
         {
-          "type": "equation",
           "content": "C_r=0.16R",
-          "parameters": {}
+          "parameters": {},
+          "type": "equation"
         },
         {
-          "type": "text",
-          "content": "Los espectros de referencia horizontal (S_(aH(Th))) y vertical (〖∙S〗_(aV(Tv))) se calculan según la siguiente expresión:",
-          "parameters": { "style": "Normal" }
+          "content": "Los espectros de referencia horizontal (S_(aH(Th))) y vertical (S_(aV(Tv))) se calculan según la siguiente expresión:",
+          "parameters": {
+            "style": "Normal"
+          },
+          "type": "text"
         },
         {
-          "type": "heading",
           "content": "Horizontal",
-          "parameters": { "level": 4 }
+          "parameters": {
+            "level": 4
+          },
+          "type": "heading"
         },
         {
-          "type": "equation",
-          "content": "S_aH(T_H) = A_r S (1+r(T_H/T_0))^p/(1+(T_H/T_0))^q",
-          "parameters": {}
+          "content": "S_(aH)(T_H)=(A_r S(1+r(T_H/T_0))^p)/((1+(T_H/T_0))^q)",
+          "parameters": {},
+          "type": "equation"
         },
+        {
+          "content": "Vertical",
+          "parameters": {
+            "level": 4
+          },
+          "type": "heading"
+        },
+        {
+          "content": "S_(aV)(T_V)=(0.7 A_r S(1+r(1.7 T_V/T_0))^p)/((1+(1.7 T_V/T_0))^q)",
+          "parameters": {},
+          "type": "equation"
+        },
+        {
+          "content": "Donde:",
+          "parameters": {
+            "style": "Normal"
+          },
+          "type": "text"
+        },
+        {
+          "content": "- S, T_0, p, q, r: \"Parámetros que dependen del tipo de suelo.\"",
+          "parameters": {},
+          "type": "equation"
+        },
+        {
+          "content": "- A_0: \"Aceleración efectiva máxima del suelo.\"",
+          "parameters": {},
+          "type": "equation"
+        },
+        {
+          "content": "- T_H: \"Periodo de vibración del modo horizontal considerado.\"",
+          "parameters": {},
+          "type": "equation"
+        },
+        {
+          "content": "- T_V: \"Periodo de vibración del modo vertical considerado.\"",
+          "parameters": {},
+          "type": "equation"
+        },
+        {
+          "content": "No obstante, la sección 5.12 y 5.13 de la NCh2369:2025 establecen un límite mínimo y máximo, respectivamente, para la fuerza sísmica de corte basal. Estos límites se definen como:",
+          "parameters": {
+            "style": "Normal"
+          },
+          "type": "text"
+        },
+        {
+          "content": "Q_(0,min)=0.25(I⋅A_r⋅S)/(g)P",
+          "parameters": {},
+          "type": "equation"
+        },
+        {
+          "content": "Q_(0,max)=2.75(I⋅A_r⋅S)/(g(R+1))⋅((0.05)/(ξ))^0.4 P",
+          "parameters": {},
+          "type": "equation"
+        },
+        {
+          "content": "Donde P es el peso sísmico total de la estructura considerada en el análisis, y g es la aceleración de la gravedad (9.81 m/s²).",
+          "parameters": {
+            "style": "Normal"
+          },
+          "type": "text"
+        },
+        {
+          "content": "Se considera como mínimo una cantidad de modos de vibración suficientes para que la suma de las masas equivalentes de la estructura sea igual o superior a 90%. Las fuerzas sísmicas resultantes se obtienen a través de superposición modal mediante el método de superposición cuadrática completa, como se especifica en la Sección 5.6.3 de la NCh2369:2025. La solicitación sísmica se considera direccionalmente acoplada (Sección 4.5.2 de NCh2369:2025). Para la estructura se asigna una categoría de importancia C2, por lo que corresponde un coeficiente de importancia I = 1.00.",
+          "parameters": {
+            "style": "Normal"
+          },
+          "type": "text"
+        },
+        {
+          "content": "Nota: el peso sísmico total de la estructura considera 100% de cargas permanentes (20% adicional por conexiones) y 25% de la sobrecarga de uso. No se considera carga viva de techo y sobrecarga de nieve al ser estas solicitaciones eventuales.",
+          "parameters": {
+            "style": "Normal"
+          },
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "id": "probando_func",
+      "title": "Prueba de funcionalidades",
+      "description": "Prueba de funcionalidades y matematicas",
+      "content": [
         {
           "type": "heading",
-          "content": "Vertical",
-          "parameters": { "level": 4 }
-        },
-        {
-          "type": "equation",
-          "content": "S_aV(T_V) = 0.7 A_r S (1+r(1.7 T_V/T_0))^p/(1+(1.7 T_V/T_0))^q",
-          "parameters": {}
+          "content": "Prueba de funcionalidad",
+          "parameters": {
+            "level": 1
+          }
         },
         {
           "type": "text",
-          "content": "Donde:",
-          "parameters": { "style": "Normal" }
+          "content": "Esta es una prueba de funcionalidades $f_c = 250 MPa$",
+          "parameters": {
+            "style": "Normal"
+          }
         },
         {
           "type": "equation",
-          "content": "- S, T_0, p, q, r: \" Parámetros que dependen del tipo de suelo.\"",
+          "content": "S_a(T_H)=(I⋅S_(aH)(T_H))/(R^*)⋅((0.05)/(ξ))^0.4",
           "parameters": {}
-        },
-        {
-          "type": "equation",
-          "content": "- A_0: \" Aceleración efectiva máxima del suelo.\"",
-          "parameters": {}
-        },
-        {
-          "type": "equation",
-          "content": "- T_H: \" Periodo de vibración del modo horizontal considerado.\"",
-          "parameters": {}
-        },
-        {
-          "type": "equation",
-          "content": "- T_V: \" Periodo de vibración del modo vertical considerado.\"",
-          "parameters": {}
-        },
-        {
-          "type": "text",
-          "content": "No obstante, la sección 5.12 y 5.13 de la NCh2369:2025 establecen un límite mínimo y máximo, respectivamente, para la fuerza sísmica de corte basal. Estos límites se definen como:",
-          "parameters": { "style": "Normal" }
-        },
-        {
-          "type": "equation",
-          "content": "Q{min}_0 = 0.25(I \u22c5 A_r \u22c5 S)/(g)P",
-          "parameters": {}
-        },
-        {
-          "type": "equation",
-          "content": "Q{max}_0 = 2.75 (I \u22c5 A_r \u22c5 S)/(g(R+1))\u22c5 (0.05/\u03be)^0.4 P",
-          "parameters": {}
-        },
-        {
-          "type": "text",
-          "content": "Donde P es el peso sísmico total de la estructura considerada en el análisis, y g es la aceleración de la gravedad (9.81 m/s²).",
-          "parameters": { "style": "Normal" }
-        },
-        {
-          "type": "text",
-          "content": "Se considera como mínimo una cantidad de modos de vibración suficientes para que la suma de las masas equivalentes de la estructura sea igual o superior a 90%. Las fuerzas sísmicas resultantes se obtienen a través de superposición modal mediante el método de superposición cuadrática completa, como se especifica en la Sección 5.6.3 de la NCh2369:2025. La solicitación sísmica se considera direccionalmente acoplada (Sección 4.5.2 de NCh2369:2025). Para la estructura se asigna una categoría de importancia C2, por lo que corresponde un coeficiente de importancia I = 1.00.",
-          "parameters": { "style": "Normal" }
-        },
-        {
-          "type": "text",
-          "content": "Nota: el peso sísmico total de la estructura considera 100% de cargas permanentes (20% adicional por conexiones) y 25% de la sobrecarga de uso. No se considera carga viva de techo y sobrecarga de nieve al ser estas solicitaciones eventuales.",
-          "parameters": { "style": "Normal" }
         }
       ]
     }

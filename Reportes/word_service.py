@@ -1,5 +1,7 @@
 import comtypes.client
 import logging
+import re
+from .equation_translator import validate_equation, expand_symbols
 
 logger = logging.getLogger(__name__)
 
@@ -51,17 +53,64 @@ class WordService:
         return self.active_doc
 
     def insert_text_at_cursor(self, text, style="Normal"):
-        """Inserta texto en la posición del cursor."""
+        """
+        Inserta texto en la posición del cursor con soporte para ecuaciones inline ($...$).
+        Ej: "El valor de $x$ es..."
+        """
         if not self.word_app: 
             return False
             
         selection = self.word_app.Selection
-        selection.TypeText(text)
+        
+        # Aplicar estilo primero
         try:
-            # A veces los estilos tienen nombres locales
-            selection.Style = style
+            # wdStyleNormal = -1
+            target_style = style if style != "Normal" else -1
+            selection.Style = target_style
         except:
-            pass # Si falla el estilo, seguimos
+            pass 
+
+        # Si no hay delimitadores $, comportamiento standard rápido
+        if "$" not in text:
+            selection.TypeText(text)
+            selection.TypeParagraph()
+            return True
+            
+        # Parsear contenido mixto
+        parts = re.split(r'(\$.*?\$)', text)
+        
+        for part in parts:
+            if not part: continue
+            
+            if part.startswith('$') and part.endswith('$') and len(part) > 2:
+                # Es ecuación inline
+                math_content = part[1:-1] # Quitar $
+                
+                # Expandir símbolos (si el usuario escribió \alpha)
+                math_unicode = expand_symbols(math_content)
+
+                rng = selection.Range
+                rng.Collapse(0) # wdCollapseEnd
+                
+                # Insertar ecuación
+                omaths = rng.OMaths
+                omaths.Add(rng)
+                omath = omaths(omaths.Count)
+                omath.Range.Text = math_unicode
+                
+                try:
+                    omath.BuildUp()
+                    # Forzar modo inline para que fluya con el texto
+                    omath.Range.OMaths(1).Type = 1 # wdOMathInline
+                except Exception as e:
+                    logger.debug(f"Error inline math build: {e}")
+                
+                # Mover cursor al final de la ecuación
+                selection.SetRange(omath.Range.End, omath.Range.End)
+            else:
+                # Texto normal
+                selection.TypeText(part)
+        
         selection.TypeParagraph()
         return True
 
@@ -98,76 +147,82 @@ class WordService:
         selection.Style = -1 # wdStyleNormal
         return True
 
-    def _preprocess_latex_to_unicode(self, text):
-        """Reemplaza comandos comunes de LaTeX por caracteres Unicode que Word entiende."""
-        replacements = {
-            r"\sqrt": "\u221A",
-            r"\sigma": "\u03C3", 
-            r"\pi": "\u03C0",
-            r"\int": "\u222B",
-            r"\sum": "\u2211",
-            r"\Delta": "\u0394",
-            r"\gamma": "\u03B3",
-            r"\alpha": "\u03B1",
-            r"\beta": "\u03B2",
-            r"\theta": "\u03B8",
-            r"\lambda": "\u03BB",
-            r"\phi": "\u03C6",
-            r"\omega": "\u03C9",
-            r"\infty": "\u221E",
-            r"\approx": "\u2248",
-            r"\neq": "\u2260",
-            r"\leq": "\u2264",
-            r"\geq": "\u2265",
-        }
-        
-        processed = text
-        for latex, unicode_char in replacements.items():
-            processed = processed.replace(latex, unicode_char)
-        return processed
-
     def insert_equation(self, equation_text):
         """
-        Inserta una ecuación controlando el objeto OMath directamente para asegurar
-        el formateo correcto (BuildUp).
+        Inserta una ecuación UnicodeMath en Word.
+        
+        Flujo:
+        1. Valida la sintaxis de la ecuación
+        2. Expande símbolos \\command a Unicode si los hay
+        3. Crea objeto OMath y aplica BuildUp para renderizar
+        
+        NOTA: El contenido ya debe estar en sintaxis UnicodeMath nativa.
         """
-        if not self.word_app: return False
+        if not self.word_app: 
+            return False
 
         try:
-            # Preprocesar LaTeX -> Unicode antes de insertar
-            equation_text = self._preprocess_latex_to_unicode(equation_text)
-
-            selection = self.word_app.Selection
-            # Usar un rango duplicado para no depender de la selección visual
-            rng = selection.Range
-            rng.Collapse(0) # wdCollapseEnd (asegurar que es un punto)
+            # 1. Validar ecuación
+            is_valid, error_msg = validate_equation(equation_text)
+            if not is_valid:
+                logger.warning(f"Ecuación con posibles errores: {error_msg}")
             
-            # 1. Crear el contenedor OMath vacío en el punto
-            # BUG FIX: comtypes a veces devuelve int/Range incorrecto desde Add()
-            # Recuperamos el objeto real de la colección
+            # 2. Expandir símbolos \\command a Unicode (si el usuario usó \\alpha, etc)
+            equation_unicode = expand_symbols(equation_text)
+            logger.debug(f"UnicodeMath: {equation_unicode}")
+            
+            selection = self.word_app.Selection
+            rng = selection.Range
+            rng.Collapse(0)  # wdCollapseEnd
+            
+            # 3. Crear objeto OMath y asignar texto UnicodeMath
             omaths = rng.OMaths
             omaths.Add(rng)
             omath = omaths(omaths.Count)
             
-            # 2. Asignar el texto al RANGO de la ecuación
-            # Esto es clave: al asignar al rango del OMath, Word lo trata como Linear Math
-            omath.Range.Text = equation_text
+            # Asignar el texto UnicodeMath
+            omath.Range.Text = equation_unicode
             
-            # 3. Forzar conversión a formato profesional
-            omath.BuildUp()
+            # 4. BuildUp convierte Linear UnicodeMath a Professional (2D)
+            try:
+                omath.BuildUp()
+            except Exception as e:
+                logger.debug(f"BuildUp info: {e}")
             
-            # 4. Mover la selección después de la ecuación
-            # Usamos el final del rango de la ecuación ya procesada
+            # 5. Mover cursor después de la ecuación
             end_pos = omath.Range.End
             selection.SetRange(end_pos, end_pos)
-            
-            # 5. Salto de línea
             selection.TypeParagraph()
             
             return True
             
         except Exception as e:
             logger.error(f"Error insertando ecuación: {e}")
+            # Fallback: insertar como texto plano
+            try:
+                self.insert_text_at_cursor(f"[ECUACIÓN: {equation_text}]", "Normal")
+            except:
+                pass
+            return False
+
+    def insert_equation_via_field(self, equation_text):
+        """
+        Método alternativo: inserta ecuación usando EQ field code.
+        Útil como fallback si OMath falla.
+        """
+        if not self.word_app:
+            return False
+        
+        try:
+            selection = self.word_app.Selection
+            # wdFieldEquation = 49
+            # El campo EQ usa sintaxis diferente, no LaTeX puro
+            # Esto es solo un fallback muy básico
+            selection.Fields.Add(selection.Range, 49, equation_text, False)
+            selection.TypeParagraph()
+            return True
+        except Exception as e:
+            logger.error(f"Error insertando campo EQ: {e}")
             return False
 
     def insert_table_from_data(self, headers, data):

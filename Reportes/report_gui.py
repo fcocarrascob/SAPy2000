@@ -1,11 +1,12 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QPushButton, 
-    QLabel, QGroupBox, QGridLayout, QMessageBox, QComboBox, QListWidget, QListWidgetItem, QSplitter
+    QLabel, QGroupBox, QGridLayout, QMessageBox, QComboBox, QListWidget, QListWidgetItem, QSplitter, QDialog
 )
 from PySide6.QtCore import Qt
 from .report_backend import ReportBackend
 from .template_engine import TemplateEngine
 from .snippet_manager import SnippetManager
+from .snippet_editor import SnippetEditorDialog
 import os
 import glob
 
@@ -97,20 +98,43 @@ class ReportWidget(QWidget):
         self.lbl_preview.setMaximumHeight(60)
         lib_vbox.addWidget(self.lbl_preview)
         
-        # Botones de libreria
-        hbox_lib_btns = QHBoxLayout()
+        # Botones de Acción (Uso)
+        hbox_action_btns = QHBoxLayout()
         
         self.btn_insert_snippet = QPushButton("Insertar en Cursor")
         self.btn_insert_snippet.setEnabled(False)
         self.btn_insert_snippet.clicked.connect(self.insert_current_snippet)
+        self.btn_insert_snippet.setStyleSheet("background-color: #e6f7ff; font-weight: bold;")
         
-        btn_reload_lib = QPushButton("Recargar Lib.")
+        self.btn_edit_snippet = QPushButton("Editar Seleccionado")
+        self.btn_edit_snippet.setEnabled(False)
+        self.btn_edit_snippet.clicked.connect(self.edit_current_snippet)
+        
+        hbox_action_btns.addWidget(self.btn_insert_snippet, 2)
+        hbox_action_btns.addWidget(self.btn_edit_snippet, 1)
+        lib_vbox.addLayout(hbox_action_btns)
+
+        # Botones de Gestión (CRUD)
+        hbox_mgmt_btns = QHBoxLayout()
+
+        btn_new_snippet = QPushButton("+ Nuevo Snippet")
+        btn_new_snippet.setToolTip("Crear un nuevo snippet en esta categoría")
+        btn_new_snippet.clicked.connect(self.add_new_snippet)
+
+        self.btn_del_snippet = QPushButton("🗑 Eliminar")
+        self.btn_del_snippet.setToolTip("Eliminar snippet seleccionado permanentemente")
+        self.btn_del_snippet.setEnabled(False)
+        self.btn_del_snippet.setStyleSheet("color: #cc0000;")
+        self.btn_del_snippet.clicked.connect(self.delete_current_snippet)
+
+        btn_reload_lib = QPushButton("⟳ Recargar")
         btn_reload_lib.clicked.connect(self.reload_library)
         
-        hbox_lib_btns.addWidget(self.btn_insert_snippet)
-        hbox_lib_btns.addWidget(btn_reload_lib)
+        hbox_mgmt_btns.addWidget(btn_new_snippet)
+        hbox_mgmt_btns.addWidget(self.btn_del_snippet)
+        hbox_mgmt_btns.addWidget(btn_reload_lib)
         
-        lib_vbox.addLayout(hbox_lib_btns)
+        lib_vbox.addLayout(hbox_mgmt_btns)
         
         group_lib.setLayout(lib_vbox)
         main_layout.addWidget(group_lib)
@@ -158,12 +182,85 @@ class ReportWidget(QWidget):
             
         self.lbl_preview.setText("")
         self.btn_insert_snippet.setEnabled(False)
+        self.btn_edit_snippet.setEnabled(False)
+        self.btn_del_snippet.setEnabled(False)
 
     def on_snippet_selected(self, item):
         data = item.data(Qt.UserRole)
         desc = data.get("description", "")
         self.lbl_preview.setText(desc)
         self.btn_insert_snippet.setEnabled(True)
+        self.btn_edit_snippet.setEnabled(True)
+        self.btn_del_snippet.setEnabled(True)
+
+    def add_new_snippet(self):
+        """Abre el editor para crear un nuevo snippet."""
+        category = self.combo_categories.currentText()
+        if not category:
+            QMessageBox.warning(self, "Aviso", "Seleccione una categoría primero.")
+            return
+
+        # Abrir editor vacío (sin data)
+        dialog = SnippetEditorDialog(self, snippet_data=None, category=category)
+        
+        if dialog.exec() == QDialog.Accepted:
+            new_data = dialog.get_snippet_data()
+            # Guardamos como nuevo (original_id=None)
+            success = self.snippet_manager.save_snippet(category, new_data, original_id=None)
+            
+            if success:
+                self.reload_library()
+                QMessageBox.information(self, "Creado", "Nuevo snippet agregado correctamente.")
+            else:
+                QMessageBox.warning(self, "Error", "No se pudo crear el snippet.")
+
+    def delete_current_snippet(self):
+        """Elimina el snippet seleccionado."""
+        item = self.list_snippets.currentItem()
+        if not item: return
+        
+        data = item.data(Qt.UserRole)
+        snippet_id = data.get("id")
+        title = data.get("title")
+        category = self.combo_categories.currentText()
+        
+        confirm = QMessageBox.question(
+            self, 
+            "Confirmar Eliminación",
+            f"¿Estás seguro de eliminar '{title}' ({snippet_id})?\nEsta acción no se puede deshacer.",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        
+        if confirm == QMessageBox.Yes:
+            success = self.snippet_manager.delete_snippet(category, snippet_id)
+            if success:
+                self.reload_library()
+                # QMessageBox.information(self, "Eliminado", "Snippet eliminado correctamente.")
+            else:
+                QMessageBox.warning(self, "Error", "No se pudo eliminar el snippet.")
+
+    def edit_current_snippet(self):
+        """Abre el editor para el snippet seleccionado."""
+        item = self.list_snippets.currentItem()
+        if not item:
+            return
+        
+        data = item.data(Qt.UserRole)
+        category = self.combo_categories.currentText()
+        
+        dialog = SnippetEditorDialog(self, snippet_data=data, category=category)
+        
+        if dialog.exec() == QDialog.Accepted:
+            new_data = dialog.get_snippet_data()
+            original_id = dialog.get_original_id()
+            
+            success = self.snippet_manager.save_snippet(category, new_data, original_id)
+            
+            if success:
+                self.reload_library()
+                QMessageBox.information(self, "Guardado", "Snippet actualizado correctamente.")
+            else:
+                QMessageBox.warning(self, "Error", "No se pudo guardar el snippet.")
 
     def insert_current_snippet(self):
         item = self.list_snippets.currentItem()

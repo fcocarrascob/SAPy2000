@@ -29,10 +29,15 @@ Herramientas avanzadas de geometría y mallado.
 Módulo específico para el modelado y generación de geometrías de placas base, pernos y rigidizadores.
 
 ### 5. Generador de Memorias y Reportes (`Reportes`)
-Sistema avanzado para la generación automática de memorias de cálculo en Microsoft Word.
+Sistema avanzado para la generación automática de memorias de cálculo en Microsoft Word. **[Ver Guía Detallada](Reportes/GUIA_USUARIO_REPORTES.md)**.
+
 - **Asistente en Vivo**: Inyecta tablas de datos de SAP2000 (Materiales, Cargas, Secciones) directamente en la posición del cursor de Word.
 - **Generación por Templates**: Crea documentos completos basándose en plantillas JSON personalizables.
-- **Librería de Contenido**: Inserción rápida de bloques de texto estándar (e.g., descripciones de carga) y **ecuaciones matemáticas** renderizadas nativamente en Word.
+- **Librería de Contenido (Snippets)**:
+    - Gestión completa (Crear, Editar, Eliminar) de bloques de texto y ecuaciones.
+    - **Editor de Ecuaciones Visual**: "Ribbon" intuitivo para insertar fórmulas complejas (Matrices, Integrales, etc.).
+    - Soporte para **Ecuaciones Inline** (ej: `$E=mc^2$`) dentro del texto.
+    - Renderizado nativo en Word usando **UnicodeMath**.
 
 ## Requisitos
 
@@ -77,20 +82,13 @@ Cree un archivo `.json` con la siguiente estructura:
 
 ### Librería y Ecuaciones
 Ubicación: `Reportes/library/`
-Agregue archivos `.json` para categorizar sus snippets. Para las ecuaciones, utilice formato lineal (similar a LaTeX simplificado):
 
-```json
-{
-  "type": "equation",
-  "content": "x = (-b + \\sqrt(b^2 - 4ac))/(2a)"
-}
-```
-**Sintaxis Soportada:**
-*   `\sqrt(x)`: Raíz cuadrada
-*   `a^2`, `a_b`: Potencias y subíndices
-*   `\sigma`, `\alpha`, `\Delta`: Caracteres griegos
-*   `\int`, `\sum`: Integrales y sumatorias
-*   Las fracciones se detectan con `/` (ej: `a/b`).
+El sistema soporta ahora una gestión completa de "Snippets" (fragmentos reutilizables) desde la propia interfaz gráfica.
+*   **Editor Visual**: Permite componer bloques de Texto, Títulos y Ecuaciones.
+*   **UnicodeMath**: Estándar nativo de Word para ecuaciones lineales de alta calidad.
+*   **Sintaxis Inline**: Puedes insertar matemáticas dentro de un párrafo encerrándolas en signos peso (ej: `El valor de $\alpha$ es...`).
+
+Consulte la **[Guía de Usuario de Reportes](Reportes/GUIA_USUARIO_REPORTES.md)** para más detalles sobre la sintaxis de matrices, operadores y el uso del Ribbon.
 
 ## Arquitectura Técnica
 

@@ -1,0 +1,199 @@
+{
+  "category": "Audit & Test Suite",
+  "snippets": [
+    {
+      "id": "TEST_01_BASIC",
+      "title": "01. Estructuras Básicas",
+      "description": "Verificación de estructuras fundamentales: Fracciones, Raíces, Índices.",
+      "content": [
+        {
+          "type": "heading",
+          "content": "Prueba 1: Estructuras Simples",
+          "parameters": {
+            "level": 3
+          }
+        },
+        {
+          "type": "text",
+          "content": "Verificar renderizado correcto de fracciones anidadas y raíces con índice.",
+          "parameters": {
+            "style": "Normal"
+          }
+        },
+        {
+          "type": "equation",
+          "content": "x = (-b + √(b^2 - 4ac))/(2a)",
+          "parameters": {}
+        },
+        {
+          "type": "equation",
+          "content": "f(x) = √(3&x^2 + 1) + (1)/(1 + (1)/(x))",
+          "parameters": {}
+        }
+      ]
+    },
+    {
+      "id": "TEST_02_MATRICES",
+      "title": "02. Matrices y Arreglos",
+      "description": "Verificación de sintaxis de matrices, vectores y alineación.",
+      "content": [
+        {
+          "type": "heading",
+          "content": "Prueba 2: Sintaxis de Matrices",
+          "parameters": {
+            "level": 3
+          }
+        },
+        {
+          "type": "text",
+          "content": "Se debe verificar la transformación correcta de \\matrix a objeto visual.",
+          "parameters": {
+            "style": "Normal"
+          }
+        },
+        {
+          "type": "equation",
+          "content": "A = [\\matrix(1&0&0@0&1&0@0&0&1)]",
+          "parameters": {}
+        },
+        {
+          "type": "equation",
+          "content": "v⃗ = (\\matrix(v_x@v_y@v_z))",
+          "parameters": {}
+        },
+        {
+          "type": "equation",
+          "content": "█(x + 2y &= 5 @ 3x - y &= -2)",
+          "parameters": {}
+        },
+        {
+          "type": "equation",
+          "content": "f(n) = ❴█(n/2 & if n is even @ 3n+1 & if n is odd)",
+          "parameters": {}
+        }
+      ]
+    },
+    {
+      "id": "TEST_03_CALCULUS",
+      "title": "03. Operadores de Cálculo",
+      "description": "Verificación de límites, sumatorias, integrales y símbolos grandes.",
+      "content": [
+        {
+          "type": "heading",
+          "content": "Prueba 3: Operadores N-arios",
+          "parameters": {
+            "level": 3
+          }
+        },
+        {
+          "type": "equation",
+          "content": "lim_(x→0) (sin(x))/(x) = 1",
+          "parameters": {}
+        },
+        {
+          "type": "equation",
+          "content": "∫_(a)^(b) f(x)dx = F(b) - F(a)",
+          "parameters": {}
+        },
+        {
+          "type": "equation",
+          "content": "∑_(i=1)^(n) i^2 = (n(n+1)(2n+1))/(6)",
+          "parameters": {}
+        }
+      ]
+    },
+    {
+      "id": "TEST_04_UNICODE",
+      "title": "04. Símbolos Unicode",
+      "description": "Verificación de caracteres griegos y operadores lógicos.",
+      "content": [
+        {
+          "type": "heading",
+          "content": "Prueba 4: Caracteres Especiales",
+          "parameters": {
+            "level": 3
+          }
+        },
+        {
+          "type": "equation",
+          "content": "α, β, γ, δ, ε, θ, λ, μ, π, σ, φ, ω, Δ, Σ, Ω",
+          "parameters": {}
+        },
+        {
+          "type": "equation",
+          "content": "∀ x ∈ ℝ, ∃ y > x : y ≠ x",
+          "parameters": {}
+        },
+        {
+          "type": "equation",
+          "content": "A ∩ B = ∅ ⇒ A ∪ B",
+          "parameters": {}
+        }
+      ]
+    },
+    {
+      "id": "TEST_05_STRESS",
+      "title": "05. Stress Test (Complejos)",
+      "description": "Ecuaciones anidadas de alta complejidad para probar el parser de Word.",
+      "content": [
+        {
+          "type": "heading",
+          "content": "Prueba 5: Anidamientos Profundos",
+          "parameters": {
+            "level": 3
+          }
+        },
+        {
+          "type": "equation",
+          "content": "e^x = ∑_(n=0)^(∞) (x^n)/(n!) = 1 + x + (x^2)/(2) + (x^3)/(6) + ⋯",
+          "parameters": {}
+        },
+        {
+          "type": "equation",
+          "content": "∇⋅D⃗ = ρ, ∇⋅B⃗ = 0, ∇×E⃗ = -(∂B⃗)/(∂t), ∇×H⃗ = J⃗ + (∂D⃗)/(∂t)",
+          "parameters": {}
+        },
+        {
+          "type": "equation",
+          "content": "R_μν - (1)/(2)R g_μν + Λg_μν = (8πG)/(c^4) T_μν",
+          "parameters": {}
+        }
+      ]
+    },
+    {
+      "id": "TEST_06_INLINE",
+      "title": "06. Ecuaciones Inline",
+      "description": "Verificación de texto mixto con ecuaciones entre signos $.",
+      "content": [
+        {
+          "type": "heading",
+          "content": "Prueba 6: Ecuaciones en Texto (Inline)",
+          "parameters": {
+            "level": 3
+          }
+        },
+        {
+          "type": "text",
+          "content": "A continuación probaremos ecuaciones integradas en el párrafo. Por ejemplo, sabemos que $E = mc^2$ es la ecuación más famosa.",
+          "parameters": {
+            "style": "Normal"
+          }
+        },
+        {
+          "type": "text",
+          "content": "También podemos usar símbolos griegos dentro del texto: sea $\\alpha$ el ángulo de inclinación y $\\beta$ el factor de reducción, entonces $\\gamma = \\alpha + \\beta$.",
+          "parameters": {
+            "style": "Normal"
+          }
+        },
+        {
+          "type": "text",
+          "content": "Incluso fracciones pequeñas se pueden escribir inline: el factor es $1/2$ o mejor visualizado como $(1)/(2)$ en el texto.",
+          "parameters": {
+            "style": "Normal"
+          }
+        }
+      ]
+    }
+  ]
+}
