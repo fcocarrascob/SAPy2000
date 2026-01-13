@@ -3,52 +3,41 @@
   "snippets": [
     {
       "id": "carga_muerta_pp",
-      "title": "Carga Muerta (D)",
+      "title": "Carga Permanente [D]",
       "description": "Definición estándar para Peso Propio y Cargas Permanentes.",
       "content": [
         {
           "type": "heading",
-          "content": "Estado de Carga: Peso Propio (D)",
+          "content": "Cargas Permanentes [D]",
           "parameters": { "level": 3 }
         },
         {
           "type": "text",
-          "content": "La carga muerta considera el peso propio de los elementos estructurales modelados, así como las cargas permanentes adicionales estimadas.",
+          "content": "Considera toda carga cuya variación de peso en el tiempo es despreciable en relación con sus valores medios, o aquella para la cual la variación tiende a un límite determinado. En general, se considera el peso propio de la estructura y las cargas asociadas a los elementos permanentes que soporta (cargas permanentes adicionales). Además, se considera el peso de conexiones de elementos de acero, aumentando el peso propio de la superestructura en un 20%. \nRespecto a las cargas permanentes asociadas a elementos o equipos soportados por la superestructura, se tiene lo siguiente",
           "parameters": { "style": "Normal" }
-        },
-        {
-          "type": "equation",
-          "content": "D = W_{estructura} + W_{sobrecarga}",
-          "parameters": {}
         }
       ]
     },
     {
-      "type": "snippet",
-      "id": "carga_viva_l", 
-      "title": "Sobrecarga de Uso (L)",
+      "id": "Sobrecarga de Uso [L]", 
+      "title": "Sobrecarga de Uso [L]",
       "description": "Definición para cargas variables de uso.",
       "content": [
         {
           "type": "heading",
-          "content": "Estado de Carga: Sobrecarga de Uso (L)",
+          "content": "Sobrecarga de Uso [L]",
           "parameters": { "level": 3 }
         },
         {
           "type": "text",
-          "content": "Se consideran las sobrecargas normativas de acuerdo al uso de la estructura (NCh1537).",
+          "content": "La sobrecarga de uso incluye las cargas debidas al tránsito y/o permanencia de personas que sean o puedan ser variables en el tiempo durante la operación normal o mantenimiento de equipos. Para el análisis se considera una sobrecarga de uso de X kgf/m2, correspondiente para una plataforma para mantención de equipos, según la Tabla 2 de la Referencia 4.1.[2].",
           "parameters": { "style": "Normal" }
-        },
-        {
-          "type": "equation",
-          "content": "L = 250 [kg/m^2]",
-          "parameters": {}
         }
       ]
     },
     {
       "id": "test_ecuaciones_complejas",
-      "title": "🧪 Test Ecuaciones (Raíces, Fracciones)",
+      "title": "Test Ecuaciones (Raíces, Fracciones)",
       "description": "Pruebas de renderizado para fórmulas matemáticas complejas.",
       "content": [
         {
@@ -100,6 +89,138 @@
           "type": "equation",
           "content": "V = \\int_0^L q(x)dx + \\sum P_i",
           "parameters": {}
+        }
+      ]
+    },
+    {
+      "id": "solicitud_sismica_e",
+      "title": "Solicitación Sísmica [E] 2025 AME",
+      "description": "Análisis modal espectral para solicitación sísmica NCh2369:2025",
+      "content": [
+        {
+          "type": "heading",
+          "content": "Solicitación Sísmica [E]",
+          "parameters": { "level": 3 }
+        },
+        {
+          "type": "text",
+          "content": "Para evaluar la solicitación sísmica sobre la estructura analizada, se utiliza un análisis elástico dinámico, mediante el análisis modal espectral de acuerdo con lo señalado en la Sección 5.6 de la NCh2369:2025. La estructura será analizada para las acciones sísmicas actuando en dos direcciones horizontales perpendiculares entre sí. Los elementos serán diseñados para los esfuerzos obtenidos de considerar el 100% de la solicitación sísmica que actúan en direcciones ortogonales de manera independiente. Los espectros de diseño horizontal y vertical se calculan de acuerdo con las siguientes expresiones:",
+          "parameters": { "style": "Normal" }
+        },
+        {
+          "type": "heading",
+          "content": "Horizontal",
+          "parameters": { "level": 4 }
+        },
+        {
+          "type": "equation",
+          "content": "S_a(T_h) = (I \u22c5 S_aH(T_h)/R^*) \u22c5 (0.05/\u03be)^{0.4}",
+          "parameters": {}
+        },
+        {
+          "type": "heading",
+          "content": "Vertical",
+          "parameters": { "level": 4 }
+        },
+        {
+          "type": "equation",
+          "content": "S_a(T_v) = (I \u22c5 S_aV(T_v)/R_v) \u22c5 (0.05/\u03be_v)^{0.4}",
+          "parameters": {}
+        },
+        {
+          "type": "text",
+          "content": "Donde para el espectro horizontal se define R*, que representa el factor de modificación de la respuesta estructural, calculado para el periodo del modo con mayor masa de traslación equivalente, en la dirección de análisis. Se calcula de la siguiente manera:",
+          "parameters": { "style": "Normal" }
+        },
+        {
+          "type": "equation",
+          "content": "R^*={█(1                  &R=1@R                  &R≠1,  T^*≥C_r T_1@1.5+(R-1.5)(T^*)/(C_r T_1)&R≠1,  T^*<C_r T_1)}",
+          "parameters": {}
+        },
+        {
+          "type": "equation",
+          "content": "C_r=0.16R",
+          "parameters": {}
+        },
+        {
+          "type": "text",
+          "content": "Los espectros de referencia horizontal (S_(aH(Th))) y vertical (〖∙S〗_(aV(Tv))) se calculan según la siguiente expresión:",
+          "parameters": { "style": "Normal" }
+        },
+        {
+          "type": "heading",
+          "content": "Horizontal",
+          "parameters": { "level": 4 }
+        },
+        {
+          "type": "equation",
+          "content": "S_aH(T_H) = A_r S (1+r(T_H/T_0))^p/(1+(T_H/T_0))^q",
+          "parameters": {}
+        },
+        {
+          "type": "heading",
+          "content": "Vertical",
+          "parameters": { "level": 4 }
+        },
+        {
+          "type": "equation",
+          "content": "S_aV(T_V) = 0.7 A_r S (1+r(1.7 T_V/T_0))^p/(1+(1.7 T_V/T_0))^q",
+          "parameters": {}
+        },
+        {
+          "type": "text",
+          "content": "Donde:",
+          "parameters": { "style": "Normal" }
+        },
+        {
+          "type": "equation",
+          "content": "- S, T_0, p, q, r: \" Parámetros que dependen del tipo de suelo.\"",
+          "parameters": {}
+        },
+        {
+          "type": "equation",
+          "content": "- A_0: \" Aceleración efectiva máxima del suelo.\"",
+          "parameters": {}
+        },
+        {
+          "type": "equation",
+          "content": "- T_H: \" Periodo de vibración del modo horizontal considerado.\"",
+          "parameters": {}
+        },
+        {
+          "type": "equation",
+          "content": "- T_V: \" Periodo de vibración del modo vertical considerado.\"",
+          "parameters": {}
+        },
+        {
+          "type": "text",
+          "content": "No obstante, la sección 5.12 y 5.13 de la NCh2369:2025 establecen un límite mínimo y máximo, respectivamente, para la fuerza sísmica de corte basal. Estos límites se definen como:",
+          "parameters": { "style": "Normal" }
+        },
+        {
+          "type": "equation",
+          "content": "Q{min}_0 = 0.25(I \u22c5 A_r \u22c5 S)/(g)P",
+          "parameters": {}
+        },
+        {
+          "type": "equation",
+          "content": "Q{max}_0 = 2.75 (I \u22c5 A_r \u22c5 S)/(g(R+1))\u22c5 (0.05/\u03be)^0.4 P",
+          "parameters": {}
+        },
+        {
+          "type": "text",
+          "content": "Donde P es el peso sísmico total de la estructura considerada en el análisis, y g es la aceleración de la gravedad (9.81 m/s²).",
+          "parameters": { "style": "Normal" }
+        },
+        {
+          "type": "text",
+          "content": "Se considera como mínimo una cantidad de modos de vibración suficientes para que la suma de las masas equivalentes de la estructura sea igual o superior a 90%. Las fuerzas sísmicas resultantes se obtienen a través de superposición modal mediante el método de superposición cuadrática completa, como se especifica en la Sección 5.6.3 de la NCh2369:2025. La solicitación sísmica se considera direccionalmente acoplada (Sección 4.5.2 de NCh2369:2025). Para la estructura se asigna una categoría de importancia C2, por lo que corresponde un coeficiente de importancia I = 1.00.",
+          "parameters": { "style": "Normal" }
+        },
+        {
+          "type": "text",
+          "content": "Nota: el peso sísmico total de la estructura considera 100% de cargas permanentes (20% adicional por conexiones) y 25% de la sobrecarga de uso. No se considera carga viva de techo y sobrecarga de nieve al ser estas solicitaciones eventuales.",
+          "parameters": { "style": "Normal" }
         }
       ]
     }

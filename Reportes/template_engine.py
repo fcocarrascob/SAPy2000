@@ -70,7 +70,12 @@ class TemplateEngine:
                 elif sType == "page_break":
                     self.word_service.insert_page_break()
 
-                # Futuros tipos: table (placeholder), image, etc.
+                elif sType == "table":
+                    # Espera que content sea un dict con headers y data
+                    if isinstance(content, dict):
+                        headers = content.get("headers", [])
+                        data = content.get("data", [])
+                        self.word_service.insert_table_from_data(headers, data)
             
             return True
             
