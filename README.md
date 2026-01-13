@@ -1,59 +1,109 @@
-# SAP2000 Automation Tools
+# Herramientas de Automatización para SAP2000
 
-This project provides a set of Python tools to automate tasks in CSI SAP2000 using the OAPI (Open Application Programming Interface) via the `comtypes` library. The application is structured in independent modules with graphical user interfaces (GUI) built with PySide6.
+Este proyecto proporciona un conjunto de herramientas en Python para automatizar tareas en CSI SAP2000 utilizando la OAPI (Open Application Programming Interface) a través de la librería `comtypes`. La aplicación sigue una arquitectura modular y unificada, integrando múltiples herramientas en una sola interfaz gráfica con pestañas.
 
-## Project Structure
+## Características Principales
 
-The project is organized into modular components, each addressing specific engineering workflows:
+*   **Aplicación Unificada**: Una sola ventana (`main_app.py`) que gestiona todas las herramientas.
+*   **Conexión Centralizada**: Gestión eficiente de la conexión a SAP2000 (OAPI) compartida entre todos los módulos.
+*   **Arquitectura Modular**: Fácil escalabilidad para añadir nuevas funcionalidades sin afectar las existentes.
 
-### 1. Load Combinations Manager (`Combinations_Carga`)
-An Excel-like interface to manage load combinations efficiently.
-- **Functionality**:
-    - Read existing load cases and combinations from the active SAP2000 model.
-    - Add, modify, or delete combinations using a grid view.
-    - Support for different combination types (Linear Additive, Envelope, etc.).
-    - Design type selection (ASD/LRFD).
-    - Robust update logic ("Upsert") to modify combinations without breaking model dependencies.
-- **Entry Point**: `Combinations_Carga/app_combos_gui.py`
+## Componentes del Sistema
 
-### 2. Mesh Utilities (`Utilidades_MOD`)
-Tools for generating and modifying finite element meshes.
-- **Functionality**:
-    - **Rectangular Mesh**: Generate rectangular area elements with specific subdivisions.
-    - **Hole Generation**: Create circular openings within existing area elements.
-    - **Preview**: Real-time visual preview of the geometry before sending it to SAP2000.
-- **Entry Point**: `Utilidades_MOD/app_utils_gui.py`
+### 1. Aplicación Principal (`main_app.py`)
+El punto de entrada de la aplicación. Gestiona la barra de herramientas, la conexión global a SAP2000 y aloja las interfaces de los módulos en pestañas.
 
-### 3. Base Plate Analysis (`Placa_Base`)
-Module dedicated to the analysis and design of base plates.
-- **Entry Point**: `Placa_Base/app_placabase_gui.py`
+### 2. Gestor de Combinaciones de Carga (`Combinations_Carga`)
+Interfaz tipo Excel para gestionar combinaciones de carga.
+- Lectura y escritura de combinaciones ("Upsert").
+- Soporte para ASD/LRFD y tipos de combinación (Lineal, Envolvente).
+- Visualización en cuadrícula.
 
-## Requirements
+### 3. Utilidades de Mallado (`Utilidades_MOD`)
+Herramientas avanzadas de geometría y mallado.
+- Generación de mallas rectangulares.
+- Creación de huecos circulares en elementos de área.
+- Vista previa en tiempo real.
 
-- **Software**: CSI SAP2000.
-- **Python**: Version 3.13 or compatible.
-- **Libraries**:
-    - `comtypes`: For COM interface communication with SAP2000.
-    - `PySide6`: For the Graphical User Interface.
+### 4. Diseño de Placa Base (`Placa_Base`)
+Módulo específico para el modelado y generación de geometrías de placas base, pernos y rigidizadores.
 
-## Usage
+### 5. Generador de Memorias y Reportes (`Reportes`)
+Sistema avanzado para la generación automática de memorias de cálculo en Microsoft Word. **[Ver Guía Detallada](Reportes/GUIA_USUARIO_REPORTES.md)**.
 
-1. Open SAP2000 and load your model.
-2. Run the desired module script using Python.
-3. The GUI will attempt to connect to the active SAP2000 instance.
+- **Asistente en Vivo**: Inyecta tablas de datos de SAP2000 (Materiales, Cargas, Secciones) directamente en la posición del cursor de Word.
+- **Generación por Templates**: Crea documentos completos basándose en plantillas JSON personalizables.
+- **Librería de Contenido (Snippets)**:
+    - Gestión completa (Crear, Editar, Eliminar) de bloques de texto y ecuaciones.
+    - **Editor de Ecuaciones Visual**: "Ribbon" intuitivo para insertar fórmulas complejas (Matrices, Integrales, etc.).
+    - Soporte para **Ecuaciones Inline** (ej: `$E=mc^2$`) dentro del texto.
+    - Renderizado nativo en Word usando **UnicodeMath**.
 
-Example:
+## Requisitos
+
+- **Software**: CSI SAP2000 (v20+ recomendado) y **Microsoft Word**.
+- **Python**: 3.13+.
+- **Librerías**:
+    - `comtypes`: Interfaz COM (SAP2000 y Word).
+    - `PySide6`: Interfaz Gráfica (Qt).
+
+Instalación de dependencias:
 ```bash
-python Combinations_Carga/app_combos_gui.py
+pip install comtypes PySide6
 ```
 
-## Architecture
+## Uso
 
-The project follows a modular pattern separating the interface from the logic:
-- **GUI (*_gui.py)**: Handles user interaction and display using PySide6.
-- **Backend (*_backend.py)**: Manages the logic and direct communication with the SAP2000 API.
+1. Abra SAP2000 y cargue un modelo (o inicie uno nuevo).
+2. Ejecute la aplicación principal:
 
-## API Interaction
+```bash
+python main_app.py
+```
+3. Navegue por las pestañas para usar las distintas herramientas.
 
-- The interaction relies on `comtypes.client.GetActiveObject("CSI.SAP2000.API.SapObject")`.
-- Parameter handling is specifically adjusted for Python's `comtypes` behavior, particularly regarding `ByRef` return values which are returned as tuples.
+## Personalización de Reportes
+
+El módulo de Reportes es altamente personalizable mediante archivos JSON.
+
+### Templates de Documento
+Ubicación: `Reportes/templates/`
+Cree un archivo `.json` con la siguiente estructura:
+```json
+{
+  "template_name": "Mi Reporte",
+  "sections": [
+    { "type": "heading", "content": "Título 1", "parameters": { "level": 1 } },
+    { "type": "text", "content": "Párrafo de texto...", "parameters": { "style": "Normal" } },
+    { "type": "page_break" }
+  ]
+}
+```
+
+### Librería y Ecuaciones
+Ubicación: `Reportes/library/`
+
+El sistema soporta ahora una gestión completa de "Snippets" (fragmentos reutilizables) desde la propia interfaz gráfica.
+*   **Editor Visual**: Permite componer bloques de Texto, Títulos y Ecuaciones.
+*   **UnicodeMath**: Estándar nativo de Word para ecuaciones lineales de alta calidad.
+*   **Sintaxis Inline**: Puedes insertar matemáticas dentro de un párrafo encerrándolas en signos peso (ej: `El valor de $\alpha$ es...`).
+
+Consulte la **[Guía de Usuario de Reportes](Reportes/GUIA_USUARIO_REPORTES.md)** para más detalles sobre la sintaxis de matrices, operadores y el uso del Ribbon.
+
+## Arquitectura Técnica
+
+El proyecto utiliza una arquitectura de **Inyección de Dependencias** para compartir la instancia de SAP2000:
+
+1.  **`SapInterface` (Singleton-like)**:
+    - Ubicado en `sap_interface.py`.
+    - Mantiene una única referencia activa al objeto COM de SAP2000 (`SapModel`).
+    - Emite señales (`connectionChanged`) cuando el estado de la conexión varía.
+
+2.  **Módulos (Paquetes)**:
+    - Cada herramienta es un paquete de Python con su propio `__init__.py`.
+    - **Backend**: Clases agnósticas de la GUI (ej. `CombosBackend`) que reciben `sap_model` en su constructor.
+    - **Frontend**: Widgets de PySide6 que reciben `sap_interface` para coordinar la conexión.
+
+3.  **Patrón de Desarrollo**:
+    - **Backend Unitario**: Permite probar la lógica sin GUI instanciando el backend y pasándole un modelo.
+    - **GUI Decoplada**: La interfaz gráfica no contiene lógica de negocio compleja, solo presentación.

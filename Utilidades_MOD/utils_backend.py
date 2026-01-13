@@ -3,10 +3,17 @@ import sys
 import math
 
 class SapUtils:
-    def __init__(self):
-        self.SapModel = None
-        # Intentamos conectar al inicializar, pero no fallamos si no se puede
-        self._connect_to_sap()
+    def __init__(self, sap_model=None):
+        """
+        Inicializa la utilidad.
+        
+        Args:
+            sap_model: Objeto SapModel opcional ya conectado.
+        """
+        self.SapModel = sap_model
+        # Intentamos conectar al inicializar solo si no nos pasaron un modelo
+        if self.SapModel is None:
+            self._connect_to_sap()
 
     def _connect_to_sap(self):
         try:

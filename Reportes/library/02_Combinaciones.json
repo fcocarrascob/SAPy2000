@@ -1,0 +1,79 @@
+{
+  "category": "Combinaciones de Carga",
+  "snippets": [
+    {
+      "id": "combo_lrfd_tabla",
+      "title": "Combinaciones LRFD (NCh3171 / NCh2369)",
+      "description": "Tabla de combinaciones de carga para diseño LRFD.",
+      "content": [
+        {
+          "type": "heading",
+          "content": "Combinaciones LRFD",
+          "parameters": { "level": 3 }
+        },
+        {
+          "type": "text",
+          "content": "A continuación se presentan las combinaciones de carga factorizadas (LRFD) utilizadas en el diseño:",
+          "parameters": { "style": "Normal" }
+        },
+        {
+          "type": "table",
+          "content": {
+            "headers": ["Número", "Combinación", "Norma"],
+            "data": [
+              ["C01", "1.4D ± T", "NCh3171.Of2010"],
+              ["C02", "1.2D + 1.6L + 0.5(Lr o S o R) ± T", "NCh3171.Of2010"],
+              ["C03", "1.2D + 1.6(Lr o S o R) + L ± T", "NCh3171.Of2010"],
+              ["C04", "1.2D + 1.6(Lr o S o R) ± 0.8W ± T", "NCh3171.Of2010"],
+              ["C05", "1.2D ± 1.6W + L + 0.5(Lr o S o R) ± T", "NCh3171.Of2010"],
+              ["C06", "1.2D ± 1.4E + L + 0.2S ± T", "NCh3171.Of2010"],
+              ["C07", "0.9D ± 1.6W ± T", "NCh3171.Of2010"],
+              ["C08", "0.9D ± 1.4E ± T", "NCh3171.Of2010"],
+              ["C09", "1.2D + 0.25L + SO + SA ± E ± T", "NCh2369:2025"],
+              ["C10", "0.9D + SA ± E ± T", "NCh2369:2025"]
+            ]
+          },
+          "parameters": {}
+        }
+      ]
+    },
+    {
+      "id": "combo_asd_tabla",
+      "title": "Combinaciones ASD (NCh3171 / NCh2369)",
+      "description": "Tabla de combinaciones de carga para diseño ASD (Tensiones Admisibles).",
+      "content": [
+        {
+          "type": "heading",
+          "content": "Combinaciones ASD",
+          "parameters": { "level": 3 }
+        },
+        {
+          "type": "text",
+          "content": "A continuación se presentan las combinaciones de carga de servicio (ASD) utilizadas en el diseño:",
+          "parameters": { "style": "Normal" }
+        },
+        {
+          "type": "table",
+          "content": {
+            "headers": ["Número", "Combinación", "Norma"],
+            "data": [
+              ["C01", "D ± T", "NCh3171.Of2010"],
+              ["C02", "1.0D + 1.0L ± T", "NCh3171.Of2010"],
+              ["C03", "1.0D + (Lr o S o R) ± T", "NCh3171.Of2010"],
+              ["C04", "1.0D + 0.75L + 0.75(Lr o S o R) ± T", "NCh3171.Of2010"],
+              ["C05", "1.0D ± 1.0W ± T", "NCh3171.Of2010"],
+              ["C06", "1.0D ± 1.0E ± T", "NCh3171.Of2010"],
+              ["C07", "1.0D ± 0.75W + 0.75L + 0.75(Lr o S o R) ± T", "NCh3171.Of2010"],
+              ["C08", "1.0D ± 0.75E + 0.75L + 0.75S ± T", "NCh3171.Of2010"],
+              ["C09", "0.6D ± 1.0W ± T", "NCh3171.Of2010"],
+              ["C10", "0.6D ± 1.0E ± T", "NCh3171.Of2010"],
+              ["C11", "1.0D + 0.25*0.75L + 0.75SO + 0.75SA ± 0.7E ± T", "NCh2369:2025"],
+              ["C12", "1.0D + 0.75SA ± 0.7E ± T", "NCh2369:2025"]
+            ]
+          },
+          "parameters": {}
+        }
+      ]
+    }
+  ]
+}

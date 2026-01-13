@@ -1,0 +1,124 @@
+{
+  "template_name": "Memoria de Cálculo Estándar",
+  "description": "Estructura base para una memoria de cálculo estructural típica.",
+  "sections": [
+    {
+      "type": "heading",
+      "content": "MEMORIA DE CÁLCULO ESTRUCTURAL: Estructura de Acero",
+      "parameters": { "level": 1 }
+    },
+    {
+      "type": "text",
+      "content": "Proyecto: [NOMBRE DEL PROYECTO]",
+      "parameters": { "style": "Normal" }
+    },
+    {
+      "type": "text",
+      "content": "Fecha: [FECHA]",
+      "parameters": { "style": "Normal" }
+    },
+    {
+      "type": "page_break"
+    },
+    {
+      "type": "heading",
+      "content": "1. INTRODUCCIÓN",
+      "parameters": { "level": 1 }
+    },
+    {
+      "type": "text",
+      "content": "[BREVE DESCRIPCIÓN DEL PROYECTO Y ALCANCE DE LA MEMORIA DE CÁLCULO]",
+      "parameters": { "style": "Normal" }
+    },
+    {
+      "type": "heading",
+      "content": "2. OBJETIVO",
+      "parameters": { "level": 1 }
+    },
+    {
+      "type": "text",
+      "content": "[DESCRIPCIÓN DEL OBJETIVO DE LA MEMORIA DE CÁLCULO]",
+      "parameters": { "style": "Normal" }
+    },
+    {
+      "type": "heading",
+      "content": "3. ALCANCE",
+      "parameters": { "level": 1 }
+    },
+    {
+      "type": "text",
+      "content": "[DESCRIPCIÓN DEL ALCANCE DE LA MEMORIA DE CÁLCULO]",
+      "parameters": { "style": "Normal" }
+    },
+    {
+      "type": "heading",
+      "content": "3.1 Trabajo Incluido",
+      "parameters": { "level": 2 }
+    },
+    {
+      "type": "heading",
+      "content": "3.1 Trabajo Excluido",
+      "parameters": { "level": 2 }
+    },
+    {
+      "type": "heading",
+      "content": "4. ANTECEDENTES",
+      "parameters": { "level": 1 }
+    },
+    {
+      "type": "heading",
+      "content": "4.1 Documentos",
+      "parameters": { "level": 2 }
+    },
+    {
+      "type": "heading",
+      "content": "4.2 Normas y Códigos",
+      "parameters": { "level": 2 }
+    },
+    {
+      "type": "heading",
+      "content": "4.3 Planos",
+      "parameters": { "level": 2 }
+    },
+    {
+      "type": "heading",
+      "content": "5. BASES DE DISEÑO",
+      "parameters": { "level": 1 }
+    },
+    {
+      "type": "heading",
+      "content": "5.1 Materiales",
+      "parameters": { "level": 2 }
+    },
+    {
+      "type": "heading",
+      "content": "5.2 Mecánica de Suelos",
+      "parameters": { "level": 2 }
+    },
+    {
+      "type": "heading",
+      "content": "5.2.1 Capacidad de Soporte",
+      "parameters": { "level": 3 }
+    },
+    {
+      "type": "heading",
+      "content": "5.2.2 Coeficiente de Balasto",
+      "parameters": { "level": 3 }
+    },
+    {
+      "type": "heading",
+      "content": "5.3 Características Sísmicas",
+      "parameters": { "level": 2 }
+    },
+    {
+      "type": "heading",
+      "content": "5.4 Estados de Carga",
+      "parameters": { "level": 2 }
+    },
+    {
+      "type": "heading",
+      "content": "5.2 Mecánica de Suelos",
+      "parameters": { "level": 2 }
+    }
+  ]
+}

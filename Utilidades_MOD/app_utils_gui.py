@@ -10,11 +10,14 @@ from PySide6.QtCore import Qt, QUrl
 
 # Importar backend
 try:
-    from utils_backend import SapUtils
+    from .utils_backend import SapUtils
 except ImportError:
-    # Fallback si se ejecuta desde otro directorio
-    sys.path.append(os.path.dirname(__file__))
-    from utils_backend import SapUtils
+    try:
+        from utils_backend import SapUtils
+    except ImportError:
+        # Fallback si se ejecuta desde otro directorio
+        sys.path.append(os.path.dirname(__file__))
+        from utils_backend import SapUtils
 
 class PreviewWidget(QWidget):
     def __init__(self, parent=None):
@@ -278,11 +281,30 @@ class PreviewWidget(QWidget):
 
 class BaseMeshWidget(QWidget):
     """Clase base para widgets de generación de malla."""
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, sap_interface=None):
         super().__init__(parent)
+        self.sap_interface = sap_interface
         self.backend = None
         self.log_text = None
         self.generate_btn = None
+        
+        # Iniciar backend con el modelo inyectado si existe
+        initial_model = self.sap_interface.SapModel if self.sap_interface else None
+        self.backend = SapUtils(sap_model=initial_model)
+
+        # Conectar señal si existe
+        if self.sap_interface:
+            self.sap_interface.connectionChanged.connect(self.on_connection_changed)
+
+    def on_connection_changed(self, connected):
+        if connected:
+            self.backend.SapModel = self.sap_interface.SapModel
+            self.log("📡 Conexión global recibida.")
+            if self.generate_btn: self.generate_btn.setEnabled(True)
+        else:
+            self.backend.SapModel = None
+            self.log("📡 Conexión global perdida.")
+            if self.generate_btn: self.generate_btn.setEnabled(False)
 
     def setup_common_ui(self, layout):
         # --- Botones ---
@@ -340,8 +362,8 @@ class BaseMeshWidget(QWidget):
 
 
 class RectangularMeshWidget(BaseMeshWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
+    def __init__(self, parent=None, sap_interface=None):
+        super().__init__(parent, sap_interface)
         self.init_ui()
         
     def init_ui(self):
@@ -479,8 +501,8 @@ class RectangularMeshWidget(BaseMeshWidget):
 
 
 class HoleMeshWidget(BaseMeshWidget):
-    def __init__(self, parent=None):
-        super().__init__(parent)
+    def __init__(self, parent=None, sap_interface=None):
+        super().__init__(parent, sap_interface)
         self.init_ui()
         
     def init_ui(self):
@@ -703,22 +725,29 @@ class NotesWidget(QWidget):
             self.viewer.setMarkdown(f"# Archivo no encontrado\n\nNo se encontró `{notes_file}`.")
 
 
-class MainWindow(QMainWindow):
-    def __init__(self):
-        super().__init__()
-        self.setWindowTitle("Utilidades SAP2000 - Modelado")
-        self.resize(800, 700) # Increased width slightly for better reading
+class MeshUtilsWidget(QWidget):
+    def __init__(self, parent=None, sap_interface=None):
+        super().__init__(parent)
         
+        layout = QVBoxLayout(self)
         self.tabs = QTabWidget()
-        self.setCentralWidget(self.tabs)
+        layout.addWidget(self.tabs)
         
-        self.rect_mesh_widget = RectangularMeshWidget()
-        self.hole_mesh_widget = HoleMeshWidget()
+        self.rect_mesh_widget = RectangularMeshWidget(sap_interface=sap_interface)
+        self.hole_mesh_widget = HoleMeshWidget(sap_interface=sap_interface)
         self.notes_widget = NotesWidget()
         
         self.tabs.addTab(self.rect_mesh_widget, "Malla Rectangular")
         self.tabs.addTab(self.hole_mesh_widget, "Malla con Orificio")
         self.tabs.addTab(self.notes_widget, "Notas y Recomendaciones")
+
+
+class MainWindow(QMainWindow):
+    def __init__(self):
+        super().__init__()
+        self.setWindowTitle("Utilidades SAP2000 - Modelado")
+        self.resize(800, 700) # Increased width slightly for better reading
+        self.setCentralWidget(MeshUtilsWidget())
 
 if __name__ == "__main__":
 
