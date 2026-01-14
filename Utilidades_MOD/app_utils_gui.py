@@ -415,6 +415,7 @@ class RectangularMeshWidget(BaseMeshWidget):
         self.prop_edit = QLineEdit("Default")
         self.plane_combo = QComboBox()
         self.plane_combo.addItems(["XY", "XZ", "YZ"])
+        self.plane_combo.setCurrentIndex(-1)  # Sin selección inicial
         
         self.btn_get_coords = QPushButton("Obtener Coordenadas")
         self.btn_get_coords.clicked.connect(self.fetch_coords)
@@ -486,12 +487,17 @@ class RectangularMeshWidget(BaseMeshWidget):
             sz = float(self.start_z.text())
             plane = self.plane_combo.currentText()
             prop = self.prop_edit.text()
+
+            if self.plane_combo.currentIndex() < 0 or plane.strip() == "":
+                self.log("⚠️ Seleccione un plano antes de generar la malla.")
+                return
             
             self.log(f"Generando malla {nx}x{ny} en {plane}...")
             areas = self.backend.create_mesh_by_coord(w, l, nx, ny, sx, sy, sz, plane, prop)
             
             if areas:
                 self.log(f"✅ Éxito: {len(areas)} áreas creadas.")
+                self.plane_combo.setCurrentIndex(-1)  # Limpiar selección tras generar
             else:
                 self.log("⚠️ No se crearon áreas (o ocurrió un error silencioso).")
                 
@@ -579,6 +585,7 @@ class HoleMeshWidget(BaseMeshWidget):
         self.prop_edit = QLineEdit("Default")
         self.plane_combo = QComboBox()
         self.plane_combo.addItems(["XY", "XZ", "YZ"])
+        self.plane_combo.setCurrentIndex(-1)  # Sin selección inicial
         
         self.btn_get_coords = QPushButton("Obtener Coordenadas")
         self.btn_get_coords.clicked.connect(self.fetch_coords)
@@ -659,6 +666,10 @@ class HoleMeshWidget(BaseMeshWidget):
             sz = float(self.start_z.text())
             plane = self.plane_combo.currentText()
             prop = self.prop_edit.text()
+
+            if self.plane_combo.currentIndex() < 0 or plane.strip() == "":
+                self.log("⚠️ Seleccione un plano antes de generar la malla.")
+                return
             
             self.log(f"Generando malla con orificio ({inner_s} en {outer_s})...")
             areas = self.backend.create_hole_mesh(
@@ -668,6 +679,7 @@ class HoleMeshWidget(BaseMeshWidget):
             
             if areas:
                 self.log(f"✅ Éxito: {len(areas)} áreas creadas.")
+                self.plane_combo.setCurrentIndex(-1)  # Limpiar selección tras generar
             else:
                 self.log("⚠️ No se crearon áreas.")
                 

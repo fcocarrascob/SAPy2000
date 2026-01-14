@@ -3,7 +3,7 @@ import os
 import json
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QLineEdit,
                                QTextEdit, QPushButton, QVBoxLayout, QHBoxLayout, QMessageBox, QComboBox,
-                               QTableWidget, QTableWidgetItem, QGroupBox, QGridLayout, QFormLayout)
+                               QTableWidget, QTableWidgetItem, QGroupBox, QGridLayout, QFormLayout, QScrollArea, QCheckBox)
 from PySide6.QtGui import QPainter, QColor, QPen, QBrush
 from PySide6.QtCore import QSize, QRectF, Qt
 
@@ -42,6 +42,13 @@ class BasePlateWidget(QWidget):
         self.web_edit = QLineEdit('')
         # espesor de placa base (mm)
         self.plate_thickness_edit = QLineEdit('20.0')
+        
+        # New inputs for Anchor Chair
+        self.include_chair_chk = QCheckBox("Incluir Silla de Anclaje")
+        self.include_chair_chk.toggled.connect(self.toggle_chair_inputs)
+        self.chair_height_edit = QLineEdit('')
+        self.chair_thickness_edit = QLineEdit('')
+
         self.A_display = QLineEdit('100')
         self.A_display.setReadOnly(True)
         self.B_display = QLineEdit('100')
@@ -73,7 +80,13 @@ class BasePlateWidget(QWidget):
         self.run_btn.clicked.connect(self.run_script)
 
         # --- Layout Construction ---
-        main_form_layout = QVBoxLayout()
+        # Scroll Area Setup
+        self.scroll_area = QScrollArea()
+        self.scroll_widget = QWidget()
+        self.scroll_area.setWidgetResizable(True)
+        self.scroll_area.setWidget(self.scroll_widget)
+        
+        main_form_layout = QVBoxLayout(self.scroll_widget)
 
         # 1. Grupo Perfil Columna
         grp_col = QGroupBox("1. Perfil Columna")
@@ -132,8 +145,19 @@ class BasePlateWidget(QWidget):
         grp_bolts.setLayout(bolts_layout)
         main_form_layout.addWidget(grp_bolts)
 
-        # 4. Salida / Log
-        grp_out = QGroupBox("4. Salida / Log")
+        # 4. Grupo Silla de Anclaje
+        grp_chair = QGroupBox("4. Silla de Anclaje")
+        chair_layout = QGridLayout()
+        chair_layout.addWidget(self.include_chair_chk, 0, 0, 1, 4)
+        chair_layout.addWidget(QLabel("Altura (mm):"), 1, 0)
+        chair_layout.addWidget(self.chair_height_edit, 1, 1)
+        chair_layout.addWidget(QLabel("Espesor (mm):"), 1, 2)
+        chair_layout.addWidget(self.chair_thickness_edit, 1, 3)
+        grp_chair.setLayout(chair_layout)
+        main_form_layout.addWidget(grp_chair)
+
+        # 5. Salida / Log
+        grp_out = QGroupBox("5. Salida / Log")
         out_layout = QVBoxLayout()
         
         btn_row = QHBoxLayout()
@@ -149,9 +173,8 @@ class BasePlateWidget(QWidget):
         self.preview = PreviewWidget(self)
 
         main_layout = QHBoxLayout()
-        left_widget = QWidget()
-        left_widget.setLayout(main_form_layout)
-        main_layout.addWidget(left_widget, 1)
+        # Left side is now the ScrollArea
+        main_layout.addWidget(self.scroll_area, 1)
         main_layout.addWidget(self.preview, 1)
 
         self.setLayout(main_layout)
@@ -178,22 +201,26 @@ class BasePlateWidget(QWidget):
                 
                 self.hcol_edit.setText(str(cfg.get('H_col', self.hcol_edit.text())))
                 self.bcol_edit.setText(str(cfg.get('B_col', self.bcol_edit.text())))
+                
+                # Helper to load optional float fields (avoid writing "None" as text)
+                def load_optional_field(edit, key, default=''):
+                    val = cfg.get(key)
+                    if val is not None:
+                        edit.setText(str(val))
+                    else:
+                        edit.setText(default)
+                
                 # cargar espesores si vienen en la config
-                if 'flange_thickness' in cfg:
-                    try:
-                        self.flange_edit.setText(str(cfg.get('flange_thickness', '')))
-                    except Exception:
-                        pass
-                if 'web_thickness' in cfg:
-                    try:
-                        self.web_edit.setText(str(cfg.get('web_thickness', '')))
-                    except Exception:
-                        pass
-                if 'plate_thickness' in cfg:
-                    try:
-                        self.plate_thickness_edit.setText(str(cfg.get('plate_thickness', '20.0')))
-                    except Exception:
-                        pass
+                load_optional_field(self.flange_edit, 'flange_thickness')
+                load_optional_field(self.web_edit, 'web_thickness')
+                load_optional_field(self.plate_thickness_edit, 'plate_thickness', '20.0')
+                
+                # Cargar estado de checkbox
+                self.include_chair_chk.setChecked(bool(cfg.get('include_anchor_chair', False)))
+
+                load_optional_field(self.chair_height_edit, 'anchor_chair_height')
+                load_optional_field(self.chair_thickness_edit, 'anchor_chair_thickness')
+                
                 # restaurar per-row (n_pernos) si existe en config
                 try:
                     cfg_n = cfg.get('n_pernos')
@@ -268,6 +295,18 @@ class BasePlateWidget(QWidget):
 
         # asegurarse de que la preview refleje la configuración cargada inicialmente
         self.preview.update()
+        
+        # Initial toggle state
+        self.toggle_chair_inputs(self.include_chair_chk.isChecked())
+
+    def log_message(self, message):
+        """Append message to log and force UI update."""
+        self.log.append(message)
+        QApplication.processEvents()
+
+    def toggle_chair_inputs(self, checked):
+        self.chair_height_edit.setEnabled(checked)
+        self.chair_thickness_edit.setEnabled(checked)
 
     def save_config(self):
         try:
@@ -296,16 +335,25 @@ class BasePlateWidget(QWidget):
                 return False
             centers.append([x, y, z])
 
+        def parse_float_field(edit):
+            """Parse float from QLineEdit, return None if empty or 'None'."""
+            val = edit.text().strip()
+            if val == '' or val.lower() == 'none':
+                return None
+            return float(val)
+
         cfg = {
             'bolt_dia': bolt_dia,
             'H_col': H_col,
             'B_col': B_col,
             'n_pernos': int(self.per_row_combo.currentData()),
             'bolt_centers': centers,
-            'flange_thickness': float(self.flange_edit.text()) if self.flange_edit.text().strip() != '' else None,
-            'web_thickness': float(self.web_edit.text()) if self.web_edit.text().strip() != '' else None
-            ,
-            'plate_thickness': float(self.plate_thickness_edit.text()) if self.plate_thickness_edit.text().strip() != '' else None
+            'flange_thickness': parse_float_field(self.flange_edit),
+            'web_thickness': parse_float_field(self.web_edit),
+            'plate_thickness': parse_float_field(self.plate_thickness_edit),
+            'include_anchor_chair': self.include_chair_chk.isChecked(),
+            'anchor_chair_height': parse_float_field(self.chair_height_edit),
+            'anchor_chair_thickness': parse_float_field(self.chair_thickness_edit)
         }
         try:
             with open(CONFIG_PATH, 'w', encoding='utf-8') as fh:
@@ -333,10 +381,10 @@ class BasePlateWidget(QWidget):
                 self.log.append("No hay conexión activa en sap_interface. Intentando conectar en backend...")
                 model = None # Backend will try to connect if None
 
-            backend = BasePlateBackend(sap_model=model)
+            backend = BasePlateBackend(sap_model=model, logger=self.log_message)
             backend.load_config_from_file(CONFIG_PATH)
             backend.run_process()
-            self.log.append("Ejecución finalizada correctamente.")
+            self.log_message("Ejecución finalizada correctamente.")
 
         except Exception as e:
             self.log.append(f"Error durante la ejecución: {str(e)}")

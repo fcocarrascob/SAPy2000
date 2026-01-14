@@ -17,6 +17,9 @@ class PlateConfig:
     flange_thickness: Optional[float] = None
     web_thickness: Optional[float] = None
     plate_thickness: Optional[float] = None
+    include_anchor_chair: bool = False
+    anchor_chair_height: Optional[float] = None
+    anchor_chair_thickness: Optional[float] = None
 
     @classmethod
     def from_json(cls, json_path: str) -> 'PlateConfig':
@@ -55,6 +58,13 @@ class PlateConfig:
             cfg.web_thickness = float(data['web_thickness'])
         if 'plate_thickness' in data and data['plate_thickness']:
             cfg.plate_thickness = float(data['plate_thickness'])
+        
+        cfg.include_anchor_chair = bool(data.get('include_anchor_chair', False))
+            
+        if 'anchor_chair_height' in data and data['anchor_chair_height']:
+            cfg.anchor_chair_height = float(data['anchor_chair_height'])
+        if 'anchor_chair_thickness' in data and data['anchor_chair_thickness']:
+            cfg.anchor_chair_thickness = float(data['anchor_chair_thickness'])
             
         return cfg
 
@@ -73,13 +83,21 @@ class PlateConfig:
 
 
 class BasePlateBackend:
-    def __init__(self, sap_model=None):
+    def __init__(self, sap_model=None, logger=None):
         self.SapModel = sap_model
+        self.logger = logger
         self.config = PlateConfig()
         
         # Conectar si no hay modelo proporcionado
         if self.SapModel is None:
             self._connect_to_sap()
+
+    def log(self, message):
+        """Envía mensaje al logger si existe, o imprime a consola."""
+        if self.logger:
+            self.logger(message)
+        else:
+            print(message)
 
     def _connect_to_sap(self):
         try:
@@ -92,14 +110,14 @@ class BasePlateBackend:
                 mySapObject = comtypes.client.GetActiveObject("CSI.SAP2000.API.SapObject")
                 
             self.SapModel = mySapObject.SapModel
-            print("Conexión exitosa a la instancia abierta de SAP2000.")
+            self.log("Conexión exitosa a la instancia abierta de SAP2000.")
         except Exception as e:
-            print(f"Aviso: Backend iniciado sin conexión a SAP2000. ({e})")
+            self.log(f"Aviso: Backend iniciado sin conexión a SAP2000. ({e})")
             self.SapModel = None
 
     def load_config_from_file(self, json_path: str):
         self.config = PlateConfig.from_json(json_path)
-        print(f"Configuración cargada desde archivo: {self.config}")
+        self.log(f"Configuración cargada desde archivo: {self.config}")
         
     def run_process(self):
         """Método principal para ejecutar la generación de la placa base."""
@@ -109,9 +127,9 @@ class BasePlateBackend:
             if not self.SapModel:
                 raise RuntimeError("No hay conexión con SAP2000.")
 
-        print("Iniciando generación de placa base...")
+        self.log("Iniciando generación de placa base...")
         self.apply_config()
-        print("Proceso finalizado.")
+        self.log("Proceso finalizado.")
 
     # [Aquí irían los métodos apply_config y la lógica de modelado refactorizada]
     # Por ahora mantendremos el código existente de SapPlateGenerator adaptado
@@ -131,11 +149,11 @@ class BasePlateBackend:
         
         if code == 0:
             if success_msg:
-                print(success_msg)
+                self.log(success_msg)
             return True
         else:
             if error_msg:
-                print(f"{error_msg} (Code: {code})")
+                self.log(f"{error_msg} (Code: {code})")
             return False
 
     def _get_created_name(self, ret, fallback: str) -> str:
@@ -167,9 +185,9 @@ class BasePlateBackend:
                 if self._check_ret(ret, f"Propiedad '{name}' creada (SetShell)."):
                     return True
             except Exception as e:
-                print(f"Error creando propiedad '{name}': {e}")
+                self.log(f"Error creando propiedad '{name}': {e}")
         except Exception as e:
-            print(f"Error creando propiedad '{name}': {e}")
+            self.log(f"Error creando propiedad '{name}': {e}")
         return False
 
     def create_point(self, x: float, y: float, z: float, user_name: str = "") -> Optional[str]:
@@ -181,7 +199,7 @@ class BasePlateBackend:
             if self._check_ret(ret):
                 return self._get_created_name(ret, user_name)
         except Exception as e:
-            print(f"Error creando punto en ({x},{y},{z}): {e}")
+            self.log(f"Error creando punto en ({x},{y},{z}): {e}")
         return None
 
     def create_area_by_points(self, points: List[str], prop_name: str = "Default", user_name: str = "") -> Optional[str]:
@@ -193,7 +211,7 @@ class BasePlateBackend:
             if self._check_ret(ret):
                 return self._get_created_name(ret, user_name)
         except Exception as e:
-            print(f"Error creando área con puntos {points}: {e}")
+            self.log(f"Error creando área con puntos {points}: {e}")
         return None
 
     def create_area_by_coord(self, xs, ys, zs, prop_name: str = "Default", user_name: str = "") -> Optional[str]:
@@ -204,7 +222,7 @@ class BasePlateBackend:
             if self._check_ret(ret):
                 return self._get_created_name(ret, user_name)
         except Exception as e:
-            print(f"Error creando área por coordenadas: {e}")
+            self.log(f"Error creando área por coordenadas: {e}")
         return None
 
     def get_point_coord(self, point_name: str) -> Optional[Tuple[float, float, float]]:
@@ -229,7 +247,7 @@ class BasePlateBackend:
             ret = self.SapModel.EditArea.Divide(area_name, 1, 0, [], n_divisions, 10)
             self._check_ret(ret, f"Área '{area_name}' dividida.")
         except Exception as e:
-            print(f"Error dividiendo área '{area_name}': {e}")
+            self.log(f"Error dividiendo área '{area_name}': {e}")
 
     def coordinate_range(self, xmin, xmax, ymin, ymax, zmin, zmax,
                          deselect=False, csys="Global", include_intersections=False,
@@ -284,7 +302,7 @@ class BasePlateBackend:
                         return list(names)
             
         except Exception as e:
-            print(f"Error dividiendo área '{area_name}' por selección: {e}")
+            self.log(f"Error dividiendo área '{area_name}' por selección: {e}")
         return []
 
     def subdivide_areas(self, area_names: List[str], n1: int = 2, n2: int = 2):
@@ -292,7 +310,7 @@ class BasePlateBackend:
         if not area_names:
             return
         
-        print(f"Subdividiendo {len(area_names)} áreas en grilla {n1}x{n2}...")
+        self.log(f"Subdividiendo {len(area_names)} áreas en grilla {n1}x{n2}...")
         for name in area_names:
             self.divide_area(name, n1) # divide_area uses n1 for both or we need to update it?
             # My existing divide_area takes 'n_divisions' and passes it as n1, and hardcodes n2=10?
@@ -408,6 +426,26 @@ class BasePlateBackend:
             p4 = outer[i]
             self.create_area_by_points([p1, p2, p3, p4], prop_name, f"{prefix}_{i+1}")
 
+    def create_anchor_chair_plates(self, z_level: float, prop_name: str):
+        """Genera placas de silla en la cota z_level usando el mismo patrón de pernos."""
+        cfg = self.config
+        A, B_bolt = PlateConfig.map_dia_to_AB(cfg.bolt_dia)
+        circle_radius = cfg.bolt_dia / 2.0
+        outer_half = B_bolt / 2.0
+        inner_half = (circle_radius + outer_half) / 2.0
+        inner_side = inner_half * 2.0
+
+        for idx, (cx, cy, _cz) in enumerate(cfg.bolt_centers, 1):
+            self.log(f"Silla: procesando perno {idx} en ({cx}, {cy}) a z={z_level}...")
+            self.create_point(cx, cy, z_level, f"CHAIR_CENTER_{idx}")
+
+            c_pts = self.create_circle_points(cx, cy, z_level, circle_radius, 16, f"CHAIR_c{idx}_")
+            in_pts = self.create_square_points(cx, cy, z_level, inner_side, 16, f"CHAIR_sin{idx}_")
+            out_pts = self.create_square_points(cx, cy, z_level, B_bolt, 16, f"CHAIR_sout{idx}_")
+
+            self.create_ring_mesh(c_pts, in_pts, (cx, cy), f"CHAIR_ring_in{idx}", prop_name)
+            self.create_ring_mesh(in_pts, out_pts, (cx, cy), f"CHAIR_ring_out{idx}", prop_name)
+
     # --- Main Execution Logic ---
 
     def run(self):
@@ -423,6 +461,14 @@ class BasePlateBackend:
         
         if cfg.web_thickness:
             self.create_material_prop("ALMA", cfg.web_thickness)
+
+        chair_prop = None
+        if cfg.include_anchor_chair:
+            if cfg.anchor_chair_height and cfg.anchor_chair_height > 0 and cfg.anchor_chair_thickness and cfg.anchor_chair_thickness > 0:
+                chair_prop = "ChairPlate"
+                self.create_material_prop(chair_prop, cfg.anchor_chair_thickness, mat_name="A992Fy50")
+            else:
+                self.log("Silla de Anclaje activada pero faltan datos válidos de altura o espesor; se omite generación de silla.")
 
         # 2. Create Column Geometry (Flanges/Web)
         H, B = cfg.H_col, cfg.B_col
@@ -498,6 +544,10 @@ class BasePlateBackend:
                         self.divide_area(link_area, 4 * cfg.n_pernos)
             except Exception as e:
                 print(f"No se pudo crear el área de enlace: {e}")
+
+        # 3b. Anchor Chair Plates (optional)
+        if chair_prop:
+            self.create_anchor_chair_plates(cfg.anchor_chair_height, chair_prop)
 
         # 5. Divide Flange by Base Points (New Logic)
         try:
