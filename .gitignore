@@ -1,4 +1,8 @@
 _REFERENCIA
-.pyc
-pycache/
+
+# Ignorar bytecode de Python
 __pycache__/
+*.pyc
+*.pyo
+*.pyd
+

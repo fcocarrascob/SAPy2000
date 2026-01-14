@@ -69,7 +69,7 @@ class UnifiedApp(QMainWindow):
         # Tab 2: Utilities
         try:
             self.utils_tab = MeshUtilsWidget(sap_interface=self.sap_interface)
-            self.tabs.addTab(self.utils_tab, "Utilidades de Mallado")
+            self.tabs.addTab(self.utils_tab, "Utilidades de Modelado")
         except Exception as e:
             self.tabs.addTab(QLabel(f"Error loading Utilities: {e}"), "Utilidades (Error)")
 
