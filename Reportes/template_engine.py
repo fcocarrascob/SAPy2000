@@ -17,7 +17,7 @@ class TemplateEngine:
         Lee el JSON en `template_path` y construye el documento usando WordService.
         """
         try:
-            with open(template_path, 'r', encoding='utf-8') as f:
+            with open(template_path, 'r', encoding='utf-8-sig') as f:
                 data = json.load(f)
         except Exception as e:
             logger.error(f"Error leyendo template {template_path}: {e}")
@@ -34,6 +34,32 @@ class TemplateEngine:
             return False
 
         logger.info(f"Generando template: {data.get('template_name', 'Sin Nombre')}")
+        
+        return self.process_blocks(sections)
+
+    def insert_structure_at_cursor(self, template_path):
+        """
+        Lee el JSON en `template_path` e inserta el contenido en el cursor del documento activo.
+        No crea un documento nuevo.
+        """
+        try:
+            with open(template_path, 'r', encoding='utf-8-sig') as f:
+                data = json.load(f)
+        except Exception as e:
+            logger.error(f"Error leyendo template {template_path}: {e}")
+            return False
+
+        sections = data.get("sections", [])
+        if not sections:
+            logger.warning("El template no tiene secciones.")
+            return False
+
+        # Verificar conexión con doc activo
+        if not self.word_service.connect():
+             logger.error("No se pudo conectar con Word o no hay documento activo.")
+             return False
+        
+        logger.info(f"Insertando template en cursor: {data.get('template_name', 'Sin Nombre')}")
         
         return self.process_blocks(sections)
 

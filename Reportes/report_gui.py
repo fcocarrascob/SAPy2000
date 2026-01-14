@@ -48,6 +48,11 @@ class ReportWidget(QWidget):
         btn_generate_tmpl.clicked.connect(self.run_template_generation)
         gen_layout.addWidget(btn_generate_tmpl)
 
+        btn_insert_tmpl = QPushButton("Insertar en Cursor Actual")
+        btn_insert_tmpl.setToolTip("Inserta la estructura del template en la posición actual del cursor sin crear un archivo nuevo")
+        btn_insert_tmpl.clicked.connect(self.run_template_insertion)
+        gen_layout.addWidget(btn_insert_tmpl)
+
         group_gen.setLayout(gen_layout)
         main_layout.addWidget(group_gen)
 
@@ -294,6 +299,21 @@ class ReportWidget(QWidget):
             QMessageBox.information(self, "Éxito", "Documento base generado correctamente.")
         else:
             QMessageBox.critical(self, "Error", "No se pudo generar el documento. Revise el log.")
+
+    def run_template_insertion(self):
+        """Inserta el template seleccionado en el documento activo."""
+        template_path = self.combo_templates.currentData()
+        if not template_path:
+            QMessageBox.warning(self, "Aviso", "Seleccione un template válido.")
+            return
+
+        engine = TemplateEngine()
+        success = engine.insert_structure_at_cursor(template_path)
+        
+        if success:
+            QMessageBox.information(self, "Éxito", "Estructura insertada correctamente.")
+        else:
+            QMessageBox.critical(self, "Error", "No se pudo insertar la estructura. ¿Está Word abierto?")
 
     def run_action(self, method_name):
 

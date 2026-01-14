@@ -1,0 +1,285 @@
+{
+  "template_name": "Memoria de Cálculo Estándar: Estructura de Acero",
+  "description": "Estructura base para una memoria de cálculo estructural típica.",
+  "sections": [
+    {
+      "type": "heading",
+      "content": "MEMORIA DE CÁLCULO ESTRUCTURAL: Estructura de Acero",
+      "parameters": {
+        "level": 1
+      }
+    },
+    {
+      "type": "text",
+      "content": "Proyecto: [NOMBRE DEL PROYECTO]",
+      "parameters": {
+        "style": "Normal"
+      }
+    },
+    {
+      "type": "text",
+      "content": "Fecha: [FECHA]",
+      "parameters": {
+        "style": "Normal"
+      }
+    },
+    {
+      "type": "page_break"
+    },
+    {
+      "type": "heading",
+      "content": "INTRODUCCIÓN",
+      "parameters": {
+        "level": 1
+      }
+    },
+    {
+      "type": "text",
+      "content": "[BREVE DESCRIPCIÓN DEL PROYECTO Y ALCANCE DE LA MEMORIA DE CÁLCULO]",
+      "parameters": {
+        "style": "Normal"
+      }
+    },
+    {
+      "type": "heading",
+      "content": "OBJETIVO",
+      "parameters": {
+        "level": 1
+      }
+    },
+    {
+      "type": "heading",
+      "content": "ALCANCE",
+      "parameters": {
+        "level": 1
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Trabajo Incluido",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Trabajo Excluido",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "REFERENCIAS",
+      "parameters": {
+        "level": 1
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Antecedentes",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Normas y Códigos de Diseño",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Documentos y Planos del Proyecto",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "BASES DE DISEÑO",
+      "parameters": {
+        "level": 1
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Materiales",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Mecánica de Suelos",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Capacidad de Soporte",
+      "parameters": {
+        "level": 3
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Coeficiente de Balasto",
+      "parameters": {
+        "level": 3
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Características Sísmicas",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Estados de Carga",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Combinaciones de Carga",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Deflexión Admisible",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Desplazamientos Admisibles",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Recomendaciones para Conexiones de Acero",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "DESCRIPCIÓN DE LA ESTRUCTURA",
+      "parameters": {
+        "level": 1
+      }
+    },
+    {
+      "type": "heading",
+      "content": "MODELO ESTRUCTURAL",
+      "parameters": {
+        "level": 1
+      }
+    },
+    {
+      "type": "heading",
+      "content": "ASIGNACIÓN DE CARGAS",
+      "parameters": {
+        "level": 1
+      }
+    },
+    {
+      "type": "heading",
+      "content": "ANÁLISIS Y DISEÑO ESTRUCTURAL",
+      "parameters": {
+        "level": 1
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Periodos Fundamentales y Masa Participante",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Revisión de Corte Basal Normativo",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Reacciones en la Base",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Esbeltez Local y Global de Elementos Estructurales",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Diseño de Elementos Estructurales de Acero",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Revisión de Deformaciones y Desplazamientos",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Deflexiones Verticales",
+      "parameters": {
+        "level": 3
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Deformaciones Laterales",
+      "parameters": {
+        "level": 3
+      }
+    },
+    {
+      "type": "heading",
+      "content": "DISEÑO DE PLACAS BASES",
+      "parameters": {
+        "level": 1
+      }
+    },
+    {
+      "type": "heading",
+      "content": "COMENTARIOS FINALES",
+      "parameters": {
+        "level": 1
+      }
+    },
+    {
+      "type": "heading",
+      "content": "ANEXOS",
+      "parameters": {
+        "level": 1
+      }
+    },
+    {
+      "type": "page_break"
+    }
+  ]
+}
