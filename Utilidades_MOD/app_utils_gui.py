@@ -4,7 +4,8 @@ import math
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QLineEdit,
                                QTextEdit, QPushButton, QVBoxLayout, QHBoxLayout, 
                                QComboBox, QGroupBox, QGridLayout, QFormLayout, QTabWidget,
-                               QTextBrowser)
+                               QTextBrowser, QTableWidget, QTableWidgetItem, QHeaderView,
+                               QListWidget, QAbstractItemView, QListWidgetItem)
 from PySide6.QtGui import QPainter, QPen, QColor, QBrush
 from PySide6.QtCore import Qt, QUrl
 
@@ -725,6 +726,237 @@ class NotesWidget(QWidget):
             self.viewer.setMarkdown(f"# Archivo no encontrado\n\nNo se encontró `{notes_file}`.")
 
 
+class CheckableListGroup(QGroupBox):
+    def __init__(self, title, parent=None):
+        super().__init__(title, parent)
+        
+        self.layout_main = QVBoxLayout(self)
+        
+        # Botones de selección rápida
+        btn_layout = QHBoxLayout()
+        self.btn_all = QPushButton("Todos")
+        self.btn_none = QPushButton("Ninguno")
+        
+        # Estilo compacto para botones
+        for btn in [self.btn_all, self.btn_none]:
+            btn.setMaximumHeight(20)
+            btn.setStyleSheet("font-size: 10px; padding: 2px;")
+            
+        self.btn_all.clicked.connect(self.select_all)
+        self.btn_none.clicked.connect(self.select_none)
+        
+        btn_layout.addWidget(self.btn_all)
+        btn_layout.addWidget(self.btn_none)
+        #btn_layout.addStretch() # Opcional: si queremos botones a la izquierda
+        
+        self.layout_main.addLayout(btn_layout)
+        
+        # Lista
+        self.list_widget = QListWidget()
+        self.list_widget.setMaximumHeight(100)
+        self.layout_main.addWidget(self.list_widget)
+        
+    def add_items(self, items):
+        self.list_widget.clear()
+        for text in items:
+            item = QListWidgetItem(text)
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setCheckState(Qt.Unchecked)
+            self.list_widget.addItem(item)
+            
+    def add_placeholder(self, text):
+        self.list_widget.clear()
+        item = QListWidgetItem(text)
+        item.setFlags(Qt.NoItemFlags)
+        self.list_widget.addItem(item)
+        
+    def get_checked_items(self):
+        checked = []
+        for i in range(self.list_widget.count()):
+            item = self.list_widget.item(i)
+            if item.checkState() == Qt.Checked:
+                checked.append(item.text())
+        return checked
+        
+    def select_all(self):
+        for i in range(self.list_widget.count()):
+            item = self.list_widget.item(i)
+            # Solo si es seleccionable
+            if item.flags() & Qt.ItemIsUserCheckable:
+                item.setCheckState(Qt.Checked)
+                
+    def select_none(self):
+        for i in range(self.list_widget.count()):
+            item = self.list_widget.item(i)
+            if item.flags() & Qt.ItemIsUserCheckable:
+                item.setCheckState(Qt.Unchecked)
+
+    def clear(self):
+        self.list_widget.clear()
+
+
+class ResultsTableWidget(QWidget):
+    def __init__(self, parent=None, sap_interface=None):
+        super().__init__(parent)
+        self.sap_interface = sap_interface
+        # Instanciar el backend. Si el sap_interface ya tiene modelo, lo pasamos.
+        # En cualquier momento que se intente usar, nos aseguraremos de que tenga el modelo actualizado.
+        model = self.sap_interface.SapModel if self.sap_interface else None
+        self.utils_backend = SapUtils(sap_model=model)
+        
+        self.init_ui()
+        
+    def init_ui(self):
+        layout = QVBoxLayout(self)
+        
+        # --- Controles Superiores: Tabla y Acciones ---
+        controls_layout = QHBoxLayout()
+        
+        self.combo_tables = QComboBox()
+        self.combo_tables.setMinimumWidth(300)
+        self.combo_tables.setPlaceholderText("Seleccione una tabla...")
+        
+        self.btn_refresh = QPushButton("↻ Actualizar Lista")
+        self.btn_refresh.setToolTip("Recargar tablas y listas de carga desde SAP2000")
+        self.btn_refresh.clicked.connect(self.load_available_data)
+        
+        self.btn_load = QPushButton("Cargar Tabla")
+        self.btn_load.clicked.connect(self.load_table_data)
+        self.btn_load.setStyleSheet("font-weight: bold;")
+        
+        controls_layout.addWidget(QLabel("Tabla:"))
+        controls_layout.addWidget(self.combo_tables)
+        controls_layout.addWidget(self.btn_refresh)
+        controls_layout.addWidget(self.btn_load)
+        controls_layout.addStretch()
+        
+        layout.addLayout(controls_layout)
+        
+        # --- Sección de Filtros: Casos y Combinaciones ---
+        filters_layout = QHBoxLayout()
+        
+        # Grupo Casos de Carga
+        self.grp_cases = CheckableListGroup("Casos de Carga")
+        filters_layout.addWidget(self.grp_cases)
+        
+        # Grupo Combinaciones
+        self.grp_combos = CheckableListGroup("Combinaciones")
+        filters_layout.addWidget(self.grp_combos)
+        
+        layout.addLayout(filters_layout)
+
+        # --- Tabla de Resultados ---
+        self.table_widget = QTableWidget()
+        layout.addWidget(self.table_widget)
+        
+        # Carga inicial si hay conexión
+        if self.sap_interface and self.sap_interface.is_connected():
+             self.load_available_data()
+             
+    def load_available_data(self):
+        """Carga tablas, casos y combinaciones disponibles."""
+        self.combo_tables.clear()
+        self.grp_cases.clear()
+        self.grp_combos.clear()
+        
+        # Actualizar referencia del modelo en el backend
+        model = self.sap_interface.SapModel if self.sap_interface else None
+        self.utils_backend.SapModel = model
+        
+        if not model:
+            self.combo_tables.addItem("Desconectado de SAP2000")
+            return
+
+        # 1. Cargar Tablas
+        tables = self.utils_backend.get_available_tables()
+        if tables:
+            tables.sort(key=lambda x: x[1])
+            for key, name in tables:
+                self.combo_tables.addItem(name, userData=key) 
+        else:
+            self.combo_tables.addItem("No se encontraron tablas disponibles")
+
+        # 2. Cargar Casos de Carga
+        cases = self.utils_backend.get_load_cases()
+        if cases:
+            self.grp_cases.add_items(cases)
+        else:
+            self.grp_cases.add_placeholder("(No hay casos)")
+
+        # 3. Cargar Combinaciones
+        combos = self.utils_backend.get_load_combos()
+        if combos:
+            self.grp_combos.add_items(combos)
+        else:
+            self.grp_combos.add_placeholder("(No hay combos)")
+
+    def load_table_data(self):
+        # Verificar selección de tabla
+        if self.combo_tables.currentIndex() < 0: return
+        table_key = self.combo_tables.currentData()
+        if not table_key: return
+        
+        # Obtener selecciones de Cargas/Combos
+        selected_cases = self.grp_cases.get_checked_items()
+        selected_combos = self.grp_combos.get_checked_items()
+        
+        # Validación simple
+        if not selected_cases and not selected_combos:
+             pass
+
+        # Actualizar referencia del modelo
+        model = self.sap_interface.SapModel if self.sap_interface else None
+        self.utils_backend.SapModel = model
+        
+        # UI Feedback
+        self.table_widget.clear()
+        self.table_widget.setRowCount(0)
+        self.table_widget.setColumnCount(0)
+        self.btn_load.setEnabled(False)
+        self.btn_load.setText("Cargando...")
+        QApplication.processEvents() 
+        
+        try:
+            # Enviamos las listas directamente. Si están vacías (pero no None), el backend se encarga de 
+            # enviar el comando de limpieza a SAP2000 (Set... with empty string).
+            fields, rows = self.utils_backend.get_table_data(
+                table_key, 
+                load_cases=selected_cases,
+                load_combos=selected_combos
+            )
+            
+            if fields:
+                self.setup_table(fields, rows)
+            else:
+                self.table_widget.setColumnCount(1)
+                self.table_widget.setRowCount(1)
+                self.table_widget.setHorizontalHeaderLabels(["Mensaje"])
+                self.table_widget.setItem(0, 0, QTableWidgetItem("No se pudieron cargar datos (Vacío o Error). Verifica la selección de Cargas/Combos."))
+        finally:
+            self.btn_load.setEnabled(True)
+            self.btn_load.setText("Cargar Tabla")
+
+    def setup_table(self, headers, data):
+        self.table_widget.setColumnCount(len(headers))
+        self.table_widget.setRowCount(len(data))
+        
+        self.table_widget.setHorizontalHeaderLabels(headers)
+        
+        # Deshabilitar actualizaciones durante la carga masiva para rendimiento
+        self.table_widget.setUpdatesEnabled(False)
+        try:
+            for r, row in enumerate(data):
+                for c, val in enumerate(row):
+                    item = QTableWidgetItem(str(val))
+                    # Hacer celdas de solo lectura
+                    item.setFlags(item.flags() ^ Qt.ItemIsEditable) 
+                    self.table_widget.setItem(r, c, item)
+        finally:
+            self.table_widget.setUpdatesEnabled(True)
+            
+        self.table_widget.resizeColumnsToContents()
+
+
 class MeshUtilsWidget(QWidget):
     def __init__(self, parent=None, sap_interface=None):
         super().__init__(parent)
@@ -735,10 +967,12 @@ class MeshUtilsWidget(QWidget):
         
         self.rect_mesh_widget = RectangularMeshWidget(sap_interface=sap_interface)
         self.hole_mesh_widget = HoleMeshWidget(sap_interface=sap_interface)
+        self.results_widget = ResultsTableWidget(sap_interface=sap_interface)
         self.notes_widget = NotesWidget()
         
         self.tabs.addTab(self.rect_mesh_widget, "Malla Rectangular")
         self.tabs.addTab(self.hole_mesh_widget, "Malla con Orificio")
+        self.tabs.addTab(self.results_widget, "Tablas de Resultados")
         self.tabs.addTab(self.notes_widget, "Notas y Recomendaciones")
 
 
