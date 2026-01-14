@@ -37,5 +37,8 @@
   ],
   "flange_thickness": 20.0,
   "web_thickness": 8.0,
-  "plate_thickness": 20.0
+  "plate_thickness": 20.0,
+  "include_anchor_chair": false,
+  "anchor_chair_height": 250.0,
+  "anchor_chair_thickness": 28.0
 }
