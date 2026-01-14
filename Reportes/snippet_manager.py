@@ -34,7 +34,7 @@ class SnippetManager:
         
         for f in files:
             try:
-                with open(f, 'r', encoding='utf-8') as json_file:
+                with open(f, 'r', encoding='utf-8-sig') as json_file:
                     data = json.load(json_file)
                     
                     cat_name = data.get("category", "Sin Categoría")
@@ -83,7 +83,7 @@ class SnippetManager:
             self._create_backup(file_path)
             
             # Cargar archivo actual
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, 'r', encoding='utf-8-sig') as f:
                 data = json.load(f)
             
             snippets = data.get("snippets", [])
@@ -124,7 +124,7 @@ class SnippetManager:
         try:
             self._create_backup(file_path)
             
-            with open(file_path, 'r', encoding='utf-8') as f:
+            with open(file_path, 'r', encoding='utf-8-sig') as f:
                 data = json.load(f)
             
             snippets = data.get("snippets", [])
