@@ -640,7 +640,9 @@ class BlockEditor(QWidget):
         idx = full_text.find("⬚")
         if idx != -1:
             cursor.setPosition(idx)
-            cursor.movePosition(cursor.Right, cursor.KeepAnchor, 1)
+            # PySide6: Usar QTextCursor.MoveOperation.Right en lugar de cursor.Right
+            from PySide6.QtGui import QTextCursor
+            cursor.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor, 1)
             self.equation_content.setTextCursor(cursor)
 
     def _setup_symbols_menu(self):

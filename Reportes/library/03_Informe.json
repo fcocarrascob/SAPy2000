@@ -1,0 +1,62 @@
+{
+  "category": "Informe",
+  "snippets": [
+    {
+      "id": "modelo_estructural",
+      "title": "Modelo Estructural (Acero)",
+      "description": "Parrafo tipo para descripción de modelo SAP2000 Frames.",
+      "content": [
+        {
+          "type": "text",
+          "content": "Se realiza un modelo estructural de la estructura completa en el software computacional SAP2000 v26.2.0, bajo la norma AISC 360, utilizando el método de tensiones admisibles ASD. La modelación se realiza a partir del nivel inferior de placa base, asignando apoyos rotulados en la dirección arriostrada y empotrados en la dirección de los marcos de momento. Todas las conexiones de corte se consideran rotuladas y se aplica un análisis de longitud efectiva para el diseño de los elementos. Los elementos columnas, vigas y diagonales de acero se modelan como tipo barra (Frame) con 3 grados de libertad traslacional y 3 rotacional. Adicionalmente, con las reacciones obtenidas de la estructura se diseña el sistema anclaje en las placas base, cumpliendo con los requisitos exigidos para este elemento. ",
+          "parameters": {
+            "style": "Normal"
+          }
+        }
+      ]
+    },
+    {
+      "id": "revision_corte_2025",
+      "title": "Revisión Corte Sísmico 2025",
+      "description": "Texto y ecuaciones tipicas para la verificación de corte sísmico según NCH2369:2025",
+      "content": [
+        {
+          "content": "Se realiza la verificación del corte basal sísmico en cada dirección ortogonal, considerando el factor de modificación de respuesta (R).",
+          "parameters": {
+            "style": "Normal"
+          },
+          "type": "text"
+        },
+        {
+          "type": "equation",
+          "content": "Q_min=0.25*(I*A_r*S)/(g)*P",
+          "parameters": {}
+        },
+        {
+          "type": "equation",
+          "content": "Q_max=2.75*(I*A_r*S)/(g(R+1))*(0.05/ξ)^0.4*P",
+          "parameters": {}
+        }
+      ]
+    },
+    {
+      "id": "prueba",
+      "title": "prueba1",
+      "description": "probando ecuaciones",
+      "content": [
+        {
+          "content": "Se realiza la verificación del corte basal sísmico en cada dirección ortogonal, considerando el factor de modificación de respuesta (R).",
+          "parameters": {
+            "style": "Normal"
+          },
+          "type": "text"
+        },
+        {
+          "type": "equation",
+          "content": "Q_min=0.25",
+          "parameters": {}
+        }
+      ]
+    }
+  ]
+}
