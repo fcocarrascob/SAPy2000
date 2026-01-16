@@ -1,8 +1,8 @@
 {
-  "category": "Cargas Estáticas",
+  "category": "Estados de Carga",
   "snippets": [
     {
-      "id": "carga_muerta_pp",
+      "id": "Carga_permanente_D",
       "title": "Carga Permanente [D]",
       "description": "Definición estándar para Peso Propio y Cargas Permanentes.",
       "content": [

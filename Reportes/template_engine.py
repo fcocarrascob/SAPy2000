@@ -74,6 +74,10 @@ class TemplateEngine:
                 sType = block.get("type")
                 content = block.get("content", "")
                 params = block.get("parameters", {})
+                
+                # Ignorar bloques con contenido vacío para evitar párrafos huérfanos
+                if not content and sType in ("text", "heading", "equation"):
+                    continue
 
                 if sType == "heading":
                     level = params.get("level", 1)

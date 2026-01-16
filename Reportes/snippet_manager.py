@@ -2,8 +2,6 @@ import os
 import json
 import glob
 import logging
-import shutil
-from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
@@ -79,9 +77,6 @@ class SnippetManager:
             return False
         
         try:
-            # Crear backup antes de modificar
-            self._create_backup(file_path)
-            
             # Cargar archivo actual
             with open(file_path, 'r', encoding='utf-8-sig') as f:
                 data = json.load(f)
@@ -122,8 +117,6 @@ class SnippetManager:
             return False
         
         try:
-            self._create_backup(file_path)
-            
             with open(file_path, 'r', encoding='utf-8-sig') as f:
                 data = json.load(f)
             
@@ -149,15 +142,3 @@ class SnippetManager:
             logger.error(f"Error eliminando snippet: {e}")
             return False
 
-    def _create_backup(self, file_path):
-        """Crea una copia de seguridad del archivo antes de modificarlo."""
-        backup_dir = os.path.join(self.library_path, ".backups")
-        os.makedirs(backup_dir, exist_ok=True)
-        
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        basename = os.path.basename(file_path)
-        backup_name = f"{basename}.{timestamp}.bak"
-        backup_path = os.path.join(backup_dir, backup_name)
-        
-        shutil.copy2(file_path, backup_path)
-        logger.debug(f"Backup creado: {backup_path}")
