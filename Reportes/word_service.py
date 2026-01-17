@@ -129,6 +129,11 @@ class WordService:
                 omath = omaths(omaths.Count)
                 
                 try:
+                    # FIX: Establecer Justification=7 ANTES de BuildUp
+                    # Esto previene que BuildUp fragmente la ecuación en múltiples líneas
+                    # wdOMathJustificationInline = 7 (no documentado oficialmente)
+                    omath.Justification = 7
+                    
                     omath.BuildUp()
                     # Forzar modo inline para que fluya con el texto
                     omath.Range.OMaths(1).Type = 1 # wdOMathInline
@@ -182,11 +187,12 @@ class WordService:
         """
         Inserta una ecuación UnicodeMath centrada (Display) en Word.
         
-        Flujo:
+        Flujo simplificado (sin buffer):
         1. Valida la sintaxis de la ecuación
         2. Expande símbolos \\command a Unicode si los hay
-        3. Inserta 3 párrafos de buffer (BuildUp los consume)
-        4. Retrocede 3 párrafos, inserta ecuación y aplica BuildUp
+        3. Inserta el texto y convierte a OMath
+        4. Aplica Justification=7 antes de BuildUp para evitar fragmentación
+        5. Cambia a modo Display (centrado)
         
         NOTA: El contenido ya debe estar en sintaxis UnicodeMath nativa.
         """
@@ -209,28 +215,9 @@ class WordService:
             
             doc = self.get_active_document()
             
-            # 3. ESTRATEGIA "PÁRRAFOS BUFFER": BuildUp consume ~3 párrafos
-            # Insertamos 3 párrafos de buffer que serán consumidos por BuildUp
-            
-            # Guardar posición inicial antes de los párrafos buffer
-            pos_inicial = selection.Range.Start
-            
-            # Insertar 3 párrafos de buffer
-            for _ in range(3):
-                selection.TypeParagraph()
-            
-            # Retroceder 3 párrafos hacia arriba para volver a la posición original
-            # wdParagraph = 4, wdMove = 0
-            selection.MoveUp(4, 3, 0)  # Unit=wdParagraph, Count=3, Extend=wdMove
-            
-            # Ahora estamos en la posición original, listos para insertar la ecuación
-            # Guardar posición de inicio de la ecuación
+            # 3. Guardar posición e insertar texto de ecuación
             start_pos = selection.Range.Start
-            
-            # Insertar el texto de la ecuación
             selection.TypeText(equation_unicode)
-            
-            # Obtener posición final del texto insertado
             end_pos = selection.Range.Start
             
             # 4. Crear rango sobre el texto recién insertado
@@ -241,11 +228,13 @@ class WordService:
             omaths.Add(eq_range)
             omath = omaths(omaths.Count)
             
-            # 6. BuildUp convierte Linear UnicodeMath a Professional (2D)
-            # Este proceso consume los 3 párrafos de buffer
+            # 6. BuildUp con fix de Justification
+            # Justification=7 (wdOMathJustificationInline no documentado)
+            # previene que BuildUp fragmente la ecuación
             try:
+                omath.Justification = 7
                 omath.BuildUp()
-                # Mantener tipo Display (centrado) - wdOMathDisplay = 0
+                # Cambiar a Display (centrado) - wdOMathDisplay = 0
                 omath.Range.OMaths(1).Type = 0
             except Exception as e:
                 logger.debug(f"BuildUp info: {e}")
