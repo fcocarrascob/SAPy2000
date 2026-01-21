@@ -13,7 +13,13 @@ Este proyecto proporciona un conjunto de herramientas en Python para automatizar
 ### 1. Aplicación Principal (`main_app.py`)
 El punto de entrada de la aplicación. Gestiona la barra de herramientas, la conexión global a SAP2000 y aloja las interfaces de los módulos en pestañas.
 
-### 2. Gestor de Combinaciones de Carga (`Combinations_Carga`)
+### 2. Generador de Modelo Base (`Modelo_Base`)
+Herramienta para inicializar modelos estandarizados.
+- Creación automática de materiales y perfiles predefinidos.
+- Generación de patrones de carga y combinaciones (NCh3171 y NCh2369:2025).
+- Configuración de espectros sísmicos según normativa chilena (NCh2369:2025).
+
+### 3. Gestor de Combinaciones de Carga (`Combinations_Carga`)
 Interfaz tipo Excel para gestionar combinaciones de carga.
 - Lectura y escritura de combinaciones ("Upsert").
 - Soporte para ASD/LRFD y tipos de combinación (Lineal, Envolvente).
@@ -61,34 +67,6 @@ pip install comtypes PySide6
 python main_app.py
 ```
 3. Navegue por las pestañas para usar las distintas herramientas.
-
-## Personalización de Reportes
-
-El módulo de Reportes es altamente personalizable mediante archivos JSON.
-
-### Templates de Documento
-Ubicación: `Reportes/templates/`
-Cree un archivo `.json` con la siguiente estructura:
-```json
-{
-  "template_name": "Mi Reporte",
-  "sections": [
-    { "type": "heading", "content": "Título 1", "parameters": { "level": 1 } },
-    { "type": "text", "content": "Párrafo de texto...", "parameters": { "style": "Normal" } },
-    { "type": "page_break" }
-  ]
-}
-```
-
-### Librería y Ecuaciones
-Ubicación: `Reportes/library/`
-
-El sistema soporta ahora una gestión completa de "Snippets" (fragmentos reutilizables) desde la propia interfaz gráfica.
-*   **Editor Visual**: Permite componer bloques de Texto, Títulos y Ecuaciones.
-*   **UnicodeMath**: Estándar nativo de Word para ecuaciones lineales de alta calidad.
-*   **Sintaxis Inline**: Puedes insertar matemáticas dentro de un párrafo encerrándolas en signos peso (ej: `El valor de $\alpha$ es...`).
-
-Consulte la **[Guía de Usuario de Reportes](Reportes/GUIA_USUARIO_REPORTES.md)** para más detalles sobre la sintaxis de matrices, operadores y el uso del Ribbon.
 
 ## Arquitectura Técnica
 

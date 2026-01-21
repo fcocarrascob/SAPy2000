@@ -27,7 +27,8 @@ from PySide6.QtWidgets import (
     QGroupBox, QSpinBox, QStackedWidget, QWidget,
     QMessageBox, QDialogButtonBox, QToolButton, QMenu,
     QWidgetAction, QGridLayout, QScrollArea, QFrame,
-    QApplication, QTabWidget
+    QApplication, QTabWidget, QTableWidget, QTableWidgetItem,
+    QHeaderView, QInputDialog
 )
 
 logger = logging.getLogger(__name__)
@@ -443,7 +444,7 @@ class BlockEditor(QWidget):
         type_layout = QHBoxLayout()
         type_layout.addWidget(QLabel("Tipo:"))
         self.combo_type = QComboBox()
-        self.combo_type.addItems(["heading", "text", "equation"])
+        self.combo_type.addItems(["heading", "text", "equation", "table"])
         self.combo_type.currentTextChanged.connect(self._on_type_changed)
         type_layout.addWidget(self.combo_type)
         type_layout.addStretch()
@@ -533,8 +534,91 @@ class BlockEditor(QWidget):
         
         e_layout.addStretch()
         self.editor_stack.addWidget(self.equation_editor)
+
+        # Editor para Tabla
+        self.table_editor = QWidget()
+        self._setup_table_editor(self.table_editor)
+        self.editor_stack.addWidget(self.table_editor)
         
         layout.addWidget(self.editor_stack)
+
+    def _setup_table_editor(self, container):
+        """Configura el editor de tablas."""
+        layout = QVBoxLayout(container)
+        
+        # Toolbar de tabla
+        toolbar = QHBoxLayout()
+        
+        btn_add_row = QPushButton("+ Fila")
+        btn_add_row.clicked.connect(self._add_table_row)
+        btn_del_row = QPushButton("- Fila")
+        btn_del_row.clicked.connect(self._del_table_row)
+        
+        btn_add_col = QPushButton("+ Col")
+        btn_add_col.clicked.connect(self._add_table_col)
+        btn_del_col = QPushButton("- Col")
+        btn_del_col.clicked.connect(self._del_table_col)
+        
+        toolbar.addWidget(btn_add_row)
+        toolbar.addWidget(btn_del_row)
+        toolbar.addSpacing(20)
+        toolbar.addWidget(btn_add_col)
+        toolbar.addWidget(btn_del_col)
+        toolbar.addStretch()
+        
+        layout.addLayout(toolbar)
+        
+        # Tabla
+        self.table_widget = QTableWidget(2, 2)
+        self.table_widget.setHorizontalHeaderLabels(["Header 1", "Header 2"])
+        self.table_widget.setItem(0, 0, QTableWidgetItem("Cell 1"))
+        self.table_widget.setItem(0, 1, QTableWidgetItem("Cell 2"))
+        self.table_widget.setItem(1, 0, QTableWidgetItem("Cell 3"))
+        self.table_widget.setItem(1, 1, QTableWidgetItem("Cell 4"))
+
+        # Conectar cambios
+        self.table_widget.itemChanged.connect(lambda: self.contentChanged.emit())
+        
+        # Haremos los headers editables via doble click
+        self.table_widget.horizontalHeader().sectionDoubleClicked.connect(self._edit_header)
+        
+        layout.addWidget(self.table_widget)
+        
+        lbl_hint = QLabel("💡 Doble clic en encabezados para editar nombres.")
+        lbl_hint.setStyleSheet("color: #666; font-style: italic;")
+        layout.addWidget(lbl_hint)
+
+    def _edit_header(self, index):
+        """Edita el texto de un encabezado."""
+        header_item = self.table_widget.horizontalHeaderItem(index)
+        current_text = header_item.text() if header_item else f"Header {index+1}"
+        new_text, ok = QInputDialog.getText(self, "Editar Encabezado", "Nuevo nombre:", text=current_text)
+        if ok:
+            if not header_item:
+                self.table_widget.setHorizontalHeaderItem(index, QTableWidgetItem(new_text))
+            else:
+                header_item.setText(new_text)
+            self.contentChanged.emit()
+
+    def _add_table_row(self):
+        self.table_widget.insertRow(self.table_widget.rowCount())
+        self.contentChanged.emit()
+
+    def _del_table_row(self):
+        if self.table_widget.rowCount() > 0:
+            self.table_widget.removeRow(self.table_widget.rowCount() - 1)
+            self.contentChanged.emit()
+
+    def _add_table_col(self):
+        col_idx = self.table_widget.columnCount()
+        self.table_widget.insertColumn(col_idx)
+        self.table_widget.setHorizontalHeaderItem(col_idx, QTableWidgetItem(f"Header {col_idx+1}"))
+        self.contentChanged.emit()
+
+    def _del_table_col(self):
+        if self.table_widget.columnCount() > 0:
+            self.table_widget.removeColumn(self.table_widget.columnCount() - 1)
+            self.contentChanged.emit()
     
     def _insert_from_ribbon(self, snippet_text):
         """Inserta texto desde el ribbon y selecciona el primer placeholder."""
@@ -556,7 +640,9 @@ class BlockEditor(QWidget):
         idx = full_text.find("⬚")
         if idx != -1:
             cursor.setPosition(idx)
-            cursor.movePosition(cursor.Right, cursor.KeepAnchor, 1)
+            # PySide6: Usar QTextCursor.MoveOperation.Right en lugar de cursor.Right
+            from PySide6.QtGui import QTextCursor
+            cursor.movePosition(QTextCursor.MoveOperation.Right, QTextCursor.MoveMode.KeepAnchor, 1)
             self.equation_content.setTextCursor(cursor)
 
     def _setup_symbols_menu(self):
@@ -582,7 +668,7 @@ class BlockEditor(QWidget):
     
     def _on_type_changed(self, block_type):
         """Cambia el editor visible según el tipo."""
-        idx = {"heading": 0, "text": 1, "equation": 2}.get(block_type, 1)
+        idx = {"heading": 0, "text": 1, "equation": 2, "table": 3}.get(block_type, 1)
         self.editor_stack.setCurrentIndex(idx)
         self.contentChanged.emit()
     
@@ -622,6 +708,7 @@ class BlockEditor(QWidget):
         self.equation_content.blockSignals(True)
         self.text_content.blockSignals(True)
         self.heading_content.blockSignals(True)
+        self.table_widget.blockSignals(True)
         
         if block_type == "heading":
             self.combo_type.setCurrentText("heading")
@@ -632,9 +719,31 @@ class BlockEditor(QWidget):
             self.combo_type.setCurrentText("equation")
             self.equation_content.setPlainText(content)
             self.editor_stack.setCurrentIndex(2)
+        elif block_type == "table":
+            self.combo_type.setCurrentText("table")
+            self.editor_stack.setCurrentIndex(3)
+            # Cargar tabla
+            if isinstance(content, dict):
+                headers = content.get("headers", [])
+                data = content.get("data", [])
+                
+                self.table_widget.setColumnCount(len(headers))
+                self.table_widget.setHorizontalHeaderLabels(headers)
+                
+                self.table_widget.setRowCount(len(data))
+                for r, row_data in enumerate(data):
+                    for c, cell_val in enumerate(row_data):
+                        if c < self.table_widget.columnCount():
+                            self.table_widget.setItem(r, c, QTableWidgetItem(str(cell_val)))
+            else:
+                # Default empty table
+                self.table_widget.setRowCount(2)
+                self.table_widget.setColumnCount(2)
+                self.table_widget.setHorizontalHeaderLabels(["Header 1", "Header 2"])
+                self.table_widget.setItem(0, 0, QTableWidgetItem(""))
         else:  # text y otros
             self.combo_type.setCurrentText("text")
-            self.text_content.setPlainText(content)
+            self.text_content.setPlainText(content if isinstance(content, str) else "")
             self.editor_stack.setCurrentIndex(1)
         
         # Desbloquear señales
@@ -642,6 +751,7 @@ class BlockEditor(QWidget):
         self.equation_content.blockSignals(False)
         self.text_content.blockSignals(False)
         self.heading_content.blockSignals(False)
+        self.table_widget.blockSignals(False)
     
     def get_block(self):
         """Retorna el bloque editado como diccionario."""
@@ -657,6 +767,29 @@ class BlockEditor(QWidget):
             return {
                 "type": "equation",
                 "content": self.equation_content.toPlainText(),
+                "parameters": {}
+            }
+        elif block_type == "table":
+            # Construir dict de tabla
+            headers = []
+            for c in range(self.table_widget.columnCount()):
+                item = self.table_widget.horizontalHeaderItem(c)
+                headers.append(item.text() if item else f"H{c+1}")
+            
+            data = []
+            for r in range(self.table_widget.rowCount()):
+                row_data = []
+                for c in range(self.table_widget.columnCount()):
+                    item = self.table_widget.item(r, c)
+                    row_data.append(item.text() if item else "")
+                data.append(row_data)
+
+            return {
+                "type": "table",
+                "content": {
+                    "headers": headers,
+                    "data": data
+                },
                 "parameters": {}
             }
         else:  # text
@@ -791,7 +924,17 @@ class SnippetEditorDialog(QDialog):
         self.list_blocks.clear()
         for i, block in enumerate(self._blocks):
             btype = block.get("type", "?")
-            content = block.get("content", "")[:30]
+            raw_content = block.get("content", "")
+            
+            if isinstance(raw_content, str):
+                content = raw_content[:30]
+            elif isinstance(raw_content, dict):
+                content = "[Estructura compleja]"
+                if btype == "table":
+                    content = "[Tabla]"
+            else:
+                content = str(raw_content)[:30]
+                
             label = f"{i+1}. [{btype}] {content}..."
             self.list_blocks.addItem(label)
     

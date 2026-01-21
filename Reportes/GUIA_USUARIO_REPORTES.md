@@ -47,6 +47,7 @@ Al crear o editar un snippet, accedes a un potente editor por bloques.
 *   **Text**: Párrafos de texto normal.
     *   **Tip**: Puedes escribir ecuaciones dentro del texto ("Inline") encerrándolas entre signos peso. Ejemplo: `La tensión $ \sigma $ es máxima.`
 *   **Equation**: Bloque exclusivo para fórmulas matemáticas centradas.
+*   **Table**: Tablas de datos con encabezados y filas editables. Permite agregar/eliminar filas y columnas dinámicamente.
 
 ### Uso del "Ribbon" de Ecuaciones
 El editor cuenta con una barra de herramientas visual para insertar estructuras matemáticas sin memorizar códigos:

@@ -13,6 +13,36 @@ class WordService:
         self.word_app = None
         self.active_doc = None
 
+    def _set_style(self, selection, style_name="Normal"):
+        """Aplica un estilo de forma defensiva para evitar heredar títulos."""
+        if not selection:
+            return False
+        try:
+            doc = self.get_active_document()
+            if doc:
+                styles = doc.Styles
+                if style_name:
+                    try:
+                        selection.Style = styles(style_name)
+                        return True
+                    except Exception:
+                        pass
+                if style_name == "Normal":
+                    try:
+                        selection.Style = styles("Normal")
+                        return True
+                    except Exception:
+                        pass
+            if style_name == "Normal":
+                selection.Style = -1  # wdStyleNormal
+                return True
+            if style_name:
+                selection.Style = style_name
+                return True
+        except Exception as e:
+            logger.debug(f"No se pudo aplicar estilo {style_name}: {e}")
+        return False
+
     def connect(self):
         """Conecta a una instancia activa de Word o crea una nueva si no existe."""
         try:
@@ -61,19 +91,14 @@ class WordService:
             return False
             
         selection = self.word_app.Selection
-        
-        # Aplicar estilo primero
-        try:
-            # wdStyleNormal = -1
-            target_style = style if style != "Normal" else -1
-            selection.Style = target_style
-        except:
-            pass 
+        selection.Collapse(0)  # wdCollapseEnd para no sobrescribir contenido
+        self._set_style(selection, style)
 
         # Si no hay delimitadores $, comportamiento standard rápido
         if "$" not in text:
             selection.TypeText(text)
             selection.TypeParagraph()
+            self._set_style(selection, style)
             return True
             
         # Parsear contenido mixto
@@ -88,17 +113,27 @@ class WordService:
                 
                 # Expandir símbolos (si el usuario escribió \alpha)
                 math_unicode = expand_symbols(math_content)
-
-                rng = selection.Range
-                rng.Collapse(0) # wdCollapseEnd
                 
-                # Insertar ecuación
-                omaths = rng.OMaths
-                omaths.Add(rng)
+                # MÉTODO SEGURO: Usar TypeText + selección inversa
+                start_pos = selection.Range.Start
+                selection.TypeText(math_unicode)
+                end_pos = selection.Range.Start
+                
+                # Crear rango sobre el texto recién insertado
+                doc = self.get_active_document()
+                eq_range = doc.Range(start_pos, end_pos)
+                
+                # Convertir a OMath
+                omaths = eq_range.OMaths
+                omaths.Add(eq_range)
                 omath = omaths(omaths.Count)
-                omath.Range.Text = math_unicode
                 
                 try:
+                    # FIX: Establecer Justification=7 ANTES de BuildUp
+                    # Esto previene que BuildUp fragmente la ecuación en múltiples líneas
+                    # wdOMathJustificationInline = 7 (no documentado oficialmente)
+                    omath.Justification = 7
+                    
                     omath.BuildUp()
                     # Forzar modo inline para que fluya con el texto
                     omath.Range.OMaths(1).Type = 1 # wdOMathInline
@@ -112,6 +147,7 @@ class WordService:
                 selection.TypeText(part)
         
         selection.TypeParagraph()
+        self._set_style(selection, style)
         return True
 
     def insert_page_break(self):
@@ -149,12 +185,14 @@ class WordService:
 
     def insert_equation(self, equation_text):
         """
-        Inserta una ecuación UnicodeMath en Word.
+        Inserta una ecuación UnicodeMath centrada (Display) en Word.
         
-        Flujo:
+        Flujo simplificado (sin buffer):
         1. Valida la sintaxis de la ecuación
         2. Expande símbolos \\command a Unicode si los hay
-        3. Crea objeto OMath y aplica BuildUp para renderizar
+        3. Inserta el texto y convierte a OMath
+        4. Aplica Justification=7 antes de BuildUp para evitar fragmentación
+        5. Cambia a modo Display (centrado)
         
         NOTA: El contenido ya debe estar en sintaxis UnicodeMath nativa.
         """
@@ -172,27 +210,39 @@ class WordService:
             logger.debug(f"UnicodeMath: {equation_unicode}")
             
             selection = self.word_app.Selection
-            rng = selection.Range
-            rng.Collapse(0)  # wdCollapseEnd
+            selection.Collapse(0)  # wdCollapseEnd - Evita sobrescribir
+            self._set_style(selection, "Normal")
             
-            # 3. Crear objeto OMath y asignar texto UnicodeMath
-            omaths = rng.OMaths
-            omaths.Add(rng)
+            doc = self.get_active_document()
+            
+            # 3. Guardar posición e insertar texto de ecuación
+            start_pos = selection.Range.Start
+            selection.TypeText(equation_unicode)
+            end_pos = selection.Range.Start
+            
+            # 4. Crear rango sobre el texto recién insertado
+            eq_range = doc.Range(start_pos, end_pos)
+            
+            # 5. Convertir el rango a OMath
+            omaths = eq_range.OMaths
+            omaths.Add(eq_range)
             omath = omaths(omaths.Count)
             
-            # Asignar el texto UnicodeMath
-            omath.Range.Text = equation_unicode
-            
-            # 4. BuildUp convierte Linear UnicodeMath a Professional (2D)
+            # 6. BuildUp con fix de Justification
+            # Justification=7 (wdOMathJustificationInline no documentado)
+            # previene que BuildUp fragmente la ecuación
             try:
+                omath.Justification = 7
                 omath.BuildUp()
+                # Cambiar a Display (centrado) - wdOMathDisplay = 0
+                omath.Range.OMaths(1).Type = 0
             except Exception as e:
                 logger.debug(f"BuildUp info: {e}")
             
-            # 5. Mover cursor después de la ecuación
-            end_pos = omath.Range.End
-            selection.SetRange(end_pos, end_pos)
+            # 7. Mover cursor al final de la ecuación e insertar nuevo párrafo
+            selection.SetRange(omath.Range.End, omath.Range.End)
             selection.TypeParagraph()
+            self._set_style(selection, "Normal")
             
             return True
             

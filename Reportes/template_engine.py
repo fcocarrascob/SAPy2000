@@ -17,7 +17,7 @@ class TemplateEngine:
         Lee el JSON en `template_path` y construye el documento usando WordService.
         """
         try:
-            with open(template_path, 'r', encoding='utf-8') as f:
+            with open(template_path, 'r', encoding='utf-8-sig') as f:
                 data = json.load(f)
         except Exception as e:
             logger.error(f"Error leyendo template {template_path}: {e}")
@@ -37,6 +37,32 @@ class TemplateEngine:
         
         return self.process_blocks(sections)
 
+    def insert_structure_at_cursor(self, template_path):
+        """
+        Lee el JSON en `template_path` e inserta el contenido en el cursor del documento activo.
+        No crea un documento nuevo.
+        """
+        try:
+            with open(template_path, 'r', encoding='utf-8-sig') as f:
+                data = json.load(f)
+        except Exception as e:
+            logger.error(f"Error leyendo template {template_path}: {e}")
+            return False
+
+        sections = data.get("sections", [])
+        if not sections:
+            logger.warning("El template no tiene secciones.")
+            return False
+
+        # Verificar conexión con doc activo
+        if not self.word_service.connect():
+             logger.error("No se pudo conectar con Word o no hay documento activo.")
+             return False
+        
+        logger.info(f"Insertando template en cursor: {data.get('template_name', 'Sin Nombre')}")
+        
+        return self.process_blocks(sections)
+
     def process_blocks(self, blocks):
         """Procesa una lista de bloques (secciones/snippets) e inserta en Word."""
         try:
@@ -48,6 +74,10 @@ class TemplateEngine:
                 sType = block.get("type")
                 content = block.get("content", "")
                 params = block.get("parameters", {})
+                
+                # Ignorar bloques con contenido vacío para evitar párrafos huérfanos
+                if not content and sType in ("text", "heading", "equation"):
+                    continue
 
                 if sType == "heading":
                     level = params.get("level", 1)

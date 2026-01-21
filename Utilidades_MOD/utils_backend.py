@@ -417,3 +417,132 @@ class SapUtils:
             print(f"Error obteniendo selección: {e}")
             
         return None
+
+    def get_available_tables(self):
+        """
+        Obtiene la lista de tablas disponibles en el modelo.
+        Retorna: Lista de tuplas (TableKey, TableName)
+        """
+        if self.SapModel is None:
+            print("Error: No hay conexión con SAP2000.")
+            return []
+
+        # GetAvailableTables(NumberTables, TableKey[], TableName[], ImportType[], RetCode)
+        try:
+            ret = self.SapModel.DatabaseTables.GetAvailableTables(0, [], [], [])
+            
+            if ret[-1] == 0:
+                table_keys = ret[1]
+                table_names = ret[2]
+                
+                tables = []
+                # Validar que tengamos datos
+                if table_keys and table_names:
+                    count = min(len(table_keys), len(table_names))
+                    for i in range(count):
+                        tables.append((table_keys[i], table_names[i]))
+                
+                return tables
+            else:
+                print(f"Error obteniendo tablas disponibles, código: {ret[-1]}")
+                return []
+        except Exception as e:
+            print(f"Excepción obteniendo tablas: {e}")
+            return []
+
+    def get_load_cases(self):
+        """Obtiene lista de nombres de Casos de Carga."""
+        if self.SapModel is None: return []
+        try:
+            # GetNameList_1(NumberNames, MyName, RetCode)
+            ret = self.SapModel.LoadCases.GetNameList_1()
+            if ret[-1] == 0:
+                return ret[1] if ret[0] > 0 else []
+        except:
+            pass
+        return []
+
+    def get_load_combos(self):
+        """Obtiene lista de nombres de Combinaciones de Carga."""
+        if self.SapModel is None: return []
+        try:
+            # GetNameList(NumberNames, MyName, RetCode)
+            ret = self.SapModel.RespCombo.GetNameList()
+            if ret[-1] == 0:
+                return ret[1] if ret[0] > 0 else []
+        except:
+            pass
+        return []
+
+    def get_table_data(self, table_key, group_name="All", load_cases=None, load_combos=None):
+        """
+        Obtiene los datos de una tabla específica para visualización.
+        Args:
+            table_key: Clave interna de la tabla.
+            group_name: Grupo de objetos (default "All").
+            load_cases: Lista de nombres de casos de carga a incluir.
+            load_combos: Lista de nombres de combinaciones a incluir.
+        Retorna: (headers, data_rows)
+        """
+        if self.SapModel is None:
+            return None, None
+
+        try:
+            # Configurar selección de output si se especifica
+            # Nota: Si se envían listas vacías, SAP podría interpretar "Ninguno" o "Todos" dependiendo la versión/función.
+            # Asumiremos que si es None no tocamos la selección (o seleccionamos todo si es requerido).
+            # Para tablas de resultados, usualmente se necesita AL MENOS un caso/combo.
+            
+            if load_cases is not None:
+                # Asegurar que se pasa una lista válida o un string vacío si está vacía
+                # Convertir a tupla por compatibilidad COM
+                cases_arg = tuple(load_cases) if load_cases else ("",)
+                ret_c = self.SapModel.DatabaseTables.SetLoadCasesSelectedForDisplay(cases_arg)
+                # ret_c puede ser una tupla o un entero dependiendo de la versión de comtypes/API
+                code = ret_c[-1] if isinstance(ret_c, (tuple, list)) else ret_c
+                if code != 0:
+                     print(f"Warning: SetLoadCasesSelectedForDisplay devolvió {code}")
+            
+            if load_combos is not None:
+                combos_arg = tuple(load_combos) if load_combos else ("",)
+                ret_cb = self.SapModel.DatabaseTables.SetLoadCombinationsSelectedForDisplay(combos_arg)
+                code = ret_cb[-1] if isinstance(ret_cb, (tuple, list)) else ret_cb
+                if code != 0:
+                     print(f"Warning: SetLoadCombinationsSelectedForDisplay devolvió {code}")
+
+            # GetTableForDisplayArray Returns:
+            # [0] FieldKeyList (empty)
+            # [1] TableVersion
+            # [2] FieldKeysIncluded (Headers)
+            # [3] NumberRecords
+            # [4] TableData (1D array)
+            # [5] RetCode
+            ret = self.SapModel.DatabaseTables.GetTableForDisplayArray(table_key, [], group_name, 0, [], 0, [])
+
+            if ret[-1] == 0:
+                fields = ret[2] # Corrected from [4]
+                num_records = ret[3] # Corrected from [5]
+                data_flat = ret[4] # Corrected from [6]
+                
+                if not fields:
+                     return [], []
+                     
+                num_fields = len(fields)
+                
+                if num_records == 0 or num_fields == 0:
+                     return fields, []
+
+                data_rows = []
+                for i in range(num_records):
+                    start_idx = i * num_fields
+                    end_idx = start_idx + num_fields
+                    row = data_flat[start_idx:end_idx]
+                    data_rows.append(row)
+                    
+                return fields, data_rows
+            else:
+                print(f"Error obteniendo datos de tabla {table_key}, código: {ret[-1]}. Posiblemente falte seleccionar casos/combos.")
+                return None, None
+        except Exception as e:
+             print(f"Excepción obteniendo datos de tabla {table_key}: {e}")
+             return None, None

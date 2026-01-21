@@ -1,0 +1,439 @@
+{
+  "template_name": "Memoria de Cálculo Estándar: Estructura de Acero",
+  "description": "Estructura base para una memoria de cálculo estructural típica.",
+  "sections": [
+    {
+      "type": "heading",
+      "content": "MEMORIA DE CÁLCULO ESTRUCTURAL: Estructura de Acero",
+      "parameters": {
+        "level": 1
+      }
+    },
+    {
+      "type": "text",
+      "content": "Proyecto: [NOMBRE DEL PROYECTO]",
+      "parameters": {
+        "style": "Normal"
+      }
+    },
+    {
+      "type": "text",
+      "content": "Fecha: [FECHA]",
+      "parameters": {
+        "style": "Normal"
+      }
+    },
+    {
+      "type": "page_break"
+    },
+    {
+      "type": "heading",
+      "content": "INTRODUCCIÓN",
+      "parameters": {
+        "level": 1
+      }
+    },
+    {
+      "type": "text",
+      "content": "[BREVE DESCRIPCIÓN DEL PROYECTO Y ALCANCE DE LA MEMORIA DE CÁLCULO]",
+      "parameters": {
+        "style": "Normal"
+      }
+    },
+    {
+      "type": "heading",
+      "content": "OBJETIVO",
+      "parameters": {
+        "level": 1
+      }
+    },
+    {
+      "type": "heading",
+      "content": "ALCANCE",
+      "parameters": {
+        "level": 1
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Trabajo Incluido",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Trabajo Excluido",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "REFERENCIAS",
+      "parameters": {
+        "level": 1
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Antecedentes",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Normas y Códigos de Diseño",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Documentos y Planos del Proyecto",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "BASES DE DISEÑO",
+      "parameters": {
+        "level": 1
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Materiales",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Mecánica de Suelos",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Capacidad de Soporte",
+      "parameters": {
+        "level": 3
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Coeficiente de Balasto",
+      "parameters": {
+        "level": 3
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Características Sísmicas",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Estados de Carga",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Combinaciones de Carga",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Deflexión Admisible",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Desplazamientos Admisibles",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Recomendaciones para Conexiones de Acero",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "DESCRIPCIÓN DE LA ESTRUCTURA",
+      "parameters": {
+        "level": 1
+      }
+    },
+    {
+      "type": "heading",
+      "content": "MODELO ESTRUCTURAL",
+      "parameters": {
+        "level": 1
+      }
+    },
+    {
+      "type": "text",
+      "content": "Se realiza un modelo estructural de la estructura completa en el software computacional SAP2000 v26.2.0, bajo la norma AISC 360, utilizando el método de tensiones admisibles ASD. La modelación se realiza a partir del nivel inferior de placa base, asignando apoyos rotulados en la dirección arriostrada y empotrados en la dirección de los marcos de momento. Todas las conexiones de corte se consideran rotuladas y se aplica un análisis de longitud efectiva para el diseño de los elementos. Los elementos columnas, vigas y diagonales de acero se modelan como tipo barra (Frame) con 3 grados de libertad traslacional y 3 rotacional. Adicionalmente, con las reacciones obtenidas de la estructura se diseña el sistema anclaje en las placas base, cumpliendo con los requisitos exigidos para este elemento. ",
+      "parameters": {
+        "style": "Normal"
+      }
+    },
+    {
+      "type": "text",
+      "content": "[AGREGAR IMÁGENES (ELEVACIONES Y PLANTAS) Y DESCRIPCIÓN DEL MODELO ESTRUCTURAL. AGREGAR TABLAS DE PROPIEDADES DE PERFILES DE ACERO. MOSTRAR LIBERACIÓN DE MOMENTOS]",
+      "parameters": {
+        "style": "Normal"
+      }
+    },
+    {
+      "type": "heading",
+      "content": "ASIGNACIÓN DE CARGAS",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "text",
+      "content": "[DESCRIPCIÓN E IMÁGENES DE LA ASIGNACIÓN DE CARGAS (MUERTAS, VIVAS, SÍSMICAS, VIENTO, OTRAS)]. Breve descripción de la magnitud total de la carga aplicada en el modelo (reacción basal).",
+      "parameters": {
+        "style": "Normal"
+      }
+    },
+    {
+      "type": "heading",
+      "content": "ANÁLISIS Y DISEÑO ESTRUCTURAL",
+      "parameters": {
+        "level": 1
+      }
+    },
+    {
+      "type": "text",
+      "content": "A continuación, se presentan los resultados más relevantes del análisis estructural y diseño de los elementos de acero que componen la estructura.",
+      "parameters": {
+        "style": "Normal"
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Periodos Fundamentales y Masa Participante",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "text",
+      "content": "Los periodos fundamentales de la estructura se obtienen a partir del análisis modal realizado en SAP2000, considerando las condiciones de borde (apoyos) y rigideces asignadas en el modelo estructural. La masa participante se calcula conforme a lo establecido en la norma NCh2369, tomando en cuenta las cargas muertas y vivas que contribuyen al comportamiento dinámico de la estructura.",
+      "parameters": {
+        "style": "Normal"
+      }
+    },
+    {
+      "type": "text",
+      "content": "[TABLA CON LOS PERIODOS FUNDAMENTALES EN CADA DIRECCIÓN PRINCIPAL DE LA ESTRUCTURA.]",
+      "parameters": {
+        "style": "Normal"
+      }
+    },
+    {
+      "type": "text",
+      "content": "[TABLA CON MASA PARTICIPANTE TOTAL Y PORCENTAJE RESPECTO A LA MASA TOTAL DE LA ESTRUCTURA. MOSTRAR QUE CUMPLEN CON MOVER MAS DEL 90% DE LA MASA PARTICIPANTE.]",
+      "parameters": {
+        "style": "Normal"
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Revisión de Corte Basal Normativo",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "text",
+      "content": "Se realiza la revisión del corte basal sísmico en cada dirección ortogonal. [TABLA CON VALORES DE CORTE BASAL OBTENIDOS DEL ANÁLISIS Y COMPARACIÓN CON VALORES MÁXIMO Y MÍNIMO EXIGIDO POR LA NORMA NCh2369.]",
+      "parameters": {
+        "style": "Normal"
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Reacciones en la Base",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "text",
+      "content": "[TABLA CON REACCIONES TOTALES EN LA BASE DE LA ESTRUCTURA (FUERZAS AXIALES, CORTANTES Y MOMENTOS).]",
+      "parameters": {
+        "style": "Normal"
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Diseño de Elementos Estructurales de Acero",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "text",
+      "content": "[TABLAS DE DISEÑO (FU MÁS DESFAVORABLE) DE CADA ELEMENTO ESTRUCTURAL (COLUMNAS, VIGAS Y DIAGONALES). INCLUIR VERIFICACIONES DE FUERZAS AXIALES, MOMENTOS FLECTORES, CORTANTES Y COMBINACIONES DE CARGA].",
+      "parameters": {
+        "style": "Normal"
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Cargas Sísmicas Amplificadas (0.7R)",
+      "parameters": {
+        "level": 3
+      }
+    },
+    {
+      "type": "text",
+      "content": "Se consideran en el diseño bajo carga sísmica amplificada todos los elementos que no son fusibles del sistema estructural. Esto con el fin de asegurar que la estructura tenga la capacidad de resistir las fuerzas sísmicas mayores que pueden presentarse durante un evento sísmico severo, garantizando así la seguridad y estabilidad de la estructura. [AGREGAR TABLA CON FU MAXIMOS POR PREFILES Y UNA BREVE DESCRIPCIÓN Y ANÁLISIS DE LAS COMBINACIONES QUE CONTROLAN EL DISEÑO DE ELEMENTOS.]",
+      "parameters": {
+        "style": "Normal"
+      }
+    },
+    {
+      "type":"heading",
+      "content":"Cargas Sísmicas Reducidas (R=X)",
+      "parameters": {
+        "level": 3
+      }
+    },
+    {
+      "type": "text",
+      "content": "Se consideran en el diseño bajo carga sísmica reducida todos los elementos fusibles del sistema estructural. Esto con el fin de permitir que ciertos elementos de la estructura puedan deformarse plásticamente y disipar energía durante un evento sísmico severo, contribuyendo así a la capacidad de la estructura para absorber y resistir las fuerzas sísmicas sin comprometer su integridad global. [AGREGAR TABLA CON FU MAXIMOS POR PREFILES Y UNA BREVE DESCRIPCIÓN Y ANÁLISIS DE LAS COMBINACIONES QUE CONTROLAN EL DISEÑO DE ELEMENTOS.]",
+      "parameters": {
+        "style": "Normal"
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Esbeltez de Elementos Estructurales",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Esbeltez Global",
+      "parameters": {
+        "level": 3
+      }
+    },
+    {
+      "type": "text",
+      "content": "Esta verificación asegura que la relación entre la altura efectiva y el radio de giro de los elementos estructurales no exceda los límites permitidos, garantizando así la estabilidad global de la estructura bajo las cargas aplicadas. [AGREGAR TABLA CON ESBELTECES GLOBALES CALCULADAS Y LÍMITES NORMATIVOS.]",
+        "parameters": {
+          "style": "Normal"
+        }
+    },
+    {
+      "type": "heading",
+      "content": "Esbeltez Local",
+      "parameters": {
+        "level": 3
+      }
+    },
+    {
+      "type": "text",
+      "content": "Esta verificación asegura que las dimensiones transversales de los elementos estructurales cumplan con los requisitos establecidos para evitar el pandeo local, garantizando así la integridad y resistencia de los elementos bajo las cargas aplicadas. [AGREGAR TABLA CON ESBELTECES LOCALES CALCULADAS Y LÍMITES NORMATIVOS.]",
+        "parameters": {
+          "style": "Normal"
+        }
+    },
+    {
+      "type": "heading",
+      "content": "Revisión de Deformaciones y Desplazamientos",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "heading",
+      "content": "Deflexiones Verticales",
+      "parameters": {
+        "level": 3
+      }
+    },
+    {
+      "type": "text",
+      "content": "Se verifica que las deflexiones verticales máximas de elementos horizontales no excedan los límites admisibles establecidos por los Criterios de Diseño TECK. Principalmente se verifican estos elementos sometidos a cargas de servicio, tales como cargas vivas y cargas muertas. [AGREGAR TABLA CON DEFLEXIONES CALCULADAS Y LÍMITES NORMATIVOS.]",
+        "parameters": {
+          "style": "Normal"
+        }
+    },
+    {
+      "type": "heading",
+      "content": "Deformaciones Laterales",
+      "parameters": {
+        "level": 3
+      }
+    },
+    {
+      "type": "text",
+      "content": "Se verifica que las deformaciones laterales máximas de la estructura no excedan los límites admisibles establecidos por la norma NCh2369. Esto es fundamental para garantizar la estabilidad y seguridad de la estructura frente a cargas laterales, como las sísmicas y de viento. [AGREGAR TABLA CON DEFORMACIONES CALCULADAS Y LÍMITES NORMATIVOS.]",
+        "parameters": {
+          "style": "Normal"
+        }
+    },
+    {
+      "type": "heading",
+      "content": "DISEÑO DE PLACAS BASES",
+      "parameters": {
+        "level": 2
+      }
+    },
+    {
+      "type": "text",
+      "content": "El diseño de las placas bases se realiza considerando las reacciones obtenidas del modelo estructural en SAP2000, asegurando que cumplan con los requisitos de resistencia y estabilidad establecidos por la norma AISC 360. Se verifica la capacidad de carga de la placa base, el diseño de los anclajes y la distribución de esfuerzos en el concreto de fundación. [AGREGAR TABLAS DE DISEÑO DE PLACAS BASE Y ANÁLISIS DE ESFUERZOS.]",
+      "parameters": {
+        "style": "Normal"
+      }
+    },
+    {
+      "type": "heading",
+      "content": "COMENTARIOS FINALES",
+      "parameters": {
+        "level": 1
+      }
+    },
+    {
+      "type": "heading",
+      "content": "ANEXOS",
+      "parameters": {
+        "level": 1
+      }
+    },
+    {
+      "type": "text",
+      "content": "Del análisis realizado, se obtiene que la estructura cumple adecuadamente la normativa vigente y criterios de diseño, el detalle se muestra a continuación:",
+      "parameters": {
+        "style": "Normal"
+      }
+    },
+    {
+      "type": "page_break"
+    }
+  ]
+}
