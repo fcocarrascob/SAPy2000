@@ -99,11 +99,9 @@ class EquationRibbon(QTabWidget):
         matrix_layout.setContentsMargins(4, 4, 4, 4)
 
         matrix_blocks = [
-            ("Matriz ( )", "\\begin{pmatrix} & \\\\ & \\end{pmatrix}", "(Mat)"),
-            ("Matriz [ ]", "\\begin{bmatrix} & \\\\ & \\end{bmatrix}", "[Mat]"),
-            ("Vector Col", "\\begin{pmatrix} \\\\ \\end{pmatrix}", "日"),
-            ("Vector Fila", "\\begin{pmatrix} & \\end{pmatrix}", "▭"),
-            ("Cases", "\\begin{cases} & \\text{if } \\\\ & \\text{else} \\end{cases}", "Cases"),
+            ("Matriz", "\\begin{matrix} & \\\\ & \\end{matrix}", "(Mat)"),
+            ("Vector Col", "\\begin{matrix}-\\\\-\\\\-\\\\ \\end{matrix}", "日"),
+            ("Vector Fila", "\\begin{matrix}-&-&-\\\\ \\end{matrix}", "▭"),
             ("Alineado", "\\begin{aligned} &= \\\\ &= \\end{aligned}", "Align"),
         ]
         self._add_group(matrix_layout, matrix_blocks)
