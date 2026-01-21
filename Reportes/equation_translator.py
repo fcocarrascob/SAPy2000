@@ -152,143 +152,136 @@ UNICODEMATH_SYMBOLS = {
 
 
 # =============================================================================
-# PALETA DE SÍMBOLOS PARA LA UI
+# PALETA DE SÍMBOLOS PARA LA UI (MODO LATEX)
 # =============================================================================
-# Organizada por categorías para el editor visual
+# Organizada por categorías para el editor visual. 
+# Clave: Comando LaTeX a insertar. Valor: Texto a mostrar en el botón.
 
 SYMBOLS_PALETTE = {
     "Griegas Minúsculas": {
-        "α": "α", "β": "β", "γ": "γ", "δ": "δ",
-        "ε": "ε", "ζ": "ζ", "η": "η", "θ": "θ",
-        "λ": "λ", "μ": "μ", "ν": "ν", "ξ": "ξ",
-        "π": "π", "ρ": "ρ", "σ": "σ", "τ": "τ",
-        "φ": "φ", "χ": "χ", "ψ": "ψ", "ω": "ω"
+        "\\alpha": "α", "\\beta": "β", "\\gamma": "γ", "\\delta": "δ",
+        "\\epsilon": "ε", "\\zeta": "ζ", "\\eta": "η", "\\theta": "θ",
+        "\\lambda": "λ", "\\mu": "μ", "\\nu": "ν", "\\xi": "ξ",
+        "\\pi": "π", "\\rho": "ρ", "\\sigma": "σ", "\\tau": "τ",
+        "\\varphi": "φ", "\\chi": "χ", "\\psi": "ψ", "\\omega": "ω"
     },
     "Griegas Mayúsculas": {
-        "Γ": "Γ", "Δ": "Δ", "Θ": "Θ", "Λ": "Λ",
-        "Ξ": "Ξ", "Π": "Π", "Σ": "Σ", "Φ": "Φ",
-        "Ψ": "Ψ", "Ω": "Ω"
+        "\\Gamma": "Γ", "\\Delta": "Δ", "\\Theta": "Θ", "\\Lambda": "Λ",
+        "\\Xi": "Ξ", "\\Pi": "Π", "\\Sigma": "Σ", "\\Phi": "Φ",
+        "\\Psi": "Ψ", "\\Omega": "Ω"
     },
     "Operadores": {
-        "≠": "≠", "≥": "≥", "≤": "≤",
-        "≈": "≈", "±": "±", "×": "×",
-        "÷": "÷", "⋅": "⋅", "∞": "∞"
+        "\\neq": "≠", "\\geq": "≥", "\\leq": "≤",
+        "\\approx": "≈", "\\pm": "±", "\\times": "×",
+        "\\div": "÷", "\\cdot": "⋅", "\\infty": "∞"
     },
     "Flechas": {
-        "→": "→", "←": "←", "↔": "↔",
-        "⇒": "⇒", "⇔": "⇔", "↦": "↦"
+        "\\to": "→", "\\leftarrow": "←", "\\leftrightarrow": "↔",
+        "\\Rightarrow": "⇒", "\\iff": "⇔", "\\mapsto": "↦"
     },
     "N-arios": {
-        "∑": "∑", "∏": "∏", "∫": "∫",
-        "∬": "∬", "∮": "∮"
+        "\\sum": "∑", "\\prod": "∏", "\\int": "∫",
+        "\\iint": "∬", "\\oint": "∮"
     },
     "Estructuras": {
-        "(a)/(b)": "fracción",
-        "√()": "raíz",
-        "√(n&x)": "raíz n",
-        "\\matrix(a&b@c&d)": "matriz",
-        "█(eq1@eq2)": "eqarray",
-        "❴█()": "cases"
+        "\\frac{a}{b}": "fracción",
+        "\\sqrt{x}": "raíz",
+        "\\sqrt[n]{x}": "raíz n",
+        "\\begin{pmatrix}a&b\\\\c&d\\end{pmatrix}": "matriz",
+        "\\begin{aligned}a&=b\\\\c&=d\\end{aligned}": "aligned",
+        "\\begin{cases}x&\\text{if }y\\\\z&\\text{else}\\end{cases}": "cases"
     }
 }
 
 
 # =============================================================================
-# TEMPLATES DE ECUACIONES EN UNICODEMATH
+# TEMPLATES DE ECUACIONES EN LATEX
 # =============================================================================
 # Plantillas predefinidas para ingeniería estructural
 
 EQUATION_TEMPLATES = {
     "Factor R* (NCh2369)": {
-        "code": "R^*=❴█(1&R=1@R&R≠1, T^*≥C_r T_1@1.5+(R-1.5)(T^*)/(C_r T_1)&R≠1, T^*<C_r T_1)",
+        "code": "R^* = \\begin{cases} 1 & R=1 \\\\ R & R\\neq 1, T^* \\geq C_r T_1 \\\\ 1.5+(R-1.5)\\frac{T^*}{C_r T_1} & R\\neq 1, T^* < C_r T_1 \\end{cases}",
         "description": "Factor de modificación de respuesta estructural"
     },
     "Espectro Horizontal": {
-        "code": "S_a(T_H)=(I⋅S_(aH)(T_H))/(R^*)⋅((0.05)/(ξ))^0.4",
+        "code": "S_a(T_H) = \\frac{I \\cdot S_{aH}(T_H)}{R^*} \\left( \\frac{0.05}{\\xi} \\right)^{0.4}",
         "description": "Espectro de diseño horizontal NCh2369"
     },
     "Espectro Vertical": {
-        "code": "S_a(T_V)=(I⋅S_(aV)(T_V))/(R_V)⋅((0.05)/(ξ_V))^0.4",
+        "code": "S_a(T_V) = \\frac{I \\cdot S_{aV}(T_V)}{R_V} \\left( \\frac{0.05}{\\xi_V} \\right)^{0.4}",
         "description": "Espectro de diseño vertical NCh2369"
     },
     "Combinación LRFD": {
-        "code": "U=1.2D+1.6L+0.5(L_r \" or \" S \" or \" R)",
+        "code": "U = 1.2D + 1.6L + 0.5(L_r \\text{ or } S \\text{ or } R)",
         "description": "Combinación de carga LRFD típica"
     },
     "Fracción": {
-        "code": "(a+b)/(c+d)",
+        "code": "\\frac{a+b}{c+d}",
         "description": "Plantilla de fracción"
     },
     "Raíz cuadrada": {
-        "code": "√(a^2+b^2)",
+        "code": "\\sqrt{a^2+b^2}",
         "description": "Plantilla de raíz cuadrada"
     },
     "Raíz n-ésima": {
-        "code": "√(n&x)",
+        "code": "\\sqrt[n]{x}",
         "description": "Plantilla de raíz n-ésima"
     },
     "Sumatoria": {
-        "code": "∑_(i=1)^n x_i",
+        "code": "\\sum_{i=1}^{n} x_i",
         "description": "Sumatoria con límites"
     },
     "Integral": {
-        "code": "∫_a^b f(x)dx",
+        "code": "\\int_{a}^{b} f(x) dx",
         "description": "Integral definida"
     },
     "Integral doble": {
-        "code": "∬_D f(x,y)dA",
+        "code": "\\iint_{D} f(x,y) dA",
         "description": "Integral doble sobre región D"
     },
     "Límite": {
-        "code": "lim_(n→∞) a_n",
+        "code": "\\lim_{n \\to \\infty} a_n",
         "description": "Límite con notación"
     },
     "Matriz 2x2": {
-        "code": "■(a&b@c&d)",
+        "code": "\\begin{pmatrix} a & b \\\\ c & d \\end{pmatrix}",
         "description": "Matriz 2x2"
     },
     "Matriz 3x3": {
-        "code": "■(a&b&c@d&e&f@g&h&i)",
+        "code": "\\begin{pmatrix} a & b & c \\\\ d & e & f \\\\ g & h & i \\end{pmatrix}",
         "description": "Matriz 3x3"
     },
-    "Matriz con paréntesis": {
-        "code": "(■(a&b@c&d))",
-        "description": "Matriz con paréntesis"
-    },
     "Matriz con corchetes": {
-        "code": "[■(a&b@c&d)]",
+        "code": "\\begin{bmatrix} a & b \\\\ c & d \\end{bmatrix}",
         "description": "Matriz con corchetes"
     },
     "Cases (2 condiciones)": {
-        "code": "f(x)=❴█(valor_1&condición_1@valor_2&condición_2)",
+        "code": "f(x) = \\begin{cases} v_1 & \\text{cond}_1 \\\\ v_2 & \\text{cond}_2 \\end{cases}",
         "description": "Función por partes con 2 casos"
     },
-    "Cases (3 condiciones)": {
-        "code": "f(x)=❴█(v_1&cond_1@v_2&cond_2@v_3&cond_3)",
-        "description": "Función por partes con 3 casos"
-    },
     "Eqarray (Sistema)": {
-        "code": "█(x+1&=2@1+2+3+y&=z@(3)/(x)&=6)",
+        "code": "\\begin{aligned} x+1 &= 2 \\\\ y &= z \\end{aligned}",
         "description": "Sistema de ecuaciones alineadas"
     },
     "Vector": {
-        "code": "v⃗",
+        "code": "\\vec{v}",
         "description": "Notación de vector con flecha"
     },
     "Vector unitario": {
-        "code": "û",
+        "code": "\\hat{u}",
         "description": "Notación de vector unitario"
     },
     "Fórmula enmarcada": {
-        "code": "▭((a)/(b))",
+        "code": "\\boxed{\\frac{a}{b}}",
         "description": "Fórmula con recuadro"
     },
     "Corte basal mínimo": {
-        "code": "Q_(0,min)=0.25(I⋅A_r⋅S)/(g)P",
+        "code": "Q_{0,min} = 0.25 \\frac{I A_r S}{g} P",
         "description": "Corte basal mínimo NCh2369"
     },
     "Corte basal máximo": {
-        "code": "Q_(0,max)=2.75(I⋅A_r⋅S)/(g(R+1))⋅((0.05)/(ξ))^0.4 P",
+        "code": "Q_{0,max} = 2.75 \\frac{I A_r S}{g(R+1)} \\left( \\frac{0.05}{\\xi} \\right)^{0.4} P",
         "description": "Corte basal máximo NCh2369"
     }
 }

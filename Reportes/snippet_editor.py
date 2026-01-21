@@ -56,121 +56,90 @@ class EquationRibbon(QTabWidget):
         self.setup_tabs()
 
     def setup_tabs(self):
-        # --- Estructuras ---
+        # 1. Structures
         struct_tab = QWidget()
         struct_layout = QHBoxLayout(struct_tab)
         struct_layout.setContentsMargins(4, 4, 4, 4)
         
-        blocks = [
-            ("Fracción", "(⬚)/(⬚)", "½"),
-            ("Índice", "⬚^⬚", "x²"),
-            ("Subíndice", "⬚_⬚", "x₂"),
-            ("Raíz", "√(⬚)", "√"),
-            ("Raíz N", "√(⬚&⬚)", "ⁿ√"),
-            ("Paréntesis", "(⬚)", "( )"),
-            ("Corchetes", "[⬚]", "[ ]"),
-            ("Llaves", "{⬚}", "{ }"),
-            ("Valor Abs.", "|⬚|", "|x|"),
+        # Format: (Label, LaTeX Code, Display Text/Icon)
+        struct_blocks = [
+            ("Fracción", "\\frac{}{}", "½"),
+            ("Índice", "^{}", "xʸ"),
+            ("Subíndice", "_{}", "x_y"),
+            ("Raíz", "\\sqrt{}", "√"),
+            ("Raíz N", "\\sqrt[]{}", "ⁿ√"),
+            ("Paréntesis", "\\left(  \\right)", "( )"),
+            ("Corchetes", "\\left[  \\right]", "[ ]"),
+            ("Llaves", "\\left\\{  \\right\\}", "{ }"),
+            ("Valor Abs.", "\\left|  \\right|", "|x|"),
         ]
-        self._add_group(struct_layout, blocks)
+        self._add_group(struct_layout, struct_blocks)
         self.addTab(struct_tab, "Estructuras")
 
-        # --- Cálculo/Op ---
+        # 2. Calculus
         calc_tab = QWidget()
         calc_layout = QHBoxLayout(calc_tab)
         calc_layout.setContentsMargins(4, 4, 4, 4)
 
         calc_blocks = [
-            ("Sumatoria", "∑_(⬚)^⬚ ⬚", "∑"),
-            ("Integral", "∫_(⬚)^⬚ ⬚ d⬚", "∫"),
-            ("Productoria", "∏_(⬚)^⬚ ⬚", "∏"),
-            ("Límite", "lim_(⬚→⬚) ⬚", "lim"),
-            ("Intersección", "∩", "∩"),
-            ("Unión", "∪", "∪"),
+            ("Sumatoria", "\\sum", "∑"),
+            ("Suma Lím", "\\sum_{}^{}", "∑lim"),
+            ("Integral", "\\int", "∫"),
+            ("Integral Lím", "\\int_{}^{}", "∫lim"),
+            ("Productoria", "\\prod", "∏"),
+            ("Límite", "\\lim", "lim"),
+            ("Límite →", "\\lim_{ \\to }", "lim→"),
         ]
         self._add_group(calc_layout, calc_blocks)
         self.addTab(calc_tab, "Cálculo")
 
-        # --- Operadores ---
-        ops_tab = QWidget()
-        ops_layout = QGridLayout(ops_tab)
-        ops_layout.setContentsMargins(4, 4, 4, 4)
-        ops_layout.setSpacing(2)
-        
-        operators = [
-            ("Igual", "="), ("Distinto", "≠"), ("Aprox", "≈"), ("Equiv", "≡"),
-            ("Mayor", ">"), ("Menor", "<"), ("MayorEq", "≥"), ("MenorEq", "≤"),
-            ("Mucho >", "≫"), ("Mucho <", "≪"), ("Prop", "∝"), ("MasMenos", "±"),
-            ("Por", "×"), ("Div", "÷"), ("Punto", "⋅"), ("Círculo", "∘"),
-            ("Flecha", "→"), ("Implica", "⇒"), ("DobleFlecha", "↔"), ("SiSoloSi", "⇔"),
-            ("ParaTodo", "∀"), ("Existe", "∃"), ("Pertenece", "∈"), ("NoPertenece", "∉"),
-            ("Infinito", "∞"), ("Nabla", "∇"), ("Parcial", "∂"), ("Grado", "°")
-        ]
-        
-        row, col = 0, 0
-        for name, char in operators:
-            btn = QPushButton(char)
-            btn.setFixedSize(40, 30)
-            btn.setToolTip(name)
-            btn.clicked.connect(lambda c=False, s=char: self.snippetClicked.emit(s))
-            ops_layout.addWidget(btn, row, col)
-            col += 1
-            if col > 7:
-                col = 0
-                row += 1
-        
-        ops_layout.setRowStretch(row+1, 1)
-        ops_layout.setColumnStretch(col+1, 1)
-        self.addTab(ops_tab, "Operadores")
-
-        # --- Matrices ---
+        # 3. Matrices
         matrix_tab = QWidget()
         matrix_layout = QHBoxLayout(matrix_tab)
         matrix_layout.setContentsMargins(4, 4, 4, 4)
 
         matrix_blocks = [
-            ("Matriz 2x2", "\\matrix(⬚&⬚@⬚&⬚)", "▦ 2x2"),
-            ("Matriz 3x3", "\\matrix(⬚&⬚&⬚@⬚&⬚&⬚@⬚&⬚&⬚)", "▦ 3x3"),
-            ("Vector Col", "\\matrix(⬚@⬚)", "日"),
-            ("Vector Fila", "\\matrix(⬚&⬚)", "▭"),
-            ("Cases", "❴█(⬚&if ⬚@⬚&if ⬚)", "{ Cases"),
-            ("EqArray", "█(⬚&=⬚@⬚&=⬚)", "EqArray"),
-            ("Matriz ( )", "(\\matrix(⬚&⬚@⬚&⬚))", "(▦)"),
-            ("Matriz [ ]", "[\\matrix(⬚&⬚@⬚&⬚)]", "[▦]"),
+            ("Matriz ( )", "\\begin{pmatrix} & \\\\ & \\end{pmatrix}", "(Mat)"),
+            ("Matriz [ ]", "\\begin{bmatrix} & \\\\ & \\end{bmatrix}", "[Mat]"),
+            ("Vector Col", "\\begin{pmatrix} \\\\ \\end{pmatrix}", "日"),
+            ("Vector Fila", "\\begin{pmatrix} & \\end{pmatrix}", "▭"),
+            ("Cases", "\\begin{cases} & \\text{if } \\\\ & \\text{else} \\end{cases}", "Cases"),
+            ("Alineado", "\\begin{aligned} &= \\\\ &= \\end{aligned}", "Align"),
         ]
         self._add_group(matrix_layout, matrix_blocks)
         self.addTab(matrix_tab, "Matrices")
 
-        # --- Símbolos (Griegas) ---
-        greek_tab = QWidget()
-        greek_layout = QGridLayout(greek_tab) # Use Grid for many symbols
-        greek_layout.setContentsMargins(4, 4, 4, 4)
-        greek_layout.setSpacing(2)
+        # 4. Operators
+        ops_tab = QWidget()
+        ops_layout = QGridLayout(ops_tab)
+        ops_layout.setContentsMargins(4, 4, 4, 4)
+        ops_layout.setSpacing(2)
         
-        greeks = [
-            ("alpha", "α"), ("beta", "β"), ("gamma", "γ"), ("theta", "θ"),
-            ("lambda", "λ"), ("mu", "μ"), ("pi", "π"), ("sigma", "σ"),
-            ("tau", "τ"), ("phi", "φ"), ("omega", "ω"), ("Delta", "Δ"),
-            ("Sigma", "Σ"), ("Omega", "Ω"), ("epsilon", "ε"), ("rho", "ρ")
+        # Format: (Tooltip Name, LaTeX Code, Button Label)
+        operators_list = [
+            ("Igual", "=", "="), ("Distinto", "\\neq", "≠"), ("Aprox", "\\approx", "≈"), ("MenorIgual", "\\leq", "≤"),
+            ("MayorIgual", "\\geq", "≥"), ("MasMenos", "\\pm", "±"), ("Por", "\\times", "×"), ("Div", "\\div", "÷"),
+            ("Punto", "\\cdot", "⋅"), ("Flecha Der", "\\to", "→"), ("Implica", "\\Rightarrow", "⇒"), ("DobleFlecha", "\\leftrightarrow", "↔"),
+            ("ParaTodo", "\\forall", "∀"), ("Existe", "\\exists", "∃"), ("Pertenece", "\\in", "∈"), ("NoPertenece", "\\notin", "∉"),
+            ("Alpha", "\\alpha", "α"), ("Beta", "\\beta", "β"), ("Delta", "\\Delta", "Δ"), ("Pi", "\\pi", "π")
         ]
-        
+
         row, col = 0, 0
-        for name, char in greeks:
-            btn = QPushButton(char)
-            btn.setFixedSize(30, 30)
-            btn.setToolTip(name)
-            btn.clicked.connect(lambda c=False, s=char: self.snippetClicked.emit(s))
-            greek_layout.addWidget(btn, row, col)
+        for name, code, label in operators_list:
+            btn = QPushButton(label)
+            btn.setFixedSize(40, 30)
+            btn.setToolTip(f"{name} ({code})")
+            # Connect using closure to capture 'code'
+            btn.clicked.connect(lambda c=False, s=code: self.snippetClicked.emit(s))
+            ops_layout.addWidget(btn, row, col)
             col += 1
-            if col > 7:
+            if col > 7: # 8 columns max
                 col = 0
                 row += 1
         
-        # Add a stretch to push valid items to top-left
-        greek_layout.setRowStretch(row+1, 1)
-        greek_layout.setColumnStretch(col+1, 1)
-        
-        self.addTab(greek_tab, "Símbolos")
+        ops_layout.setRowStretch(row+1, 1)
+        ops_layout.setColumnStretch(col+1, 1)
+        self.addTab(ops_tab, "Operadores Simples")
 
 
     def _add_group(self, layout, items):

@@ -1,7 +1,7 @@
 import comtypes.client
 import logging
 import re
-from .equation_translator import validate_equation, expand_symbols
+# from .equation_translator import validate_equation, expand_symbols # DEPRECATED
 
 logger = logging.getLogger(__name__)
 
@@ -108,15 +108,12 @@ class WordService:
             if not part: continue
             
             if part.startswith('$') and part.endswith('$') and len(part) > 2:
-                # Es ecuación inline
+                # Es ecuación inline (Raw LaTeX)
                 math_content = part[1:-1] # Quitar $
-                
-                # Expandir símbolos (si el usuario escribió \alpha)
-                math_unicode = expand_symbols(math_content)
                 
                 # MÉTODO SEGURO: Usar TypeText + selección inversa
                 start_pos = selection.Range.Start
-                selection.TypeText(math_unicode)
+                selection.TypeText(math_content)
                 end_pos = selection.Range.Start
                 
                 # Crear rango sobre el texto recién insertado
@@ -129,16 +126,12 @@ class WordService:
                 omath = omaths(omaths.Count)
                 
                 try:
-                    # FIX: Establecer Justification=7 ANTES de BuildUp
-                    # Esto previene que BuildUp fragmente la ecuación en múltiples líneas
-                    # wdOMathJustificationInline = 7 (no documentado oficialmente)
-                    omath.Justification = 7
-                    
-                    omath.BuildUp()
+                    # NO HACEMOS BuildUp()
+                    # Dejamos el LaTeX crudo para que el usuario lo convierta manualmente (o Word lo detecte si está configurado)
                     # Forzar modo inline para que fluya con el texto
                     omath.Range.OMaths(1).Type = 1 # wdOMathInline
                 except Exception as e:
-                    logger.debug(f"Error inline math build: {e}")
+                    logger.debug(f"Error inline math setup: {e}")
                 
                 # Mover cursor al final de la ecuación
                 selection.SetRange(omath.Range.End, omath.Range.End)
@@ -185,29 +178,19 @@ class WordService:
 
     def insert_equation(self, equation_text):
         """
-        Inserta una ecuación UnicodeMath centrada (Display) en Word.
+        Inserta una ecuación en formato LaTeX (RAW) centrada (Display) en Word.
         
-        Flujo simplificado (sin buffer):
-        1. Valida la sintaxis de la ecuación
-        2. Expande símbolos \\command a Unicode si los hay
-        3. Inserta el texto y convierte a OMath
-        4. Aplica Justification=7 antes de BuildUp para evitar fragmentación
-        5. Cambia a modo Display (centrado)
-        
-        NOTA: El contenido ya debe estar en sintaxis UnicodeMath nativa.
+        Flujo simplificado (Raw LaTeX):
+        1. Inserta el texto LaTeX puro (sin modificar)
+        2. Convierte a OMath
+        3. NO ejecuta BuildUp() -> Deja el texto visible para conversión manual
+        4. Cambia a modo Display (centrado)
         """
         if not self.word_app: 
             return False
 
         try:
-            # 1. Validar ecuación
-            is_valid, error_msg = validate_equation(equation_text)
-            if not is_valid:
-                logger.warning(f"Ecuación con posibles errores: {error_msg}")
-            
-            # 2. Expandir símbolos \\command a Unicode (si el usuario usó \\alpha, etc)
-            equation_unicode = expand_symbols(equation_text)
-            logger.debug(f"UnicodeMath: {equation_unicode}")
+            logger.debug(f"Insertando LaTeX Raw: {equation_text}")
             
             selection = self.word_app.Selection
             selection.Collapse(0)  # wdCollapseEnd - Evita sobrescribir
@@ -215,9 +198,9 @@ class WordService:
             
             doc = self.get_active_document()
             
-            # 3. Guardar posición e insertar texto de ecuación
+            # 3. Guardar posición e insertar texto de ecuación (sin traducción)
             start_pos = selection.Range.Start
-            selection.TypeText(equation_unicode)
+            selection.TypeText(equation_text)
             end_pos = selection.Range.Start
             
             # 4. Crear rango sobre el texto recién insertado
@@ -228,16 +211,12 @@ class WordService:
             omaths.Add(eq_range)
             omath = omaths(omaths.Count)
             
-            # 6. BuildUp con fix de Justification
-            # Justification=7 (wdOMathJustificationInline no documentado)
-            # previene que BuildUp fragmente la ecuación
+            # 6. Configurar
             try:
-                omath.Justification = 7
-                omath.BuildUp()
                 # Cambiar a Display (centrado) - wdOMathDisplay = 0
                 omath.Range.OMaths(1).Type = 0
             except Exception as e:
-                logger.debug(f"BuildUp info: {e}")
+                logger.debug(f"Error configurando OMath: {e}")
             
             # 7. Mover cursor al final de la ecuación e insertar nuevo párrafo
             selection.SetRange(omath.Range.End, omath.Range.End)
@@ -248,11 +227,6 @@ class WordService:
             
         except Exception as e:
             logger.error(f"Error insertando ecuación: {e}")
-            # Fallback: insertar como texto plano
-            try:
-                self.insert_text_at_cursor(f"[ECUACIÓN: {equation_text}]", "Normal")
-            except:
-                pass
             return False
 
     def insert_equation_via_field(self, equation_text):

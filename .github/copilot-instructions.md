@@ -1,77 +1,97 @@
-# Instrucciones para GitHub Copilot - SAP2000 API con comtypes
+# Instrucciones para GitHub Copilot - SAP2000 Automation Suite
 
-Estás trabajando en un proyecto de Python que interactúa con la API de SAP2000 (CSI OAPI) utilizando la librería `comtypes`. La aplicación se ha migrado a una arquitectura unificada y modular.
+Proyecto Python que automatiza CSI SAP2000 vía COM (`comtypes`) con GUI PySide6. Incluye integración con Microsoft Word para reportes.
 
-## Reglas Críticas de Implementación
+## Arquitectura del Proyecto
 
-### 1. Manejo de Retornos (La Regla de Oro)
-La API de SAP2000 está diseñada para lenguajes que soportan parámetros `ByRef` (como VBA o C#). En Python con `comtypes`, el comportamiento es diferente:
+```
+main_app.py           # Punto de entrada - QMainWindow con pestañas
+sap_interface.py      # Singleton de conexión SAP2000 (emite connectionChanged Signal)
+<Modulo>/
+  ├── backend.py      # Lógica pura (comtypes, sin PySide6)
+  ├── *_gui.py        # Widget QWidget (recibe sap_interface)
+  └── config.py       # Constantes y configuración (opcional)
+API/                  # Documentación de referencia CSI OAPI
+Reportes/library/     # Snippets JSON para generación de memorias
+```
 
-*   **NO** asumas que los parámetros de entrada se modifican in-place.
-*   Las funciones retornan una **TUPLA** o **LISTA** que contiene todos los valores de salida definidos como `ByRef` en la documentación original, seguidos por el valor de retorno de la función.
-*   **El último elemento** de la lista de retorno es SIEMPRE el código de estado (`RetCode`). `0` significa éxito.
+## Regla de Oro: Retornos de comtypes
 
-### 2. Patrón de Código Obligatorio
+La API de SAP2000 usa `ByRef`. En Python con comtypes, las funciones retornan **TUPLA** con todos los valores de salida + código de estado **al final**.
 
-**Incorrecto (Estilo VBA/C#):**
 ```python
-# NO HACER ESTO
+# ✗ Incorrecto (estilo VBA/C#)
 ret = SapModel.Func(param_in, param_out)
 if ret != 0: ...
+
+# ✓ Correcto (Python comtypes)
+ret = SapModel.LoadCases.GetNameList()  # → (count, names_tuple, RetCode)
+if ret[-1] == 0:  # RetCode siempre es el último
+    count, names = ret[0], ret[1]
 ```
 
-**Correcto (Estilo Python comtypes):**
-```python
-# HACER ESTO: Desempaquetar o acceder por índice
-ret = SapModel.Func(param_in, 0, []) 
+## Inyección de Dependencias
 
-# ret es [ValorSalida1, ValorSalida2, ..., RetCode]
-
-if ret[-1] == 0: # Verificar éxito (último elemento)
-    resultado_1 = ret[0]
-else:
-    print(f"Error en la función, código: {ret[-1]}")
-```
-
-### 3. Conexión y Arquitectura (NUEVO)
-**No utilices GetActiveObject dentro de los módulos individuales.** La aplicación utiliza una arquitectura de **Inyección de Dependencias**.
-
-#### Backends
-*   Deben ser clases que reciban `sap_model` en su `__init__`.
-*   No deben depender de librerías GUI (PySide6).
+**Backend**: recibe `sap_model` en constructor, sin dependencias GUI.
 
 ```python
-class MiModuloBackend:
+class MiBackend:
     def __init__(self, sap_model):
-        self.SapModel = sap_model
+        self.SapModel = sap_model  # Puede ser None para tests
 
-    def ejecutar_tarea(self):
-        if not self.SapModel: return
-        # Lógica OAPI...
+    def mi_tarea(self):
+        if not self.SapModel: return None
+        ret = self.SapModel.DatabaseTables.GetTableForDisplayArray(...)
+        return ret[:-1] if ret[-1] == 0 else None
 ```
 
-#### Frontend (GUI)
-*   Deben ser Widgets (`QWidget`) que reciban `sap_interface` en su `__init__`.
-*   Usan `sap_interface.SapModel` para instanciar el backend.
+**GUI Widget**: recibe `sap_interface`, instancia backend bajo demanda.
 
 ```python
-class MiModuloWidget(QWidget):
+class MiWidget(QWidget):
     def __init__(self, parent=None, sap_interface=None):
         super().__init__(parent)
         self.sap_interface = sap_interface
 
-    def on_button_click(self):
-        model = self.sap_interface.SapModel
-        backend = MiModuloBackend(model)
-        backend.ejecutar_tarea()
+    def on_action(self):
+        backend = MiBackend(self.sap_interface.SapModel)
+        backend.mi_tarea()
 ```
 
-### 4. Estructura de Módulos
-Para crear una nueva herramienta:
-1.  Crea una carpeta nueva con `__init__.py`.
-2.  Crea un archivo `backend.py` con la lógica agnóstica.
-3.  Crea un archivo `gui.py` con la interfaz visual.
-4.  Registra el widget en `main_app.py`.
+## Crear Nuevo Módulo
 
-### 5. Documentación de la API
-La documentación y ejemplos de la API de SAP2000 están disponibles en la carpeta `API` del repositorio.
+1. Crear carpeta `Nuevo_Modulo/` con `__init__.py`, `backend.py`, `*_gui.py`
+2. Backend incluye `if __name__ == "__main__":` para pruebas standalone
+3. GUI soporta ejecución aislada con fallback a `GetActiveObject`:
+   ```python
+   if __name__ == "__main__":
+       app = QApplication(sys.argv)
+       window = MiWidget()  # sap_interface=None → backend conecta solo
+       window.show()
+       sys.exit(app.exec())
+   ```
+4. Registrar en `main_app.py` → `init_tabs()` pasando `self.sap_interface`
+
+## Pruebas de Módulos
+
+```bash
+# Backend aislado (conecta vía GetActiveObject)
+python Nuevo_Modulo/backend.py
+
+# GUI como módulo
+python -m Nuevo_Modulo.gui
+```
+
+## Integración con Word (Reportes)
+
+El módulo `Reportes/` usa `WordService` (comtypes → Word.Application):
+- Ecuaciones: UnicodeMath nativo, no LaTeX. Ver `equation_translator.py`
+- Símbolos: `\alpha` → `α`, `\sum` → `∑` (diccionario `UNICODEMATH_SYMBOLS`)
+- Snippets: JSON en `Reportes/library/` con estructura `{category, snippets: [{id, title, content}]}`
+
+## Convenciones
+
+- Usar `self.SapModel` (mayúscula) para consistencia con API CSI
+- Verificar `if not self.SapModel: return` al inicio de métodos backend
+- Importaciones relativas en módulos: `from .backend import MiBackend`
+- Referencia API: consultar archivos `.md` en `API/` (ej: `Load_Cases.md`, `Database_Tables.md`)

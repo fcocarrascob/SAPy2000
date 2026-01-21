@@ -52,8 +52,18 @@
           "type": "text"
         },
         {
+          "content": "\\frac{1}{2}\\cdot\\sqrt{30}\\sqrt[2]{B}",
+          "parameters": {},
+          "type": "equation"
+        },
+        {
+          "content": "\\left[ ASDASD \\right]",
+          "parameters": {},
+          "type": "equation"
+        },
+        {
           "type": "equation",
-          "content": "Q_min=0.25",
+          "content": "\n",
           "parameters": {}
         }
       ]
