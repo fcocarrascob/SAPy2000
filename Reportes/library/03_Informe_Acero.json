@@ -1,0 +1,304 @@
+{
+  "category": "Informe_Acero",
+  "snippets": [
+    {
+      "id": "objetivo",
+      "title": "Objetivo_Acero",
+      "description": "Objetivo Tipico para estructuras de acero.",
+      "content": [
+        {
+          "content": "El objetivo de este documento es exponer y detallar los cálculos realizados, a nivel de ingeniería de detalles, de la estructura de acero correspondientes al [ESTRUCTURA], el cual se localizará en [UBICACION Y FIGURA]. Este documento se centrará en los requisitos generales y específicos de diseño que forman el alcance, así mismo, debe ser leído e interpretado en conjunto con los planos y especificaciones indicadas en la sección Referencias.",
+          "parameters": {
+            "style": "Normal"
+          },
+          "type": "text"
+        }
+      ]
+    },
+    {
+      "id": "alcance_acero",
+      "title": "Alcance_Acero",
+      "description": "Alcance tipico de estructura de acero",
+      "content": [
+        {
+          "type": "text",
+          "content": "El alcance de la presente memoria de cálculo corresponde al diseño y verificación normativa del [ESTRUCTURA] para [SU FUNCION/OBJETIVO]. En el diseño se incluye la revisión de los elementos estructurales principales considerando las distintas cargas verticales y laterales a las que se verá sometida la estructura en operación.\nEl análisis considera una estructura de acero compuesta por [MAC O MRM], considerando como elementos fusibles las [DIAGONGALES/ANCLAJES/ROTULAS EN VIGAS].\nDe igual forma se tiene que el alcance de los trabajos contempla lo siguiente:",
+          "parameters": {
+            "style": "Normal"
+          }
+        }
+      ]
+    },
+    {
+      "id": "antecedentes_TECK",
+      "title": "Antecedentes_TECK",
+      "description": "Antecedentes Tipicos de MdC Acero de Teck",
+      "content": [
+        {
+          "type": "table",
+          "content": {
+            "headers": [
+              "Header 1",
+              "Header 2",
+              "Header 3"
+            ],
+            "data": [
+              [
+                "[1]",
+                "CODIGO",
+                "Mecánica de Suelos"
+              ],
+              [
+                "[2]",
+                "POQB-CRI-0000-C-00001",
+                "Criterio de Diseño Civil Estructural."
+              ],
+              [
+                "[3]",
+                "POQB-TSP-0000-C-00001",
+                "Especificación Técnica Hormigones."
+              ],
+              [
+                "[4]",
+                "POQB-TSP-0000-I-00003",
+                "Especificaciones Técnicas Pinturas para Estructuras de Acero."
+              ],
+              [
+                "[5]",
+                "POQB-TSP-0000-I-00006",
+                "Especificación técnica Fabricación y Montaje de Estructuras de Acero."
+              ],
+              [
+                "[6]",
+                "Código",
+                "Maqueta BIM"
+              ],
+              [
+                "",
+                "",
+                ""
+              ]
+            ]
+          },
+          "parameters": {}
+        }
+      ]
+    },
+    {
+      "id": "normas_y_codigos",
+      "title": "Normas y Codigos Acero",
+      "description": "Normas y códigos tipicos estructuras de Acero",
+      "content": [
+        {
+          "type": "table",
+          "content": {
+            "headers": [
+              "Header 1",
+              "Header 2",
+              "Header 3"
+            ],
+            "data": [
+              [
+                "[1]",
+                "NCh 3171.Of2010",
+                "Diseño Estructural - Combinaciones de Cargas."
+              ],
+              [
+                "[2]",
+                "NCh 1537.Of2009",
+                "Cargas Permanentes y Sobrecargas de Uso."
+              ],
+              [
+                "[3]",
+                "NCh 2369.Of2025",
+                "Diseño Sísmico de Instalaciones Industriales."
+              ],
+              [
+                "[4]",
+                "NCh 432.Of2010",
+                "Diseño Estructural - Cargas de Viento."
+              ],
+              [
+                "[5]",
+                "NCh 431.Of1977",
+                "Construcción - Sobrecargas de Nieves."
+              ],
+              [
+                "[6]",
+                "NCh 427.Of2016",
+                "Cálculo de Estructuras de Acero"
+              ],
+              [
+                "[7]",
+                "ANSI/AISC 360",
+                "Specification for Structural Steel Buildings."
+              ],
+              [
+                "[8]",
+                "AWS D.1.1",
+                "Structural Welding Code 􀂱 Steel."
+              ],
+              [
+                "[9]",
+                "ASCE 7-10",
+                "Minimum Design Loads for Buildings and Other Structures"
+              ]
+            ]
+          },
+          "parameters": {}
+        }
+      ]
+    },
+    {
+      "id": "materiales_acero",
+      "title": "Materiales Acero",
+      "description": "Tabla de Materiales tipicos de estructuras de acero",
+      "content": [
+        {
+          "content": "La calidad de los materiales utilizados en cada elementos estructural se indican a continuación.",
+          "parameters": {
+            "style": "Normal"
+          },
+          "type": "text"
+        },
+        {
+          "content": {
+            "data": [
+              [
+                "Perfiles Estructurales de Acero",
+                "ASTM A36"
+              ],
+              [
+                "Perfiles Tubulares",
+                "ASTM A500Gr. B"
+              ],
+              [
+                "Planchas de Acero",
+                "ASTM A36"
+              ],
+              [
+                "Pernos de Anclaje",
+                " ASTM F1554 Gr. 36"
+              ]
+            ],
+            "headers": [
+              "Ítem",
+              "Calidad"
+            ]
+          },
+          "parameters": {},
+          "type": "table"
+        }
+      ]
+    },
+    {
+      "id": "tabla_tipo_acero",
+      "title": "Tabla Acero Tipo",
+      "description": "Tabla con propiedades básicas para definir aceros",
+      "content": [
+        {
+          "type": "table",
+          "content": {
+            "headers": [
+              "Ítem",
+              "Propiedad",
+              "Unidad"
+            ],
+            "data": [
+              [
+                "Peso Específico",
+                "y = 7850",
+                "kgf/m3"
+              ],
+              [
+                "Tensión de Fluencia",
+                "fy = 2530",
+                "kgf/cm2"
+              ],
+              [
+                "Tensión de Rotura",
+                "fu = 4080",
+                "kgf/cm2"
+              ],
+              [
+                "Módulo de Elasticidad",
+                "E = 2100000",
+                "kgf/cm2"
+              ]
+            ]
+          },
+          "parameters": {}
+        }
+      ]
+    },
+    {
+      "id": "mecanica_de_suelos",
+      "title": "Mecánica de Suelos",
+      "description": "Párrafo tipo para Mecánica de Suelos",
+      "content": [
+        {
+          "content": "De acuerdo con lo indicado en el informe de Mecánica de Suelos (Ref. 4.1.[X]), a partir del análisis de los estratos mediante excavaciones y ensayos, se definieron los siguientes horizontes y estratos principales para el diseño de las fundaciones:\n\n[INSERTAR DESCRIPCIÓN DE ESTRATOS]\n\nPara fundaciones sobre suelo, el sello de excavación debe llegar hasta X m de profundidad y el nivel de fundación ubicarse a X m. En el caso de apoyo sobre roca, tanto el sello de excavación como el nivel de fundación se establecen a X m. Por lo anterior, el sello de excavación debe garantizar la profundidad mínima indicada o extenderse hasta encontrar roca, asegurando así un sistema de apoyo estable para las obras civiles.",
+          "parameters": {
+            "style": "Normal"
+          },
+          "type": "text"
+        },
+        {
+          "type": "text",
+          "content": "Parámetros de diseño tipicos en suelos/rellenos de fundación.",
+          "parameters": {
+            "style": "Normal"
+          }
+        },
+        {
+          "type": "table",
+          "content": {
+            "headers": [
+              "Parámetro",
+              "Valor",
+              "Unidad"
+            ],
+            "data": [
+              [
+                "Peso Unitario Suelo de Sobrecarga",
+                "2.00",
+                "[kgf/m3]"
+              ],
+              [
+                "Peso Unitario Sello de Fundación",
+                "2.00",
+                "[kgf/m3]"
+              ],
+              [
+                "Ángulo de Fricción Sello de Fundación",
+                "38",
+                "[°]"
+              ],
+              [
+                "Cohesión Sello de Fundación",
+                "0.00",
+                "[kgf/m2]"
+              ],
+              [
+                "Módulo de Elasticidad Sello de Fundación",
+                "900",
+                "[MPa]"
+              ],
+              [
+                "Coeficiente Poisson Sello de Fundación",
+                "0.3",
+                "[-]"
+              ],
+              [
+                "Profundidad al Sello de Fundación",
+                "1.20",
+                "[m]"
+              ]
+            ]
+          },
+          "parameters": {}
+        }
+      ]
+    }
+  ]
+}
