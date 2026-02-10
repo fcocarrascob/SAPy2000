@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal, QThread
 from PySide6.QtGui import QFont, QColor
+import pythoncom
 
 # Importar matplotlib para preview del espectro
 try:
@@ -38,10 +39,15 @@ class CreateModelWorker(QThread):
         self.params = params
     
     def run(self):
-        result = self.backend.create_base_model(
-            **self.params,
-            progress_callback=self._report_progress
-        )
+        pythoncom.CoInitialize()
+        try:
+            result = self.backend.create_base_model(
+                **self.params,
+                progress_callback=self._report_progress
+            )
+        finally:
+            pythoncom.CoUninitialize()
+
         self.finished.emit(result)
     
     def _report_progress(self, pct: int, msg: str):
@@ -556,16 +562,6 @@ class ModeloBaseWidget(QWidget):
             Sa_vert.append(val_v)
         
         return T_vals, Sa_x, Sa_y, Sa_vert
-    
-    # Métodos auxiliares eliminados ya que la lógica está integrada arriba para garantizar paridad.
-
-        """Calcula el factor de amplificación α según NCh433."""
-        if T <= T0:
-            # Rama ascendente: α = 1 + T/T0 * (2.75-1)
-            return 1.0 + (T / T0) * 1.75 if T0 > 0 else 2.75
-        else:
-            # Rama descendente: α = 2.75 * (T0/T)^p
-            return 2.75 * (T0 / T) ** p
 
     def _calc_alpha_vertical(self, T: float, T0: float, p: float, q: float) -> float:
         """Calcula el factor de amplificación α vertical (sin factor r)."""
