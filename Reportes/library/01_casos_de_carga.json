@@ -228,6 +228,20 @@
           "type": "text"
         }
       ]
+    },
+    {
+      "id": "solicitacion_sismica_funda",
+      "title": "Carga Sísmica [E] Fundacion",
+      "description": "Parrafo tipo para estado de carga sísmico en fundaciones.",
+      "content": [
+        {
+          "type": "text",
+          "content": "La acción sísmica de la superestructura se transmite a las fundaciones mediante fuerzas equivalentes, las cuales son ingresadas en el modelo de fundaciones como cargas estáticas aplicadas en el tope de los pedestales. Dichas fuerzas se obtienen a partir del análisis sísmico de la superestructura, considerando las reacciones en los apoyos como acciones externas sobre la fundación. El análisis sísmico de la superestructura fue realizado mediante un análisis modal espectral, implementado en el software SAP2000 (Ref. 4.3.[1]). En este tipo de análisis, la respuesta estructural se determina combinando los efectos modales mediante el método de combinación cuadrática completa (CQC). \nCabe destacar que, debido a la naturaleza estadística del método CQC, los resultados obtenidos para el estado sísmico puro corresponden a valores máximos absolutos, perdiéndose la información del signo de la respuesta (sentido de actuación de las fuerzas). Por este motivo, para cada estado de carga sísmico considerado (EX, EY y EZ), se definen dos casos de carga independientes: \nSentido positivo de la acción sísmica (valor máximo) \nSentido negativo de la acción sísmica (valor mínimo). \nDe esta manera, se garantiza la consideración de los efectos más desfavorables de la acción sísmica en ambos sentidos de actuación, permitiendo una correcta evaluación del comportamiento estructural de las fundaciones. ",
+          "parameters": {
+            "style": "Normal"
+          }
+        }
+      ]
     }
   ]
 }

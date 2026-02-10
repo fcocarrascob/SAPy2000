@@ -309,6 +309,83 @@
           }
         }
       ]
+    },
+    {
+      "id": "estabilidad_global",
+      "title": "Estabilidad Global",
+      "description": "Texto tipo estabilidad global Criterios TECK",
+      "content": [
+        {
+          "content": "De acuerdo con lo establecido en la Referencia 4.1.[X], la estabilidad global del sistema de fundación se verifica mediante factores de seguridad asociados a los mecanismos potenciales de falla por deslizamiento y volcamiento. Los valores mínimos adoptados para dichos factores de seguridad se presentan en la Tabla X, diferenciando entre condiciones de carga estática y sísmica.",
+          "parameters": {
+            "style": "Normal"
+          },
+          "type": "text"
+        },
+        {
+          "content": "Respecto a la estabilidad al volcamiento, se exige que el área en compresión sea mayor al 100 % en condición estática y mayor al 80 % en condición sísmica.",
+          "parameters": {
+            "style": "Normal"
+          },
+          "type": "text"
+        },
+        {
+          "content": "La verificación de la estabilidad frente al deslizamiento se basa en el modelo clásico de fricción de Coulomb, el cual establece que la resistencia al deslizamiento en una interfaz es proporcional a la fuerza normal actuante sobre dicha superficie. En el caso de fundaciones directas, esta resistencia está dada por la fricción desarrollada en la interfaz suelo–hormigón.",
+          "parameters": {
+            "style": "Normal"
+          },
+          "type": "text"
+        },
+        {
+          "content": "F_{r}=\\mu N",
+          "parameters": {},
+          "type": "equation"
+        },
+        {
+          "type": "text",
+          "content": "Donde:\n$\\mu$: Coeficiente de fricción del suelo, equivalente a $tan(\\frac{2}{3}\\phi)$\n\n$N$: Fuerza de compresión normal a la superficie de contacto.\n\n$\\phi$: Ángulo de fricción del suelo en interfaz suelo-estructura.",
+          "parameters": {
+            "style": "Normal"
+          }
+        },
+        {
+          "content": {
+            "data": [
+              [
+                "Deslizamiento",
+                "2.0",
+                "1.5"
+              ],
+              [
+                "Volcamiento",
+                "1.5",
+                "1.3"
+              ]
+            ],
+            "headers": [
+              "Verificación",
+              "Caso Estático",
+              "Caso Sísmico"
+            ]
+          },
+          "parameters": {},
+          "type": "table"
+        }
+      ]
+    },
+    {
+      "id": "modelo_funda",
+      "title": "Modelo Estructural",
+      "description": "Parrafos tipos para descripción del modelo estructural de fundaciones",
+      "content": [
+        {
+          "type": "text",
+          "content": "Se realiza un modelo estructural completo de las fundaciones de la superestructura en el software computacional SAP2000 v26.2.0. La modelación se realiza a partir del nivel de sello de fundación hasta el nivel de tope de concreto de los pedestales, asignando restricciones de desplazamiento en dirección horizontal al plano y manteniendo libre el desplazamiento en sentido de la gravedad, el cual queda controlado por resortes que simulan la interacción suelo-estructura. Se aplica un análisis no lineal por elementos finitos para determinar los casos más desfavorables que controlen la estabilidad y el diseño. Para el diseño de las fundaciones se evalúan las tensiones de contacto, cortes y momentos solicitantes máximos. Las fuerzas provenientes de las reacciones de la estructura se asignan como cargas en el tope de los pedestales. Para el diseño de la armadura de refuerzo se aplica una envolvente de diseño considerando los casos más críticos.\nCabe destacar que para simular la interacción suelo-estructura se consideran resortes verticales en todos los nodos que unen los elementos de área (Shell-Thick) que simulan la zapata. Estos resortes solamente tienen rigidez a compresión, siendo nula a tracción. La rigidez considerada es igual al módulo de balasto calculado a partir de parámetros y ecuaciones presentadas en la Mecánica de Suelos (Ref. 4.1.[1].)",
+          "parameters": {
+            "style": "Normal"
+          }
+        }
+      ]
     }
   ]
 }
