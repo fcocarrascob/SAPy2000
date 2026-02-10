@@ -73,11 +73,19 @@ class BasePlateWidget(QWidget):
         self.log = QTextEdit()
         self.log.setReadOnly(True)
 
-        self.save_btn = QPushButton('Guardar config')
         self.run_btn = QPushButton('Guardar y Ejecutar')
 
-        self.save_btn.clicked.connect(self.save_config)
         self.run_btn.clicked.connect(self.run_script)
+        
+        # Connect to SAP interface signal if available
+        if self.sap_interface:
+            self.sap_interface.connectionChanged.connect(self.on_connection_changed)
+            # Initialize state
+            self.on_connection_changed(self.sap_interface.is_connected())
+        else:
+            # Standalone mode or no interface passed
+            self.run_btn.setEnabled(False)
+            self.run_btn.setToolTip("Modo desconectado (Execute via Main App)")
 
         # --- Layout Construction ---
         # Scroll Area Setup
@@ -161,7 +169,6 @@ class BasePlateWidget(QWidget):
         out_layout = QVBoxLayout()
         
         btn_row = QHBoxLayout()
-        btn_row.addWidget(self.save_btn)
         btn_row.addWidget(self.run_btn)
         out_layout.addLayout(btn_row)
         
@@ -297,6 +304,16 @@ class BasePlateWidget(QWidget):
         # Initial toggle state
         self.toggle_chair_inputs(self.include_chair_chk.isChecked())
 
+    def on_connection_changed(self, connected):
+        """Enable/Disable run button based on SAP2000 connection."""
+        self.run_btn.setEnabled(connected)
+        if connected:
+            self.run_btn.setToolTip("Guardar configuración y ejecutar en SAP2000")
+            self.run_btn.setText("Guardar y Ejecutar")
+        else:
+            self.run_btn.setToolTip("Conecte SAP2000 para ejecutar")
+            self.run_btn.setText("Guardar y Ejecutar (Sin Conexión)")
+
     def log_message(self, message):
         """Append message to log and force UI update."""
         self.log.append(message)
@@ -371,23 +388,22 @@ class BasePlateWidget(QWidget):
             return
         
         self.log.append('Iniciando ejecución de Placa Base...')
-        try:
-            # Check connection
-            if self.sap_interface and self.sap_interface.SapModel:
-                model = self.sap_interface.SapModel
-            else:
-                self.log.append("No hay conexión activa en sap_interface. Intentando conectar en backend...")
-                model = None # Backend will try to connect if None
+        
+        # Obtener modelo (si está conectado)
+        model = self.sap_interface.SapModel if self.sap_interface else None
 
+        try:
             backend = BasePlateBackend(sap_model=model, logger=self.log_message)
             backend.load_config_from_file(CONFIG_PATH)
             backend.run_process()
-            self.log_message("Ejecución finalizada correctamente.")
+            self.log_message("✅ Ejecución finalizada correctamente.")
 
         except Exception as e:
-            self.log.append(f"Error durante la ejecución: {str(e)}")
-            import traceback
-            self.log.append(traceback.format_exc())
+            self.log.append(f"❌ Error durante la ejecución: {str(e)}")
+            # Solo mostrar traceback si NO es el error de conexión conocido (por si acaso)
+            if "No hay conexión" not in str(e):
+                import traceback
+                self.log.append(traceback.format_exc())
 
     def add_row(self):
         r = self.centers_table.rowCount()
