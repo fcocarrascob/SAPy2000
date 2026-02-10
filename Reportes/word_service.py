@@ -285,10 +285,7 @@ class WordService:
             for col_idx, cell_data in enumerate(row_data):
                 cell = table.Cell(row_idx + 2, col_idx + 1)
                 cell.Range.Text = str(cell_data)
-
-        # Mover cursor fuera de la tabla (después de la tabla)
-        # table.Range.Collapse(0) # wdCollapseEnd
-        # selection.EndKey(6) # wdStory ? No, solo queremos salir de la tabla.
         
         # Una forma robusta de salir de la tabla es seleccionar el rango despues de la tabla
-        pass
+        selection.SetRange(table.Range.End, table.Range.End)
+        selection.TypeParagraph() # Insertar párrafo después de la tabla

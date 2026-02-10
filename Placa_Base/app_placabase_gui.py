@@ -247,8 +247,6 @@ class BasePlateWidget(QWidget):
                         self.centers_table.setItem(r, 2, QTableWidgetItem(str(c[2] if len(c) > 2 else 0.0)))
             except Exception as e:
                 self.log.append(f'No se pudo leer config existente: {e}')
-            except Exception as e:
-                self.log.append(f'No se pudo leer config existente: {e}')
 
         # actualizar A/B según bolt_dia inicial
         self.update_A_B_display()

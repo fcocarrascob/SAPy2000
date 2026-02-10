@@ -194,6 +194,94 @@
           }
         }
       ]
+    },
+    {
+      "id": "prueba_tablas",
+      "title": "07. Prueba de Tablas",
+      "description": "Probando inserción de tablas",
+      "content": [
+        {
+          "content": "Prueba de tablas",
+          "parameters": {
+            "style": "Normal"
+          },
+          "type": "text"
+        },
+        {
+          "content": {
+            "data": [
+              [
+                "Prueba",
+                "De"
+              ],
+              [
+                "Tablas",
+                "ASD"
+              ]
+            ],
+            "headers": [
+              "Header 1",
+              "Header 2"
+            ]
+          },
+          "parameters": {},
+          "type": "table"
+        },
+        {
+          "content": "probando texto seguido de tablas",
+          "parameters": {
+            "style": "Normal"
+          },
+          "type": "text"
+        },
+        {
+          "content": "asdasdasd",
+          "parameters": {
+            "style": "Normal"
+          },
+          "type": "text"
+        },
+        {
+          "content": {
+            "data": [
+              [
+                "Prueba",
+                "De"
+              ],
+              [
+                "Tablas",
+                "ASD"
+              ]
+            ],
+            "headers": [
+              "Header 1",
+              "Header 2"
+            ]
+          },
+          "parameters": {},
+          "type": "table"
+        },
+        {
+          "type": "table",
+          "content": {
+            "headers": [
+              "Header 1",
+              "Header 2"
+            ],
+            "data": [
+              [
+                "asdasd",
+                "De"
+              ],
+              [
+                "asdasd",
+                "asd"
+              ]
+            ]
+          },
+          "parameters": {}
+        }
+      ]
     }
   ]
 }
