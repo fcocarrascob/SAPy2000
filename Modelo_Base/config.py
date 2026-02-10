@@ -1,7 +1,7 @@
 """Configuración para el módulo de creación de Modelo Base.
 
 Contiene constantes de materiales, patrones de carga, combinaciones
-y parámetros sísmicos (NCh433/NCh2369).
+y parámetros sísmicos (NCh2369).
 """
 
 from dataclasses import dataclass

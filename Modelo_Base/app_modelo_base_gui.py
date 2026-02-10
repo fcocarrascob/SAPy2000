@@ -58,7 +58,7 @@ class SpectrumPreviewDialog(QDialog):
     """Diálogo emergente para mostrar gráfico y tabla del espectro."""
     def __init__(self, parent=None, data_dict=None, params_text=""):
         super().__init__(parent)
-        self.setWindowTitle("Vista Previa Espectro NCh433")
+        self.setWindowTitle("Vista Previa Espectro NCh2369:2025")
         self.resize(1100, 650)
         self.setModal(True)
         
@@ -156,7 +156,7 @@ class SpectrumPreviewDialog(QDialog):
             
         ax.set_xlabel("Period $T$ [s]")
         ax.set_ylabel("Spectral Acceleration $S_a$ [g]")
-        ax.set_title("Espectro de Diseño NCh433 Ref.")
+        ax.set_title("Espectro de Diseño NCh2369:2025.")
         ax.legend()
         
         self.canvas.draw()

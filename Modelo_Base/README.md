@@ -1,6 +1,6 @@
 # Modelo Base
 
-Módulo para crear un modelo SAP2000 en blanco preconfigurado con parámetros de la norma sísmica chilena **NCh433 / NCh2369**, materiales estándar, load patterns, secciones de marco, espectros de respuesta y combinaciones de diseño LRFD/ASD.
+Módulo para crear un modelo SAP2000 en blanco preconfigurado con parámetros de la norma sísmica chilena **/ NCh2369**, materiales estándar, load patterns, secciones de marco, espectros de respuesta y combinaciones de diseño LRFD/ASD.
 
 ## Descripción
 
@@ -92,7 +92,7 @@ flowchart TD
 | 6 | `_setup_combinations()` | NCh (E1–E3 con 100/30/30%), LRFD (21 base × temp), ASD (25 base × temp) |
 | 7 | `_create_envelopes()` | Envolventes finales ENV_LRFD y ENV_ASD |
 
-### Fórmula espectral NCh433
+### Fórmula espectral NCh2369:2025
 
 $$S_a = \frac{I \cdot A_r \cdot S \cdot \left(1 + r\left(\frac{T}{T_0}\right)^p\right)}{\left(1 + \left(\frac{T}{T_0}\right)^q\right) \cdot R^*} \cdot \left(\frac{0.05}{\xi}\right)^{0.4}$$
 
