@@ -79,8 +79,8 @@ Este documento contiene el análisis arquitectónico, mejoras recomendadas, idea
 | Tarea | Prioridad | Impacto | Esfuerzo |
 | :--- | :--- | :--- | :--- |
 | **Fix: Bugs Críticos (Indentación/COM)**  OK CORREGIDO | 🚨 Inmediata | Crítico | Bajo-Medio |
-| **Fix: Cursor e inserción en Word** | 🚨 Inmediata | Alto | Bajo |
-| **Arquitectura: Regla de Oro (Retornos)** | 🔼 Alta | Estabilidad | Bajo |
+| **Fix: Cursor e inserción en Word** OK CORREGIDO | 🚨 Inmediata | Alto | Bajo |
+| **Arquitectura: Regla de Oro (Retornos)** OK CORREGIDO| 🔼 Alta | Estabilidad | Bajo |
 | **Arquitectura: Singleton Connection** | 🔼 Alta | Limpieza | Medio |
 | **Funcionalidad: Export Excel** | 🔽 Media | Valor Usuario | Medio |
 | **Funcionalidad: Validador** | 🔽 Media | Calidad | Alto |

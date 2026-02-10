@@ -35,6 +35,19 @@ class BaseModelBackend:
     def __init__(self, sap_model):
         self.SapModel = sap_model
 
+    def _ret_ok(self, ret: Any) -> bool:
+        """Verifica si el retorno de una llamada COM es exitoso (0).
+        
+        Maneja tanto enteros directos como tuplas (comtypes devuelve tupla
+        si hay argumentos [out], con el código de retorno al final).
+        """
+        try:
+            if isinstance(ret, (list, tuple)):
+                return ret[-1] == 0
+            return ret == 0
+        except Exception:
+            return False
+
     def create_base_model(
         self, 
         zone: int, 
@@ -81,11 +94,11 @@ class BaseModelBackend:
             # 1. Start New Model
             report(5, "Inicializando modelo nuevo...")
             ret = self.SapModel.InitializeNewModel(TON_M_UNITS)
-            if ret != 0:
+            if not self._ret_ok(ret):
                 return BaseModelResult(False, f"Error al inicializar modelo nuevo. Code: {ret}")
 
             ret = self.SapModel.File.NewBlank()
-            if ret != 0:
+            if not self._ret_ok(ret):
                 return BaseModelResult(False, f"Error al crear archivo en blanco. Code: {ret}")
             
             # 2. Materials
@@ -152,19 +165,19 @@ class BaseModelBackend:
             
             # 1. Definir Material (SetMaterial crea o edita)
             ret = self.SapModel.PropMaterial.SetMaterial(name, m_type)
-            if ret != 0:
+            if not self._ret_ok(ret):
                 errors.append(f"SetMaterial '{name}' failed (Code {ret})")
                 continue
 
             # 2. Propiedades Isotrópicas (E, U, A)
             iso = mat["isotropic"]
             ret = self.SapModel.PropMaterial.SetMPIsotropic(name, iso["E"], iso["U"], iso["A"])
-            if ret != 0:
+            if not self._ret_ok(ret):
                 errors.append(f"SetMPIsotropic '{name}' failed")
 
             # 3. Peso y Masa
             ret = self.SapModel.PropMaterial.SetWeightAndMass(name, 1, mat["w"])
-            if ret != 0:
+            if not self._ret_ok(ret):
                 errors.append(f"SetWeightAndMass '{name}' failed")
 
             # 4. Propiedades de Diseño (SetOSteel_1 / SetOConcrete_1)
@@ -181,7 +194,7 @@ class BaseModelBackend:
                     c["sstype"], c["shys"], c["sfc"], c["sult"], 0.0
                 )
             
-            if ret != 0:
+            if not self._ret_ok(ret):
                 errors.append(f"SetDesignProps '{name}' failed")
             else:
                 count += 1
@@ -198,7 +211,7 @@ class BaseModelBackend:
         for lp in LOAD_PATTERNS:
             # Add(Name, Type, SelfWtMult, AddLoadCase)
             ret = self.SapModel.LoadPatterns.Add(lp["name"], lp["type"], lp["self_wt"], True)
-            if ret == 0:
+            if self._ret_ok(ret):
                 count += 1
         return count
 
@@ -219,7 +232,7 @@ class BaseModelBackend:
                 sec["t2"], sec["tf"],  # t2b, tfb (symmetric)
                 -1, "", ""
             )
-            if ret == 0:
+            if self._ret_ok(ret):
                 count += 1
         
         # Tube Sections (HSS rectangular)
@@ -230,7 +243,7 @@ class BaseModelBackend:
                 sec["t3"], sec["t2"], sec["t"], sec["t"],
                 -1, "", ""
             )
-            if ret == 0:
+            if self._ret_ok(ret):
                 count += 1
         
         # Angle Sections
@@ -241,7 +254,7 @@ class BaseModelBackend:
                 sec["t3"], sec["t2"], sec["t"], sec["t"],
                 -1, "", ""
             )
-            if ret == 0:
+            if self._ret_ok(ret):
                 count += 1
         
         # Channel Sections
@@ -252,7 +265,7 @@ class BaseModelBackend:
                 sec["t3"], sec["t2"], sec["tf"], sec["tw"],
                 -1, "", ""
             )
-            if ret == 0:
+            if self._ret_ok(ret):
                 count += 1
         
         return count
@@ -281,8 +294,7 @@ class BaseModelBackend:
         periods_x, accels_x = self._compute_nch_spectrum(zone, soil, I, r_x, damp_x)
         if periods_x:
             ret = self.SapModel.Func.FuncRS.SetUser(func_name_x, len(periods_x), periods_x, accels_x, damp_x)
-            rc = ret[-1] if isinstance(ret, (list, tuple)) else ret
-            if rc == 0:
+            if self._ret_ok(ret):
                 func_count += 1
                 
         # Espectro Y
@@ -293,8 +305,7 @@ class BaseModelBackend:
             periods_y, accels_y = self._compute_nch_spectrum(zone, soil, I, r_y, damp_y)
             if periods_y:
                 ret = self.SapModel.Func.FuncRS.SetUser(func_name_y, len(periods_y), periods_y, accels_y, damp_y)
-                rc = ret[-1] if isinstance(ret, (list, tuple)) else ret
-                if rc == 0:
+                if self._ret_ok(ret):
                     func_count += 1
         
         # 2. Espectro Vertical
@@ -303,8 +314,7 @@ class BaseModelBackend:
         func_name_v = f"SaV_{zone}{soil}_R{r_v}"
         if periods_v:
             ret = self.SapModel.Func.FuncRS.SetUser(func_name_v, len(periods_v), periods_v, accels_v, xi_v)
-            rc = ret[-1] if isinstance(ret, (list, tuple)) else ret
-            if rc == 0:
+            if self._ret_ok(ret):
                 func_count += 1
         
         # 3. Load Cases para Response Spectrum
@@ -356,7 +366,7 @@ class BaseModelBackend:
         # 1. Combos NCh (E1, E2, E3) - estos son SRSS de casos RS
         for combo_name, items in NCH_COMBOS:
             ret = self.SapModel.RespCombo.Add(combo_name, 0)  # 0=Linear Add
-            if ret == 0:
+            if self._ret_ok(ret):
                 count += 1
                 known_combos.add(combo_name)
                 for case_name, sf in items:
@@ -366,7 +376,7 @@ class BaseModelBackend:
         # 2. Combos LRFD
         for combo_name, items in LRFD_COMBOS:
             ret = self.SapModel.RespCombo.Add(combo_name, 0)
-            if ret != 0:
+            if not self._ret_ok(ret):
                 continue
             
             count += 1
@@ -384,7 +394,7 @@ class BaseModelBackend:
         # 3. Combos ASD
         for combo_name, items in ASD_COMBOS:
             ret = self.SapModel.RespCombo.Add(combo_name, 0)
-            if ret != 0:
+            if not self._ret_ok(ret):
                 continue
             
             count += 1
