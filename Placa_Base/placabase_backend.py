@@ -87,10 +87,6 @@ class BasePlateBackend:
         self.SapModel = sap_model
         self.logger = logger
         self.config = PlateConfig()
-        
-        # Conectar si no hay modelo proporcionado
-        if self.SapModel is None:
-            self._connect_to_sap()
 
     def log(self, message):
         """Envía mensaje al logger si existe, o imprime a consola."""
@@ -99,22 +95,6 @@ class BasePlateBackend:
         else:
             print(message)
 
-    def _connect_to_sap(self):
-        try:
-            # Intentar usar el Helper oficial o GetActiveObject
-            try:
-                helper = comtypes.client.CreateObject('SAP2000v1.Helper')
-                helper = helper.QueryInterface(comtypes.gen.SAP2000v1.cHelper)
-                mySapObject = helper.GetObject("CSI.SAP2000.API.SapObject")
-            except:
-                mySapObject = comtypes.client.GetActiveObject("CSI.SAP2000.API.SapObject")
-                
-            self.SapModel = mySapObject.SapModel
-            self.log("Conexión exitosa a la instancia abierta de SAP2000.")
-        except Exception as e:
-            self.log(f"Aviso: Backend iniciado sin conexión a SAP2000. ({e})")
-            self.SapModel = None
-
     def load_config_from_file(self, json_path: str):
         self.config = PlateConfig.from_json(json_path)
         self.log(f"Configuración cargada desde archivo: {self.config}")
@@ -122,10 +102,7 @@ class BasePlateBackend:
     def run_process(self):
         """Método principal para ejecutar la generación de la placa base."""
         if not self.SapModel:
-            # Reintentar conexión si se perdió
-            self._connect_to_sap()
-            if not self.SapModel:
-                raise RuntimeError("No hay conexión con SAP2000.")
+            raise RuntimeError("No hay conexión con SAP2000.")
 
         self.log("Iniciando generación de placa base...")
         self.apply_config()

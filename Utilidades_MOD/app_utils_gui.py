@@ -310,14 +310,15 @@ class BaseMeshWidget(QWidget):
     def setup_common_ui(self, layout):
         # --- Botones ---
         btn_layout = QHBoxLayout()
-        self.connect_btn = QPushButton("Conectar SAP2000")
-        self.connect_btn.clicked.connect(self.connect_sap)
         
         self.generate_btn = QPushButton("Generar Malla")
         self.generate_btn.clicked.connect(self.generate_mesh)
-        self.generate_btn.setEnabled(False) # Deshabilitado hasta conectar
+
+        # Habilitación inicial depende del estado actual, se puede gestionar mejor
+        # si sap_interface ya está conectado al inicio
+        is_connected = self.sap_interface and self.sap_interface.is_connected()
+        self.generate_btn.setEnabled(is_connected if self.sap_interface else False)
         
-        btn_layout.addWidget(self.connect_btn)
         btn_layout.addWidget(self.generate_btn)
         layout.addLayout(btn_layout)
         
@@ -329,21 +330,6 @@ class BaseMeshWidget(QWidget):
     def log(self, message):
         if self.log_text:
             self.log_text.append(message)
-
-    def connect_sap(self):
-        self.log("Intentando conectar a SAP2000...")
-        self.backend = SapUtils()
-        if self.backend.SapModel:
-            self.log("✅ Conectado exitosamente.")
-            if self.generate_btn:
-                self.generate_btn.setEnabled(True)
-            try:
-                filename = self.backend.SapModel.GetModelFilename()
-                self.log(f"Archivo abierto: {filename}")
-            except:
-                pass
-        else:
-            self.log("❌ Error al conectar. Asegúrate de que SAP2000 esté abierto.")
 
     def ensure_connection(self):
         if not self.backend or not self.backend.SapModel:

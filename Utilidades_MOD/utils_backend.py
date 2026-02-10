@@ -11,22 +11,6 @@ class SapUtils:
             sap_model: Objeto SapModel opcional ya conectado.
         """
         self.SapModel = sap_model
-        # Intentamos conectar al inicializar solo si no nos pasaron un modelo
-        if self.SapModel is None:
-            self._connect_to_sap()
-
-    def _connect_to_sap(self):
-        try:
-            # Intentar conectar a una instancia activa
-            # GetActiveObject puede lanzar excepción si no encuentra el objeto
-            SapObject = comtypes.client.GetActiveObject("CSI.SAP2000.API.SapObject")
-            self.SapModel = SapObject.SapModel
-            print("Conexión exitosa a la instancia abierta de SAP2000.")
-            return self.SapModel
-        except Exception as e:
-            print(f"Aviso: No se pudo conectar automáticamente a SAP2000: {e}")
-            self.SapModel = None
-            return None
 
     def create_mesh_by_coord(self, width, length, nx, ny, start_x=0.0, start_y=0.0, start_z=0.0, plane="XY", prop_name="Default"):
         """
@@ -45,10 +29,8 @@ class SapUtils:
             list: Lista de nombres de las áreas creadas.
         """
         if self.SapModel is None:
-            # Intentar reconectar si se perdió
-            if self._connect_to_sap() is None:
-                print("No hay conexión con SAP2000.")
-                return []
+            print("No hay conexión con SAP2000.")
+            return []
 
         created_areas = []
         
@@ -252,8 +234,7 @@ class SapUtils:
             prop_name (str): Propiedad de área.
         """
         if self.SapModel is None:
-            if self._connect_to_sap() is None:
-                return []
+            return []
 
         print(f"Generando malla con orificio: {inner_shape} -> {outer_shape} en {plane}...")
         
