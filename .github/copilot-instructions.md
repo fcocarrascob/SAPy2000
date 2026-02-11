@@ -8,6 +8,7 @@ Proyecto Python que automatiza CSI SAP2000 vía COM (`comtypes`) con GUI PySide6
 main_app.py           # Punto de entrada - QMainWindow con pestañas
 sap_interface.py      # Singleton de conexión SAP2000 (emite connectionChanged Signal)
 <Modulo>/
+  ├── README.md       # Descripción, uso y diagrama Mermaid del procedimiento
   ├── backend.py      # Lógica pura (comtypes, sin PySide6)
   ├── *_gui.py        # Widget QWidget (recibe sap_interface)
   └── config.py       # Constantes y configuración (opcional)
@@ -60,9 +61,10 @@ class MiWidget(QWidget):
 
 ## Crear Nuevo Módulo
 
-1. Crear carpeta `Nuevo_Modulo/` con `__init__.py`, `backend.py`, `*_gui.py`
-2. Backend incluye `if __name__ == "__main__":` para pruebas standalone
-3. GUI soporta ejecución aislada con fallback a `GetActiveObject`:
+1. Crear carpeta `Nuevo_Modulo/` con `__init__.py`, `backend.py`, `*_gui.py`, `README.md`
+2. `README.md` debe incluir: descripción, tabla de arquitectura (archivo → clase → responsabilidad), diagrama Mermaid del procedimiento técnico (flowchart con subgraphs GUI/Backend/SAP API), instrucciones de uso y ejecución standalone
+3. Backend incluye `if __name__ == "__main__":` para pruebas standalone
+4. GUI soporta ejecución aislada con fallback a `GetActiveObject`:
    ```python
    if __name__ == "__main__":
        app = QApplication(sys.argv)
@@ -70,7 +72,7 @@ class MiWidget(QWidget):
        window.show()
        sys.exit(app.exec())
    ```
-4. Registrar en `main_app.py` → `init_tabs()` pasando `self.sap_interface`
+5. Registrar en `main_app.py` → `init_tabs()` pasando `self.sap_interface`
 
 ## Pruebas de Módulos
 

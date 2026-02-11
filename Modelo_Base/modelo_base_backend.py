@@ -6,6 +6,9 @@ materiales, patrones de carga y espectros de diseño NCh.
 import math
 from dataclasses import dataclass, field
 from typing import List, Tuple, Any, Optional, Callable
+import logging
+
+logger = logging.getLogger(__name__)
 
 # Dependiendo de cómo se ejecute, el import relativo puede fallar si no es un paquete
 # Asumimos que la app corre desde el root y esto es un módulo.
@@ -145,8 +148,7 @@ class BaseModelBackend:
             return result
             
         except Exception as e:
-            import traceback
-            traceback.print_exc()
+            logger.exception("Error crítico al crear modelo base: %s", str(e))
             return BaseModelResult(False, f"Excepción crítica: {str(e)}", errors=[str(e)])
 
     def _setup_materials(self) -> Tuple[List[str], int]:
@@ -155,6 +157,9 @@ class BaseModelBackend:
         Returns:
             Tuple de (lista de errores, cantidad de materiales creados)
         """
+        if not self.SapModel:
+            return ["No hay conexión con SAP2000"], 0
+
         errors = []
         count = 0
         for mat in DEFAULT_MATERIALS:
@@ -207,6 +212,9 @@ class BaseModelBackend:
         Returns:
             Cantidad de patrones creados
         """
+        if not self.SapModel:
+            return 0
+
         count = 0
         for lp in LOAD_PATTERNS:
             # Add(Name, Type, SelfWtMult, AddLoadCase)
@@ -221,6 +229,9 @@ class BaseModelBackend:
         Returns:
             Cantidad de secciones creadas
         """
+        if not self.SapModel:
+            return 0
+        
         count = 0
         
         # I-Sections (W shapes)
@@ -279,6 +290,9 @@ class BaseModelBackend:
         Returns:
             Tuple de (funciones creadas, casos creados)
         """
+        if not self.SapModel:
+            return 0, 0
+
         func_count = 0
         case_count = 0
         
@@ -336,22 +350,38 @@ class BaseModelBackend:
     def _set_rs_case(self, case_name: str, func_name: str, dir_flag: str, scale: float, damp: float) -> bool:
         """Configura un caso de espectro de respuesta.
         
+        Args:
+            case_name: Nombre del Load Case (ej: EQX)
+            func_name: Nombre de la función de espectro asignada
+            dir_flag: Dirección (U1, U2, U3)
+            scale: Factor de escala (usualmente GRAVITY 9.81)
+            damp: Amortiguamiento modal constante (ej: 0.03 para 3%)
+            
         Returns:
             True si se creó exitosamente
         """
+        if not self.SapModel:
+            return False
+
         try:
-            self.SapModel.LoadCases.ResponseSpectrum.SetCase(case_name)
-            
+            # 1. Crear/Inicializar el caso como Response Spectrum
+            ret = self.SapModel.LoadCases.ResponseSpectrum.SetCase(case_name)
+            if not self._ret_ok(ret): return False
+
+            # 2. Asignar las Cargas (Dirección y Función)
             # SetLoads (Name, N, LoadName, Func, SF, CSys, Ang)
-            self.SapModel.LoadCases.ResponseSpectrum.SetLoads(
+            ret = self.SapModel.LoadCases.ResponseSpectrum.SetLoads(
                 case_name, 1, [dir_flag], [func_name], [scale], ["Global"], [0.0]
             )
-            
-            # SetDamping
-            self.SapModel.LoadCases.ResponseSpectrum.SetDampingConstant(case_name, damp)
+            if not self._ret_ok(ret): return False
+
+            # 3. Asignar Amortiguamiento Modal Constante
+            ret = self.SapModel.LoadCases.ResponseSpectrum.SetDampConstant(case_name, damp)
+            if not self._ret_ok(ret): return False
             
             return True
-        except Exception:
+        except Exception as e:
+            logger.error(f"Error al configurar caso RS '{case_name}': {str(e)}")
             return False
 
     def _setup_combinations(self) -> int:
@@ -360,6 +390,9 @@ class BaseModelBackend:
         Returns:
             Cantidad de combinaciones creadas
         """
+        if not self.SapModel:
+            return 0
+
         count = 0
         known_combos = set()
         
@@ -371,7 +404,9 @@ class BaseModelBackend:
                 known_combos.add(combo_name)
                 for case_name, sf in items:
                     # Items de NCH_COMBOS (RS_EQX, etc) son Load Cases (type=0)
-                    self.SapModel.RespCombo.SetCaseList(combo_name, 0, case_name, sf)
+                    ret = self.SapModel.RespCombo.SetCaseList(combo_name, 0, case_name, sf)
+                    if not self._ret_ok(ret):
+                        logger.warning("SetCaseList falló: combo='%s', case='%s'", combo_name, case_name)
         
         # 2. Combos LRFD
         for combo_name, items in LRFD_COMBOS:
@@ -385,8 +420,9 @@ class BaseModelBackend:
             for cname, sf in items:
                 # Determinar si es Load Case (0) o Combo (1)
                 c_type = 1 if cname in known_combos else 0
-                self.SapModel.RespCombo.SetCaseList(combo_name, c_type, cname, sf)
-            
+                ret = self.SapModel.RespCombo.SetCaseList(combo_name, c_type, cname, sf)
+                if not self._ret_ok(ret):
+                    logger.warning("SetCaseList falló: combo='%s', item='%s'", combo_name, cname)
             # Set as Design Combo
             self.SapModel.DesignSteel.SetComboStrength(combo_name, True)
             self.SapModel.DesignConcrete.SetComboStrength(combo_name, True)
@@ -402,7 +438,9 @@ class BaseModelBackend:
 
             for cname, sf in items:
                 c_type = 1 if cname in known_combos else 0
-                self.SapModel.RespCombo.SetCaseList(combo_name, c_type, cname, sf)
+                ret = self.SapModel.RespCombo.SetCaseList(combo_name, c_type, cname, sf)
+                if not self._ret_ok(ret):
+                    logger.warning("SetCaseList falló: combo='%s', item='%s'", combo_name, cname)
             
             # Set as ASD Design Combo
             self.SapModel.DesignSteel.SetComboStrength(combo_name, True)
@@ -412,6 +450,9 @@ class BaseModelBackend:
 
     def _create_envelopes(self):
         """Crea envolventes de diseño (ENV_LRFD, ENV_ASD)."""
+        if not self.SapModel:
+            return
+
         # ENV_LRFD: Envolvente de todas las combinaciones LRFD
         lrfd_names = [name for name, _ in LRFD_COMBOS]
         if lrfd_names:
@@ -426,92 +467,62 @@ class BaseModelBackend:
             for name in asd_names:
                 self.SapModel.RespCombo.SetCaseList("ENV_ASD", 1, name, 1.0)
 
-    def _compute_nch_spectrum(self, zone: int, soil: str, I: float, R: float, damp: float) -> Tuple[List[float], List[float]]:
-        """Calcula Sa (g) vs T (s) basado en lógica NCh de referencia."""
-        if zone not in AR_BY_ZONE or soil not in SOIL_PARAMS:
-            return [], []
-
-        ar = AR_BY_ZONE[zone]
-        sp = SOIL_PARAMS[soil]
-        
-        # Parámetros (Reference logic adapted)
-        # config.py has: S, r, T0, p, q, T1
-        s, r, t0, p_exp, q_exp, t1 = sp.S, sp.r, sp.T0, sp.p, sp.q, sp.T1
-        
-        # Ticks (mayor resolución como en referencia)
-        period_limit = 5.0
-        period_step = 0.01
-        count = int(period_limit / period_step)
-        
-        periods = []
-        accels = []
-        
-        # Correction for damping
-        damping_scale = (0.05 / damp) ** 0.4
-        
-        for i in range(count + 1):
-            T = i * period_step
-            periods.append(T)
-            
-            # Spectrum Shape
-            ratio = (T / t0) if t0 > 0 else 0
-            # From reference:
-            # numerator = 1.0 + r * math.pow(ratio, p_exp)
-            # denominator = 1.0 + math.pow(ratio, q_exp)
-            # sah = ar * s * numerator / denominator
-            
-            if T == 0:
-                 sah = ar * s # ratio=0 -> num=1, den=1
-            else:
-                 num = 1.0 + r * (ratio ** p_exp)
-                 den = 1.0 + (ratio ** q_exp)
-                 sah = ar * s * num / den
-            
-            # R* Calculation (Short period reduction)
-            # If R given is the "Response Modification Factor" (e.g. 5, 7)
-            
-            # Reference:
-            # cr = 0.16 * response_modification_factor
-            # limit = cr * t1
-            # ...
-            
-            # Using passed R as response_modification_factor
-            cr = 0.16 * R
-            limit = cr * t1
-            
-            if limit <= 0:
-                r_star = R
-            elif T >= limit:
-                r_star = R
-            else:
-                # Linear interpolation ??
-                # ratio_t = period / limit
-                # r_star = 1.5 + (R - 1.5) * ratio_t
-                ratio_t = T / limit
-                r_star = 1.5 + (R - 1.5) * ratio_t
-            
-            # Final Accel
-            accel = I * sah * damping_scale / r_star
-            accels.append(accel)
-            
-        return periods, accels
-
-    def _compute_vertical_spectrum(
-        self, zone: int, soil: str, I: float, R_v: float, xi_v: float
-    ) -> Tuple[List[float], List[float]]:
-        """Calcula espectro vertical NCh2369.
-        
-        La fórmula del espectro vertical usa un período desplazado (1.7×T)
-        y un factor de escala de 0.7 respecto al horizontal.
-        
-        Fórmula: Sa_v = 0.7 × Ar × S × (1 + r × (1.7T/T0)^p) / (1 + (1.7T/T0)^q)
+    def _spectrum_shape(self, ar: float, sp, T: float, scale_factor: float = 1.0, period_shift: float = 1.0) -> float:
+        """Calcula la forma espectral Sa para un período dado.
         
         Args:
-            zone: Zona sísmica (1, 2 o 3)
+            ar: Aceleración efectiva de la zona
+            sp: Parámetros de suelo (SoilParams)
+            T: Período estructural (s)
+            scale_factor: Factor de escala (1.0 horizontal, 0.7 vertical)
+            period_shift: Desplazamiento de período (1.0 horizontal, 1.7 vertical)
+            
+        Returns:
+            Aceleración espectral (g) sin reducción R ni corrección damping
+        """
+        if T == 0:
+            return scale_factor * ar * sp.S
+        
+        T_shifted = period_shift * T
+        ratio = (T_shifted / sp.T0) if sp.T0 > 0 else 0.0
+        num = 1.0 + sp.r * (ratio ** sp.p)
+        den = 1.0 + (ratio ** sp.q)
+        return scale_factor * ar * sp.S * num / den
+
+    def _r_star(self, T: float, R: float, t1: float) -> float:
+        """Calcula R* (factor de reducción corregido por período corto).
+        
+        NCh2369: Para períodos cortos, R se interpola linealmente 
+        desde 1.5 hasta R en el rango [0, 0.16·R·T1].
+        
+        Args:
+            T: Período estructural (s)
+            R: Factor de reducción nominal
+            t1: Período característico del suelo T1
+            
+        Returns:
+            R* corregido
+        """
+        limit = 0.16 * R * t1
+        if limit <= 0 or T >= limit:
+            return R
+        return 1.5 + (R - 1.5) * (T / limit)
+
+    def _generate_spectrum(
+        self, zone: int, soil: str, I: float, R: float, damp: float,
+        scale_factor: float = 1.0, period_shift: float = 1.0, apply_r_star: bool = True
+    ) -> Tuple[List[float], List[float]]:
+        """Genera un espectro de diseño NCh2369 (horizontal o vertical).
+        
+        Args:
+            zone: Zona sísmica (1, 2, 3)
             soil: Tipo de suelo (A-E)
             I: Factor de importancia
-            R_v: Factor de reducción vertical
-            xi_v: Amortiguamiento vertical
+            R: Factor de reducción
+            damp: Amortiguamiento (ej: 0.05)
+            scale_factor: 1.0 para horizontal, 0.7 para vertical
+            period_shift: 1.0 para horizontal, 1.7 para vertical
+            apply_r_star: True para horizontal (aplica R*), False para vertical (R directo)
             
         Returns:
             Tuple de (períodos, aceleraciones) en unidades g
@@ -522,44 +533,45 @@ class BaseModelBackend:
         ar = AR_BY_ZONE[zone]
         sp = SOIL_PARAMS[soil]
         
-        s, r, t0, p_exp, q_exp, t1 = sp.S, sp.r, sp.T0, sp.p, sp.q, sp.T1
-        
-        # Ticks (mayor resolución como en referencia)
         period_limit = 5.0
         period_step = 0.01
-        count = int(period_limit / period_step)
+        n_points = int(period_limit / period_step)
         
         periods = []
         accels = []
         
-        # Corrección por amortiguamiento
-        damping_scale = (0.05 / xi_v) ** 0.4
+        damping_scale = (0.05 / damp) ** 0.4
         
-        # Factor de escala vertical (NCh2369)
-        vertical_factor = 0.7
-        
-        # Desplazamiento de período para espectro vertical
-        period_shift = 1.7
-        
-        for i in range(count + 1):
-            T = i * period_step
+        for i in range(n_points + 1):
+            T = round(i * period_step, 4)
             periods.append(T)
             
-            # Período desplazado para el espectro vertical
-            T_shifted = period_shift * T
+            sa = self._spectrum_shape(ar, sp, T, scale_factor, period_shift)
             
-            # Spectrum Shape con período desplazado
-            ratio = (T_shifted / t0) if t0 > 0 else 0
+            r_eff = self._r_star(T, R, sp.T1) if apply_r_star else R
             
-            if T == 0:
-                sav = vertical_factor * ar * s
-            else:
-                num = 1.0 + r * (ratio ** p_exp)
-                den = 1.0 + (ratio ** q_exp)
-                sav = vertical_factor * ar * s * num / den
-            
-            # Espectro vertical NO aplica R* (usa R_v directo como en referencia)
-            accel = I * sav * damping_scale / R_v
+            accel = I * sa * damping_scale / r_eff
             accels.append(accel)
-            
+        
         return periods, accels
+
+    def _compute_nch_spectrum(
+        self, zone: int, soil: str, I: float, R: float, damp: float
+    ) -> Tuple[List[float], List[float]]:
+        """Calcula espectro horizontal NCh2369."""
+        return self._generate_spectrum(
+            zone, soil, I, R, damp,
+            scale_factor=1.0, period_shift=1.0, apply_r_star=True
+        )
+
+    def _compute_vertical_spectrum(
+        self, zone: int, soil: str, I: float, R_v: float, xi_v: float
+    ) -> Tuple[List[float], List[float]]:
+        """Calcula espectro vertical NCh2369.
+        
+        Factor 0.7 y período desplazado 1.7×T. No aplica R*.
+        """
+        return self._generate_spectrum(
+            zone, soil, I, R_v, xi_v,
+            scale_factor=0.7, period_shift=1.7, apply_r_star=False
+        )
