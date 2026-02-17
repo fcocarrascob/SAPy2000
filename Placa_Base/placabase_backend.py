@@ -20,6 +20,7 @@ class PlateConfig:
     include_anchor_chair: bool = False
     anchor_chair_height: Optional[float] = None
     anchor_chair_thickness: Optional[float] = None
+    bolt_material: str = "A36"
 
     @classmethod
     def from_json(cls, json_path: str) -> 'PlateConfig':
@@ -65,6 +66,8 @@ class PlateConfig:
             cfg.anchor_chair_height = float(data['anchor_chair_height'])
         if 'anchor_chair_thickness' in data and data['anchor_chair_thickness']:
             cfg.anchor_chair_thickness = float(data['anchor_chair_thickness'])
+        
+        cfg.bolt_material = str(data.get('bolt_material', cfg.bolt_material))
             
         return cfg
 
@@ -416,25 +419,190 @@ class BasePlateBackend:
             p4 = outer[i]
             self.create_area_by_points([p1, p2, p3, p4], prop_name, f"{prefix}_{i+1}")
 
-    def create_anchor_chair_plates(self, z_level: float, prop_name: str):
-        """Genera placas de silla en la cota z_level usando el mismo patrón de pernos."""
+    # --- Bolt Frame & Body Constraint Logic ---
+
+    def create_bolt_section(self) -> Optional[str]:
+        """Crea una sección Frame circular sólida para los pernos de anclaje.
+        Usa PropFrame.SetCircle(Name, MatProp, t3).
+        Retorna el nombre de la sección creada o None si falla.
+        """
         cfg = self.config
-        A, B_bolt = PlateConfig.map_dia_to_AB(cfg.bolt_dia)
-        circle_radius = cfg.bolt_dia / 2.0
-        outer_half = B_bolt / 2.0
-        inner_half = (circle_radius + outer_half) / 2.0
-        inner_side = inner_half * 2.0
+        dia = cfg.bolt_dia
+        mat = cfg.bolt_material
+        section_name = f"BOLT_{int(dia)}"
+        try:
+            ret = self.SapModel.PropFrame.SetCircle(section_name, mat, dia)
+            if self._check_ret(ret, f"Sección Frame circular '{section_name}' creada (d={dia}, mat={mat})."):
+                return section_name
+            else:
+                self.log(f"Error: SetCircle retornó código no cero para '{section_name}'.")
+        except Exception as e:
+            self.log(f"Error creando sección Frame '{section_name}': {e}")
+        return None
 
-        for idx, (cx, cy, _cz) in enumerate(cfg.bolt_centers, 1):
-            self.log(f"Silla: procesando perno {idx} en ({cx}, {cy}) a z={z_level}...")
-            self.create_point(cx, cy, z_level, f"CHAIR_CENTER_{idx}")
+    def create_bolt_frame(self, center_point_name: str, cx: float, cy: float, cz: float,
+                          section_name: str, idx: int) -> Tuple[Optional[str], Optional[str]]:
+        """Crea un Frame (perno) desde el centro del bolt hacia abajo (longitud = 8 × diámetro).
+        
+        Args:
+            center_point_name: Nombre del punto en la placa (I-End, nodo superior).
+            cx, cy, cz: Coordenadas del centro del perno.
+            section_name: Nombre de la sección Frame circular.
+            idx: Índice del perno (1-based).
+            
+        Returns:
+            (frame_name, bottom_point_name) o (None, None) si falla.
+        """
+        cfg = self.config
+        bolt_length = 8.0 * cfg.bolt_dia
+        z_bottom = cz - bolt_length
 
-            c_pts = self.create_circle_points(cx, cy, z_level, circle_radius, 16, f"CHAIR_c{idx}_")
-            in_pts = self.create_square_points(cx, cy, z_level, inner_side, 16, f"CHAIR_sin{idx}_")
-            out_pts = self.create_square_points(cx, cy, z_level, B_bolt, 16, f"CHAIR_sout{idx}_")
+        # Crear punto inferior
+        bottom_pt = self.create_point(cx, cy, z_bottom, f"BOLT_BASE_{idx}")
+        if not bottom_pt:
+            self.log(f"Error: no se pudo crear punto inferior para perno {idx}.")
+            return None, None
 
-            self.create_ring_mesh(c_pts, in_pts, (cx, cy), f"CHAIR_ring_in{idx}", prop_name)
-            self.create_ring_mesh(in_pts, out_pts, (cx, cy), f"CHAIR_ring_out{idx}", prop_name)
+        # Crear Frame entre el centro (placa) y el punto inferior (fundación)
+        try:
+            ret = self.SapModel.FrameObj.AddByPoint(
+                center_point_name, bottom_pt, "", section_name, f"BOLT_FRAME_{idx}"
+            )
+            if self._check_ret(ret):
+                frame_name = self._get_created_name(ret, f"BOLT_FRAME_{idx}")
+                self.log(f"Perno Frame '{frame_name}' creado (idx={idx}, L={bolt_length} mm).")
+                return frame_name, bottom_pt
+            else:
+                self.log(f"Error: FrameObj.AddByPoint retornó código no cero para perno {idx}.")
+        except Exception as e:
+            self.log(f"Error creando Frame perno {idx}: {e}")
+        return None, None
+
+    def create_bolt_body_constraint(self, constraint_name: str, center_point_name: str,
+                                     circle_point_names: List[str],
+                                     dof_values: Optional[List[bool]] = None) -> bool:
+        """Crea un Body Constraint que conecta el centro del perno con los puntos del círculo.
+        
+        Args:
+            constraint_name: Nombre del constraint (ej: 'BOLT_BODY_1', 'BOLT_BODY_CHAIR_1').
+            center_point_name: Nombre del punto central del perno.
+            circle_point_names: Lista de nombres de puntos del anillo circular.
+            dof_values: Lista de 6 booleans [UX, UY, UZ, RX, RY, RZ]. Default: todos True.
+            
+        Returns:
+            True si el constraint se creó y asignó correctamente.
+        """
+        if dof_values is None:
+            dof_values = [True, True, True, True, True, True]
+        
+        # 1. Definir el Body Constraint
+        try:
+            ret = self.SapModel.ConstraintDef.SetBody(constraint_name, dof_values, "Global")
+            if not self._check_ret(ret):
+                self.log(f"Error definiendo constraint '{constraint_name}'.")
+                return False
+        except Exception as e:
+            self.log(f"Error definiendo Body Constraint '{constraint_name}': {e}")
+            return False
+
+        # 2. Asignar al punto central
+        try:
+            ret = self.SapModel.PointObj.SetConstraint(center_point_name, constraint_name)
+            if not self._check_ret(ret):
+                self.log(f"Error asignando constraint al punto central '{center_point_name}'.")
+                return False
+        except Exception as e:
+            self.log(f"Error asignando constraint al centro: {e}")
+            return False
+
+        # 3. Asignar a cada punto del círculo
+        assigned_count = 0
+        for pt_name in circle_point_names:
+            if not pt_name:
+                continue
+            try:
+                ret = self.SapModel.PointObj.SetConstraint(pt_name, constraint_name)
+                if self._check_ret(ret):
+                    assigned_count += 1
+            except Exception as e:
+                self.log(f"Error asignando constraint a punto '{pt_name}': {e}")
+
+        dof_str = ''.join(['1' if v else '0' for v in dof_values])
+        self.log(f"Body Constraint '{constraint_name}' [{dof_str}] asignado: centro + {assigned_count}/{len(circle_point_names)} puntos.")
+        return True
+
+    def set_pin_restraint(self, point_name: str) -> bool:
+        """Asigna apoyo articulado (Pin) al nodo inferior del perno.
+        Pin = fijo en traslaciones (UX, UY, UZ), libre en rotaciones (RX, RY, RZ).
+        """
+        try:
+            # SetRestraint(Name, Value[], ItemType)
+            # Value = [UX, UY, UZ, RX, RY, RZ]
+            value = [True, True, True, False, False, False]
+            ret = self.SapModel.PointObj.SetRestraint(point_name, value)
+            if self._check_ret(ret, f"Apoyo Pin asignado a '{point_name}'."):
+                return True
+            else:
+                self.log(f"Error asignando restraint Pin a '{point_name}'.")
+        except Exception as e:
+            self.log(f"Error asignando Pin restraint a '{point_name}': {e}")
+        return False
+
+    def create_single_chair(self, idx: int, cx: float, cy: float, z_level: float,
+                             circle_radius: float, inner_side: float, B_bolt: float,
+                             prop_name: str) -> Tuple[Optional[str], List[str]]:
+        """Genera la placa de silla para UN perno y retorna los nombres de puntos creados.
+        
+        Args:
+            idx: Índice del perno (1-based).
+            cx, cy: Coordenadas X/Y del centro del perno.
+            z_level: Cota Z de la silla (anchor_chair_height).
+            circle_radius: Radio del círculo del perno.
+            inner_side: Lado del cuadrado interior.
+            B_bolt: Lado del cuadrado exterior (B de bolt spacing).
+            prop_name: Propiedad shell de la silla.
+            
+        Returns:
+            (chair_center_name, chair_circle_pts) — nombre del punto central y lista de 16 puntos del círculo.
+        """
+        self.log(f"Silla: procesando perno {idx} en ({cx}, {cy}) a z={z_level}...")
+        chair_center = self.create_point(cx, cy, z_level, f"CHAIR_CENTER_{idx}")
+
+        c_pts = self.create_circle_points(cx, cy, z_level, circle_radius, 16, f"CHAIR_c{idx}_")
+        in_pts = self.create_square_points(cx, cy, z_level, inner_side, 16, f"CHAIR_sin{idx}_")
+        out_pts = self.create_square_points(cx, cy, z_level, B_bolt, 16, f"CHAIR_sout{idx}_")
+
+        self.create_ring_mesh(c_pts, in_pts, (cx, cy), f"CHAIR_ring_in{idx}", prop_name)
+        self.create_ring_mesh(in_pts, out_pts, (cx, cy), f"CHAIR_ring_out{idx}", prop_name)
+
+        return chair_center or f"CHAIR_CENTER_{idx}", c_pts
+
+    def create_chair_bolt_frame(self, chair_point_name: str, plate_center_name: str,
+                                 section_name: str, idx: int) -> Optional[str]:
+        """Crea un Frame (tramo superior del perno) desde la silla de anclaje hasta la placa base.
+        
+        Args:
+            chair_point_name: Nombre del punto en la silla (I-End, nodo superior).
+            plate_center_name: Nombre del punto en la placa (J-End, nodo inferior).
+            section_name: Nombre de la sección Frame circular.
+            idx: Índice del perno (1-based).
+            
+        Returns:
+            frame_name o None si falla.
+        """
+        try:
+            ret = self.SapModel.FrameObj.AddByPoint(
+                chair_point_name, plate_center_name, "", section_name, f"BOLT_CHAIR_FRAME_{idx}"
+            )
+            if self._check_ret(ret):
+                frame_name = self._get_created_name(ret, f"BOLT_CHAIR_FRAME_{idx}")
+                self.log(f"Tramo superior perno '{frame_name}' creado (silla→placa, idx={idx}).")
+                return frame_name
+            else:
+                self.log(f"Error: FrameObj.AddByPoint retornó código no cero para tramo superior perno {idx}.")
+        except Exception as e:
+            self.log(f"Error creando tramo superior Frame perno {idx}: {e}")
+        return None
 
     # --- Main Execution Logic ---
 
@@ -459,6 +627,13 @@ class BasePlateBackend:
                 self.create_material_prop(chair_prop, cfg.anchor_chair_thickness, mat_name="A992Fy50")
             else:
                 self.log("Silla de Anclaje activada pero faltan datos válidos de altura o espesor; se omite generación de silla.")
+
+        # 1b. Create Bolt Frame Section (circular sólida)
+        bolt_section_name = self.create_bolt_section()
+        if bolt_section_name:
+            self.log(f"Sección de perno '{bolt_section_name}' lista.")
+        else:
+            self.log("⚠ No se pudo crear la sección Frame del perno. Los Frames de perno no se generarán.")
 
         # 2. Create Column Geometry (Flanges/Web)
         H, B = cfg.H_col, cfg.B_col
@@ -512,6 +687,55 @@ class BasePlateBackend:
                 self.create_ring_mesh(c_pts, in_pts, (cx, cy), f"A_ring_in{idx}", plate_prop)
                 self.create_ring_mesh(in_pts, out_pts, (cx, cy), f"A_ring_out{idx}", plate_prop)
 
+            # 3a. Anchor Chair + Bolt Frames + Body Constraints + Pin
+            if bolt_section_name:
+                center_name = f"CENTER_{idx}"
+
+                if chair_prop:
+                    # --- CON SILLA DE ANCLAJE: perno de 2 tramos ---
+                    # 3a-i. Crear geometría de silla para este perno
+                    chair_center, chair_c_pts = self.create_single_chair(
+                        idx, cx, cy, cfg.anchor_chair_height,
+                        circle_radius, inner_side, B_bolt, chair_prop
+                    )
+
+                    # 3a-ii. Tramo superior: silla → placa
+                    self.create_chair_bolt_frame(chair_center, center_name, bolt_section_name, idx)
+
+                    # 3a-iii. Tramo inferior: placa → fundación (L=8d)
+                    frame_name, bottom_pt = self.create_bolt_frame(
+                        center_name, cx, cy, cz, bolt_section_name, idx
+                    )
+
+                    # 3a-iv. Body Constraint en SILLA: todos los DOF restringidos
+                    self.create_bolt_body_constraint(
+                        f"BOLT_BODY_CHAIR_{idx}", chair_center, chair_c_pts,
+                        dof_values=[True, True, True, True, True, True]
+                    )
+
+                    # 3a-v. Body Constraint en PLACA: UZ libre (perno puede deslizar verticalmente)
+                    self.create_bolt_body_constraint(
+                        f"BOLT_BODY_{idx}", center_name, c_pts,
+                        dof_values=[True, True, False, True, True, True]
+                    )
+
+                    # 3a-vi. Pin en nodo inferior
+                    if frame_name and bottom_pt:
+                        self.set_pin_restraint(bottom_pt)
+
+                else:
+                    # --- SIN SILLA: perno de 1 tramo (comportamiento original) ---
+                    frame_name, bottom_pt = self.create_bolt_frame(
+                        center_name, cx, cy, cz, bolt_section_name, idx
+                    )
+                    if frame_name:
+                        # Body Constraint: todos los DOF restringidos
+                        self.create_bolt_body_constraint(
+                            f"BOLT_BODY_{idx}", center_name, c_pts
+                        )
+                        # Pin restraint en nodo inferior
+                        self.set_pin_restraint(bottom_pt)
+
         # 4. Create Link Area (if applicable)
         # Logic: Connect specific points of outer squares if we have enough centers
         if len(cfg.bolt_centers) >= 4 and len(outer_square_points_list) == len(cfg.bolt_centers):
@@ -538,10 +762,6 @@ class BasePlateBackend:
                         self.divide_area(link_area, 4 * cfg.n_pernos)
             except Exception as e:
                 print(f"No se pudo crear el área de enlace: {e}")
-
-        # 3b. Anchor Chair Plates (optional)
-        if chair_prop:
-            self.create_anchor_chair_plates(cfg.anchor_chair_height, chair_prop)
 
         # 5. Divide Flange by Base Points (New Logic)
         try:

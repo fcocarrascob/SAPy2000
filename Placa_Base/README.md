@@ -7,8 +7,13 @@ Módulo para la generación automatizada de geometría FEA de **placas base** en
 A partir de las dimensiones de una columna tipo I, parámetros de la placa y coordenadas de pernos, el módulo genera automáticamente en SAP2000:
 
 - **Propiedades de área** shell (PLACA_BASE, ALA, ALMA)
+- **Sección Frame circular** para pernos de anclaje (ej: `BOLT_19`)
 - **Geometría de columna** (alas superior/inferior + alma) como áreas de 4 puntos
 - **Anillos de pernos** por cada centro de bolt: puntos en círculo → cuadrado interior → cuadrado exterior → ring meshes conectando las capas
+- **Pernos Frame** — elemento Frame circular sólido desde cada centro hacia abajo (longitud = 8×diámetro)
+- **Con silla de anclaje**: perno de 2 tramos (silla→placa + placa→fundación), con Body en silla (6 DOF) y Body en placa (UZ libre)
+- **Sin silla**: perno de 1 tramo (placa→fundación, Body 6 DOF)
+- **Apoyo Pin** en el nodo inferior de cada perno (fijo UX/UY/UZ, libre RX/RY/RZ)
 - **Área de enlace** (link area) conectando los grupos de pernos
 - **Subdivisión** de alas, alma y link area en los puntos de intersección con pernos
 - **Anchor chairs** opcionales
@@ -17,8 +22,8 @@ A partir de las dimensiones de una columna tipo I, parámetros de la placa y coo
 
 | Archivo | Clase | Responsabilidad |
 |---|---|---|
-| `placabase_backend.py` | `PlateConfig` | Dataclass con geometría completa (bolts, columna, placa, anchor). `from_json()` carga desde JSON |
-| `placabase_backend.py` | `BasePlateBackend` | Lógica de generación: crea puntos, áreas, ring meshes y subdivisiones vía API SAP2000 |
+| `placabase_backend.py` | `PlateConfig` | Dataclass con geometría completa (bolts, columna, placa, anchor, material perno). `from_json()` carga desde JSON |
+| `placabase_backend.py` | `BasePlateBackend` | Lógica de generación: crea puntos, áreas, ring meshes, pernos Frame, Body constraints, Pin restraints y subdivisiones vía API SAP2000 |
 | `app_placabase_gui.py` | `BasePlateWidget` | Formulario con 5 grupos de inputs + log de salida |
 | `app_placabase_gui.py` | `PreviewWidget` | Canvas custom (`paintEvent`) — dibuja sección I, bolt positions y contorno A×A |
 | `placabase_ARA_config.json` | — | Configuración persistida (dimensiones, centros de pernos) |
@@ -43,17 +48,16 @@ flowchart TD
 
     subgraph Backend["BasePlateBackend.run()"]
         P1["<b>1. Shell Properties</b><br/>PropArea.SetShell_1()<br/>× 3 (PLACA_BASE, ALA, ALMA)"]
-        P2["<b>2. Geometría columna</b><br/>create_area_by_coord()<br/>× 4 áreas:<br/>flange top, flange bottom,<br/>web left, web right"]
+        P1B["<b>1b. Bolt Section</b><br/>PropFrame.SetCircle()<br/>BOLT_{dia}"]
+        P2["<b>2. Geometría columna</b><br/>create_area_by_coord()<br/>× 4 áreas"]
         P3["<b>3. Loop por bolt_center</b>"]
-        P3A["create_circle_points()<br/>PointObj.AddCartesian × N"]
-        P3B["create_square_points()<br/>(inner square)"]
-        P3C["create_square_points()<br/>(outer square)"]
-        P3D["sort_points_angularly()<br/>+ align_rings()"]
-        P3E["create_ring_mesh()<br/>circle ↔ inner square"]
-        P3F["create_ring_mesh()<br/>inner ↔ outer square"]
-        P4["<b>4. Link area</b><br/>create_area_by_coord()<br/>conecta grupos de pernos"]
-        P5["<b>5. Subdivisión</b><br/>divide_area_by_selection()<br/>alas + alma + link en<br/>intersecciones con pernos"]
-        P6["<b>6. Anchor chairs</b><br/>(si habilitado)<br/>create_area_by_coord()"]
+        P3A["create_circle/square_points()"]
+        P3E["create_ring_mesh() × 2"]
+        P3CHAIR{"  ¿Silla de anclaje?"}
+        P3YES["<b>CON SILLA</b><br/>create_single_chair()<br/>+ Frame silla→placa<br/>+ Frame placa→fundación<br/>+ Body silla (6 DOF)<br/>+ Body placa (UZ libre)<br/>+ Pin"]
+        P3NO["<b>SIN SILLA</b><br/>Frame placa→fundación<br/>+ Body (6 DOF)<br/>+ Pin"]
+        P4["<b>4. Link area</b><br/>conecta grupos de pernos"]
+        P5["<b>5. Subdivisión</b><br/>alas + alma + link"]
         P7["View.RefreshView()"]
     end
 
@@ -61,12 +65,15 @@ flowchart TD
     A --> A3 --> A4 --> C1
     C1 --> C2 --> P1
 
-    P1 --> P2 --> P3
-    P3 --> P3A --> P3B --> P3C
-    P3C --> P3D --> P3E --> P3F
-    P3F -->|"Siguiente bolt_center"| P3
-    P3F -->|"Todos procesados"| P4
-    P4 --> P5 --> P6 --> P7
+    P1 --> P1B --> P2 --> P3
+    P3 --> P3A --> P3E --> P3CHAIR
+    P3CHAIR -->|"✅ Sí"| P3YES
+    P3CHAIR -->|"❌ No"| P3NO
+    P3YES -->|"Siguiente bolt"| P3
+    P3NO -->|"Siguiente bolt"| P3
+    P3YES -->|"Todos procesados"| P4
+    P3NO -->|"Todos procesados"| P4
+    P4 --> P5 --> P7
 
     style GUI fill:#e8f4f8,stroke:#2196F3
     style Config fill:#e8f5e9,stroke:#4CAF50
@@ -78,11 +85,14 @@ flowchart TD
 | Paso | Acción | API SAP2000 |
 |---|---|---|
 | 1 | Crear propiedades shell con espesores diferentes | `PropArea.SetShell_1()` |
+| 1b | Crear sección Frame circular para pernos | `PropFrame.SetCircle()` |
 | 2 | Crear 4 áreas rectangulares para alas y alma | `AreaObj.AddByCoord()` |
-| 3a | Generar N puntos equidistantes sobre círculo del perno | `PointObj.AddCartesian()` |
-| 3b–c | Generar puntos de cuadrado interior y exterior | `PointObj.AddCartesian()` |
-| 3d | Ordenar angularmente y alinear anillos | Lógica geométrica Python |
-| 3e–f | Crear paneles de transición entre anillos consecutivos | `AreaObj.AddByPoint()` |
+| 3a | Generar puntos en círculo y cuadrados por perno | `PointObj.AddCartesian()` |
+| 3b | Crear ring meshes (transición círculo→cuadrados) | `AreaObj.AddByPoint()` |
+| 3c | **Con silla**: crear geometría de silla + Frame silla→placa | `create_single_chair()` + `FrameObj.AddByPoint()` |
+| 3d | Crear Frame placa→fundación (L=8d) | `FrameObj.AddByPoint()` |
+| 3e | Body Constraint en silla (6 DOF) o placa (6 DOF sin silla, UZ libre con silla) | `ConstraintDef.SetBody()` + `PointObj.SetConstraint()` |
+| 3f | Asignar apoyo Pin al nodo inferior | `PointObj.SetRestraint()` |
 | 4 | Crear área rectangular que conecta bolt groups | `AreaObj.AddByCoord()` |
 | 5 | Subdividir áreas existentes por puntos de perno | `EditArea.Divide()` con selección |
 | 6 | Placas anchor chair (opcional) | `AreaObj.AddByCoord()` |
@@ -93,6 +103,21 @@ El widget incluye un generador automático (`generate_preset_positions()`) que c
 - Número de pernos por fila
 - Dimensiones de la columna (H, B)
 - Espaciamientos predefinidos por diámetro de perno
+
+## Configuración JSON
+
+El archivo `placabase_ARA_config.json` almacena:
+
+| Campo | Tipo | Descripción |
+|---|---|---|
+| `bolt_dia` | `float` | Diámetro del perno (mm) |
+| `bolt_material` | `string` | Nombre del material para la sección Frame del perno (debe existir en el modelo SAP2000) |
+| `H_col`, `B_col` | `float` | Dimensiones de la columna |
+| `n_pernos` | `int` | Pernos por fila (para preset) |
+| `bolt_centers` | `list` | Coordenadas `[x, y, z]` de cada centro |
+| `flange_thickness`, `web_thickness`, `plate_thickness` | `float?` | Espesores (mm) |
+| `include_anchor_chair` | `bool` | Toggle para silla de anclaje |
+| `anchor_chair_height`, `anchor_chair_thickness` | `float?` | Dimensiones de la silla |
 
 ## Uso en la GUI
 

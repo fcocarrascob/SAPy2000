@@ -12,6 +12,7 @@ flowchart TD
   CFG["Leer config JSON<br/>placabase_ARA_config.json si existe"]
   UT["Funciones utilitarias<br/>_ret_ok, _ret_code, _created_name_from_ret"]
   PROP["Crear o asegurar propiedades de área<br/>SetShell / SetShell_1 / ensure_plate_prop"]
+  BOLTSEC["Crear sección Frame circular<br/>PropFrame.SetCircle(BOLT_{dia}, mat, dia)"]
   LOOP["Por cada bolt_center definido"]
   AddCenter["PointObj.AddCartesian<br/>crear punto centro"]
   CreateCircle["create_circle_points<br/>PointObj.AddCartesian x N"]
@@ -19,16 +20,20 @@ flowchart TD
   CreateInnerSquare["create_square_points inner<br/>PointObj.AddCartesian"]
   RingInner["create_ring_areas<br/>inner=circle, outer=inner_square<br/>AreaObj.AddByPoint o AddByCoord"]
   RingOuter["create_ring_areas<br/>inner=inner_square, outer=outer_square<br/>AreaObj.AddByPoint o AddByCoord"]
+  BoltFrame["Crear Frame perno vertical<br/>FrameObj.AddByPoint(CENTER, BOLT_BASE)<br/>L = 8×diámetro"]
+  BodyConst["Crear Body Constraint<br/>ConstraintDef.SetBody(BOLT_BODY_{idx})<br/>Asignar a centro + 16 pts círculo<br/>PointObj.SetConstraint()"]
+  PinRestraint["Asignar Pin al nodo inferior<br/>PointObj.SetRestraint()<br/>UX,UY,UZ=True / RX,RY,RZ=False"]
   LinkArea["Crear área especial A_outer_link<br/>si hay suficientes centros"]
   DivideArea["EditArea.Divide('A_outer_link', 1, 0, [], n_pernos*4, 10)"]
   REF["View.RefreshView o RefreshWindow"]
   Summary["Imprimir resumen y contadores"]
   End([Fin])
 
-  Start --> H --> Q --> G --> SM --> UT --> CFG --> PROP --> LOOP
+  Start --> H --> Q --> G --> SM --> UT --> CFG --> PROP --> BOLTSEC --> LOOP
   LOOP --> AddCenter --> CreateCircle --> CreateOuterSquare --> CreateInnerSquare
   CreateInnerSquare --> RingInner --> RingOuter
-  RingOuter --> LOOP
+  RingOuter --> BoltFrame --> BodyConst --> PinRestraint
+  PinRestraint --> LOOP
   LOOP --> LinkArea --> DivideArea --> REF --> Summary --> End
 
   subgraph CheckRet["Verificación de retorno COM"]
@@ -55,6 +60,8 @@ flowchart TD
 - **Configuración:** lectura de `placabase_ARA_config.json` → `CFG`.
 - **Propiedades de área:** `ensure_plate_prop`, `PropArea.SetShell`, `PropArea.SetShell_1` → `PROP` y `Fallbacks`.
 - **Puntos y áreas:** `PointObj.AddCartesian`, `create_circle_points`, `create_square_points`, `AreaObj.AddByPoint`, `AreaObj.AddByCoord` → `AddCenter`, `CreateCircle`, `CreateOuterSquare`, `RingInner`, `RingOuter`.
+- **Pernos Frame:** `PropFrame.SetCircle` → `BOLTSEC`; `FrameObj.AddByPoint` → `BoltFrame`.
+- **Constraints:** `ConstraintDef.SetBody`, `PointObj.SetConstraint` → `BodyConst`; `PointObj.SetRestraint` → `PinRestraint`.
 - **Edición:** `EditArea.Divide` con múltiples firmas intentadas → `DivideArea`.
 - **Interfaz visual:** `SapModel.View.RefreshView`, `SapModel.View.RefreshWindow` → `REF`.
 - **Resumen:** `print` finales con contadores → `Summary`.
