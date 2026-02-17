@@ -1,43 +1,43 @@
 {
-  "bolt_dia": 32.0,
-  "H_col": 450.0,
+  "bolt_dia": 19.0,
+  "H_col": 200.0,
   "B_col": 200.0,
   "n_pernos": 3,
   "bolt_centers": [
     [
-      -125.0,
-      287.5,
+      -100.0,
+      150.0,
       0.0
     ],
     [
       0.0,
-      287.5,
+      150.0,
       0.0
     ],
     [
-      125.0,
-      287.5,
+      100.0,
+      150.0,
       0.0
     ],
     [
-      -125.0,
-      -287.5,
+      -100.0,
+      -150.0,
       0.0
     ],
     [
       0.0,
-      -287.5,
+      -150.0,
       0.0
     ],
     [
-      125.0,
-      -287.5,
+      100.0,
+      -150.0,
       0.0
     ]
   ],
   "flange_thickness": 18.0,
   "web_thickness": 8.0,
-  "plate_thickness": 32.0,
+  "plate_thickness": 20.0,
   "include_anchor_chair": false,
   "anchor_chair_height": 250.0,
   "anchor_chair_thickness": 32.0

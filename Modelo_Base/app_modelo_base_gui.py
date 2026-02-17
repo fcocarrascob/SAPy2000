@@ -26,6 +26,7 @@ except ImportError:
 
 from .modelo_base_backend import BaseModelBackend, BaseModelResult
 from .config import AR_BY_ZONE, SOIL_PARAMS, GRAVITY
+from .notas_widget import NotasWidget
 
 
 class CreateModelWorker(QThread):
@@ -213,7 +214,16 @@ class ModeloBaseWidget(QWidget):
 
     def init_ui(self):
         # Layout Principal
-        main_layout = QVBoxLayout(self)
+        main_layout = QHBoxLayout(self)
+
+        # --- Splitter principal: Config (izq) | Notas (der) ---
+        self.main_splitter = QSplitter(Qt.Horizontal)
+        main_layout.addWidget(self.main_splitter)
+
+        # Panel izquierdo — toda la configuración existente
+        config_panel = QWidget()
+        config_layout = QVBoxLayout(config_panel)
+        config_layout.setContentsMargins(0, 0, 0, 0)
         
         # --- Grupo: Base Model (Inputs) ---
         self.base_model_group = QGroupBox("Parámetros del Modelo Base")
@@ -360,9 +370,18 @@ class ModeloBaseWidget(QWidget):
         
         # (Gráfico eliminado de la interfaz principal, ahora es un pop-up)
 
-        # Spacer final
-        main_layout.addWidget(self.base_model_group)
-        main_layout.addStretch()
+        # Agregar grupo al panel de config
+        config_layout.addWidget(self.base_model_group)
+        config_layout.addStretch()
+
+        # Panel derecho — Notas
+        self.notas_widget = NotasWidget()
+
+        self.main_splitter.addWidget(config_panel)
+        self.main_splitter.addWidget(self.notas_widget)
+        self.main_splitter.setSizes([550, 400])
+        self.main_splitter.setCollapsible(0, False)  # Config no colapsable
+        self.main_splitter.setCollapsible(1, True)   # Notas colapsable
 
     def on_create_model_click(self):
         """Manejador para crear el modelo."""
