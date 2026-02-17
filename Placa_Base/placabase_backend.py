@@ -304,9 +304,10 @@ class BasePlateBackend:
     # --- Geometric Logic ---
 
     def create_circle_points(self, cx, cy, z, radius, num_points=16, prefix="P_c") -> List[str]:
+        """Genera puntos en círculo en sentido horario (eje 3 → +Z)."""
         names = []
         for j in range(num_points):
-            angle = math.radians(j * (360.0 / num_points))
+            angle = -math.radians(j * (360.0 / num_points))
             x = cx + radius * math.cos(angle)
             y = cy + radius * math.sin(angle)
             nm = self.create_point(x, y, z, f"{prefix}{j+1}")
@@ -314,6 +315,7 @@ class BasePlateBackend:
         return names
 
     def create_square_points(self, cx, cy, z, side, num_points=16, prefix="P_s") -> List[str]:
+        """Genera puntos equiespaciados en un cuadrado, sentido horario desde punto medio derecho (eje 3 → +Z)."""
         half = side / 2.0
         perimeter = 4.0 * side
         names = []
@@ -321,14 +323,25 @@ class BasePlateBackend:
         
         for i in range(num_points):
             s = (i * perimeter) / num_points
-            if s < side:
-                x, y = -half + s, half
-            elif s < 2 * side:
-                x, y = half, half - (s - side)
-            elif s < 3 * side:
-                x, y = half - (s - 2 * side), -half
+            if s < half:
+                # Fase 1: Borde derecho, bajando desde punto medio
+                x, y = half, -s
+            elif s < half + side:
+                # Fase 2: Borde inferior, hacia la izquierda
+                rem = s - half
+                x, y = half - rem, -half
+            elif s < half + 2 * side:
+                # Fase 3: Borde izquierdo, subiendo
+                rem = s - (half + side)
+                x, y = -half, -half + rem
+            elif s < half + 3 * side:
+                # Fase 4: Borde superior, hacia la derecha
+                rem = s - (half + 2 * side)
+                x, y = -half + rem, half
             else:
-                x, y = -half, -half + (s - 3 * side)
+                # Fase 5: Borde derecho, bajando desde esquina superior
+                rem = s - (half + 3 * side)
+                x, y = half, half - rem
             
             nm = self.create_point(cx + x, cy + y, z, f"{prefix}{i+1}")
             names.append(nm)
@@ -344,7 +357,7 @@ class BasePlateBackend:
                 angle = math.atan2(coord[1] - center[1], coord[0] - center[0])
                 valid_pts.append((pn, angle))
         
-        valid_pts.sort(key=lambda x: x[1])
+        valid_pts.sort(key=lambda x: x[1], reverse=True)  # Descendente → sentido horario
         return [p[0] for p in valid_pts]
 
     def align_rings(self, inner_pts: List[str], outer_pts: List[str], center: Tuple[float, float]) -> Tuple[List[str], List[str]]:
@@ -510,10 +523,14 @@ class BasePlateBackend:
                 
                 # Ensure indices are within bounds
                 if 2*N-1 < len(outer_square_points_list):
-                    p1 = outer_square_points_list[0][12]      # 1st center, point 13
-                    p2 = outer_square_points_list[N-1][8]     # Nth center, point 9
-                    p3 = outer_square_points_list[2*N-1][4]   # 2Nth center, point 5
-                    p4 = outer_square_points_list[N][0]       # (N+1)th center, point 1
+                    # Índices para cuadrado CW desde punto medio derecho:
+                    # Idx 2=BR, 6=BL, 10=TL, 14=TR (con 16 puntos)
+                    # Orden CCW (visto desde +Z) para eje 3 → +Z:
+                    # BL_link → BR_link → TR_link → TL_link
+                    p1 = outer_square_points_list[N][10]      # (N+1)th center, TL = BL del link
+                    p2 = outer_square_points_list[2*N-1][14]  # 2Nth center, TR = BR del link
+                    p3 = outer_square_points_list[N-1][2]     # Nth center, BR = TR del link
+                    p4 = outer_square_points_list[0][6]       # 1st center, BL = TL del link
                     
                     link_area = self.create_area_by_points([p1, p2, p3, p4], plate_prop, "A_outer_link")
                     
