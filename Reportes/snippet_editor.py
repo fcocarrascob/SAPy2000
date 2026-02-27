@@ -924,7 +924,12 @@ class SnippetEditorDialog(QDialog):
             if item:
                 btype = block_data.get("type", "?")
                 # Limpiar saltos de línea para el label
-                content = block_data.get("content", "")[:30].replace("\n", " ")
+                raw_content = block_data.get("content", "")
+                if btype == "table":
+                    content = "[Tabla]"
+                else:
+                    content = str(raw_content)[:30].replace("\n", " ")
+
                 label = f"{row+1}. [{btype}] {content}..."
                 item.setText(label)
     

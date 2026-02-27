@@ -1,4 +1,3 @@
-import comtypes.client
 
 class ComboBackend:
     def __init__(self, sap_model=None):
@@ -9,23 +8,11 @@ class ComboBackend:
             sap_model: Objeto SapModel opcional ya conectado. Si es None, intentará conectar.
         """
         self.SapModel = sap_model
-        if self.SapModel is None:
-            self._connect()
-
-    def _connect(self):
-        try:
-            # Intentar conectar a instancia activa
-            SapObject = comtypes.client.GetActiveObject("CSI.SAP2000.API.SapObject")
-            self.SapModel = SapObject.SapModel
-            return True
-        except Exception:
-            self.SapModel = None
-            return False
 
     def get_load_cases(self):
         """Retorna una lista con los nombres de todos los Load Cases."""
         if not self.SapModel: 
-            if not self._connect(): return []
+            return []
             
         try:
             # GetNameList retorna (NumberNames, (Name1, Name2...), RetCode)
@@ -46,7 +33,7 @@ class ComboBackend:
         Estructura: [{'name': 'COMB1', 'type': 0, 'items': {'DEAD': 1.2, 'LIVE': 1.6}}, ...]
         """
         if not self.SapModel:
-            if not self._connect(): return []
+            return []
             
         combos = []
         try:
@@ -141,7 +128,7 @@ class ComboBackend:
         combos_data: lista de dicts {'name': str, 'type': int, 'items': {'CASE': factor}}
         """
         if not self.SapModel:
-            if not self._connect(): return False
+            return False
         
         success_count = 0
         

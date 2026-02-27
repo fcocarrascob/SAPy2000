@@ -70,14 +70,28 @@ class BasePlateWidget(QWidget):
         self.generate_preset_btn = QPushButton('Generar posiciones (preset)')
         self.generate_preset_btn.clicked.connect(self.generate_preset_positions)
 
+        # Material del perno (Frame) — ComboBox que se llena desde el modelo SAP2000
+        self.bolt_material_combo = QComboBox()
+        self.bolt_material_combo.setEditable(True)  # Permitir texto libre como fallback
+        self.bolt_material_combo.addItem("A36")
+        self.bolt_material_combo.setToolTip("Material para la sección Frame del perno. Se actualiza al conectar con SAP2000.")
+
         self.log = QTextEdit()
         self.log.setReadOnly(True)
 
-        self.save_btn = QPushButton('Guardar config')
         self.run_btn = QPushButton('Guardar y Ejecutar')
 
-        self.save_btn.clicked.connect(self.save_config)
         self.run_btn.clicked.connect(self.run_script)
+        
+        # Connect to SAP interface signal if available
+        if self.sap_interface:
+            self.sap_interface.connectionChanged.connect(self.on_connection_changed)
+            # Initialize state
+            self.on_connection_changed(self.sap_interface.is_connected())
+        else:
+            # Standalone mode or no interface passed
+            self.run_btn.setEnabled(False)
+            self.run_btn.setToolTip("Modo desconectado (Execute via Main App)")
 
         # --- Layout Construction ---
         # Scroll Area Setup
@@ -142,6 +156,12 @@ class BasePlateWidget(QWidget):
         row_preset.addWidget(self.generate_preset_btn)
         bolts_layout.addLayout(row_preset)
         
+        # 3.4 Material del perno
+        row_mat = QHBoxLayout()
+        row_mat.addWidget(QLabel("Material Perno:"))
+        row_mat.addWidget(self.bolt_material_combo)
+        bolts_layout.addLayout(row_mat)
+        
         grp_bolts.setLayout(bolts_layout)
         main_form_layout.addWidget(grp_bolts)
 
@@ -161,7 +181,6 @@ class BasePlateWidget(QWidget):
         out_layout = QVBoxLayout()
         
         btn_row = QHBoxLayout()
-        btn_row.addWidget(self.save_btn)
         btn_row.addWidget(self.run_btn)
         out_layout.addLayout(btn_row)
         
@@ -221,6 +240,16 @@ class BasePlateWidget(QWidget):
                 load_optional_field(self.chair_height_edit, 'anchor_chair_height')
                 load_optional_field(self.chair_thickness_edit, 'anchor_chair_thickness')
                 
+                # Cargar material del perno
+                cfg_bolt_mat = cfg.get('bolt_material')
+                if cfg_bolt_mat:
+                    idx_mat = self.bolt_material_combo.findText(cfg_bolt_mat)
+                    if idx_mat >= 0:
+                        self.bolt_material_combo.setCurrentIndex(idx_mat)
+                    else:
+                        self.bolt_material_combo.addItem(cfg_bolt_mat)
+                        self.bolt_material_combo.setCurrentText(cfg_bolt_mat)
+                
                 # restaurar per-row (n_pernos) si existe en config
                 try:
                     cfg_n = cfg.get('n_pernos')
@@ -245,8 +274,6 @@ class BasePlateWidget(QWidget):
                         self.centers_table.setItem(r, 0, QTableWidgetItem(str(c[0])))
                         self.centers_table.setItem(r, 1, QTableWidgetItem(str(c[1])))
                         self.centers_table.setItem(r, 2, QTableWidgetItem(str(c[2] if len(c) > 2 else 0.0)))
-            except Exception as e:
-                self.log.append(f'No se pudo leer config existente: {e}')
             except Exception as e:
                 self.log.append(f'No se pudo leer config existente: {e}')
 
@@ -299,6 +326,44 @@ class BasePlateWidget(QWidget):
         # Initial toggle state
         self.toggle_chair_inputs(self.include_chair_chk.isChecked())
 
+    def on_connection_changed(self, connected):
+        """Enable/Disable run button based on SAP2000 connection."""
+        self.run_btn.setEnabled(connected)
+        if connected:
+            self.run_btn.setToolTip("Guardar configuración y ejecutar en SAP2000")
+            self.run_btn.setText("Guardar y Ejecutar")
+            # Cargar materiales del modelo al conectar
+            self.load_materials_from_model()
+        else:
+            self.run_btn.setToolTip("Conecte SAP2000 para ejecutar")
+            self.run_btn.setText("Guardar y Ejecutar (Sin Conexión)")
+
+    def load_materials_from_model(self):
+        """Lee los materiales definidos en el modelo SAP2000 y los carga en el ComboBox."""
+        if not self.sap_interface or not self.sap_interface.is_connected():
+            return
+        try:
+            sap_model = self.sap_interface.SapModel
+            ret = sap_model.PropMaterial.GetNameList()
+            # ret = (Count, (Name1, Name2, ...), RetCode)
+            if ret[-1] == 0 and ret[0] > 0:
+                # Guardar selección actual
+                current_text = self.bolt_material_combo.currentText()
+                self.bolt_material_combo.clear()
+                names = ret[1]
+                if isinstance(names, (list, tuple)):
+                    for name in names:
+                        self.bolt_material_combo.addItem(str(name))
+                # Restaurar selección previa si existe
+                idx = self.bolt_material_combo.findText(current_text)
+                if idx >= 0:
+                    self.bolt_material_combo.setCurrentIndex(idx)
+                elif self.bolt_material_combo.count() > 0:
+                    self.bolt_material_combo.setCurrentIndex(0)
+                self.log.append(f"Materiales cargados del modelo: {self.bolt_material_combo.count()} disponibles.")
+        except Exception as e:
+            self.log.append(f"No se pudieron cargar materiales del modelo: {e}")
+
     def log_message(self, message):
         """Append message to log and force UI update."""
         self.log.append(message)
@@ -348,6 +413,7 @@ class BasePlateWidget(QWidget):
             'B_col': B_col,
             'n_pernos': int(self.per_row_combo.currentData()),
             'bolt_centers': centers,
+            'bolt_material': self.bolt_material_combo.currentText().strip() or 'A36',
             'flange_thickness': parse_float_field(self.flange_edit),
             'web_thickness': parse_float_field(self.web_edit),
             'plate_thickness': parse_float_field(self.plate_thickness_edit),
@@ -373,23 +439,25 @@ class BasePlateWidget(QWidget):
             return
         
         self.log.append('Iniciando ejecución de Placa Base...')
-        try:
-            # Check connection
-            if self.sap_interface and self.sap_interface.SapModel:
-                model = self.sap_interface.SapModel
-            else:
-                self.log.append("No hay conexión activa en sap_interface. Intentando conectar en backend...")
-                model = None # Backend will try to connect if None
+        
+        # Refrescar materiales antes de ejecutar (por si se agregaron en SAP)
+        self.load_materials_from_model()
+        
+        # Obtener modelo (si está conectado)
+        model = self.sap_interface.SapModel if self.sap_interface else None
 
+        try:
             backend = BasePlateBackend(sap_model=model, logger=self.log_message)
             backend.load_config_from_file(CONFIG_PATH)
             backend.run_process()
-            self.log_message("Ejecución finalizada correctamente.")
+            self.log_message("✅ Ejecución finalizada correctamente.")
 
         except Exception as e:
-            self.log.append(f"Error durante la ejecución: {str(e)}")
-            import traceback
-            self.log.append(traceback.format_exc())
+            self.log.append(f"❌ Error durante la ejecución: {str(e)}")
+            # Solo mostrar traceback si NO es el error de conexión conocido (por si acaso)
+            if "No hay conexión" not in str(e):
+                import traceback
+                self.log.append(traceback.format_exc())
 
     def add_row(self):
         r = self.centers_table.rowCount()

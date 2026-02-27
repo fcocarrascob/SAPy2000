@@ -12,6 +12,7 @@ from PySide6.QtWidgets import (
 )
 from PySide6.QtCore import Qt, Signal, QThread
 from PySide6.QtGui import QFont, QColor
+import pythoncom
 
 # Importar matplotlib para preview del espectro
 try:
@@ -25,6 +26,7 @@ except ImportError:
 
 from .modelo_base_backend import BaseModelBackend, BaseModelResult
 from .config import AR_BY_ZONE, SOIL_PARAMS, GRAVITY
+from .notas_widget import NotasWidget
 
 
 class CreateModelWorker(QThread):
@@ -38,10 +40,15 @@ class CreateModelWorker(QThread):
         self.params = params
     
     def run(self):
-        result = self.backend.create_base_model(
-            **self.params,
-            progress_callback=self._report_progress
-        )
+        pythoncom.CoInitialize()
+        try:
+            result = self.backend.create_base_model(
+                **self.params,
+                progress_callback=self._report_progress
+            )
+        finally:
+            pythoncom.CoUninitialize()
+
         self.finished.emit(result)
     
     def _report_progress(self, pct: int, msg: str):
@@ -52,7 +59,7 @@ class SpectrumPreviewDialog(QDialog):
     """Diálogo emergente para mostrar gráfico y tabla del espectro."""
     def __init__(self, parent=None, data_dict=None, params_text=""):
         super().__init__(parent)
-        self.setWindowTitle("Vista Previa Espectro NCh433")
+        self.setWindowTitle("Vista Previa Espectro NCh2369:2025")
         self.resize(1100, 650)
         self.setModal(True)
         
@@ -150,7 +157,7 @@ class SpectrumPreviewDialog(QDialog):
             
         ax.set_xlabel("Period $T$ [s]")
         ax.set_ylabel("Spectral Acceleration $S_a$ [g]")
-        ax.set_title("Espectro de Diseño NCh433 Ref.")
+        ax.set_title("Espectro de Diseño NCh2369:2025.")
         ax.legend()
         
         self.canvas.draw()
@@ -207,7 +214,16 @@ class ModeloBaseWidget(QWidget):
 
     def init_ui(self):
         # Layout Principal
-        main_layout = QVBoxLayout(self)
+        main_layout = QHBoxLayout(self)
+
+        # --- Splitter principal: Config (izq) | Notas (der) ---
+        self.main_splitter = QSplitter(Qt.Horizontal)
+        main_layout.addWidget(self.main_splitter)
+
+        # Panel izquierdo — toda la configuración existente
+        config_panel = QWidget()
+        config_layout = QVBoxLayout(config_panel)
+        config_layout.setContentsMargins(0, 0, 0, 0)
         
         # --- Grupo: Base Model (Inputs) ---
         self.base_model_group = QGroupBox("Parámetros del Modelo Base")
@@ -354,9 +370,18 @@ class ModeloBaseWidget(QWidget):
         
         # (Gráfico eliminado de la interfaz principal, ahora es un pop-up)
 
-        # Spacer final
-        main_layout.addWidget(self.base_model_group)
-        main_layout.addStretch()
+        # Agregar grupo al panel de config
+        config_layout.addWidget(self.base_model_group)
+        config_layout.addStretch()
+
+        # Panel derecho — Notas
+        self.notas_widget = NotasWidget()
+
+        self.main_splitter.addWidget(config_panel)
+        self.main_splitter.addWidget(self.notas_widget)
+        self.main_splitter.setSizes([550, 400])
+        self.main_splitter.setCollapsible(0, False)  # Config no colapsable
+        self.main_splitter.setCollapsible(1, True)   # Notas colapsable
 
     def on_create_model_click(self):
         """Manejador para crear el modelo."""
@@ -556,16 +581,6 @@ class ModeloBaseWidget(QWidget):
             Sa_vert.append(val_v)
         
         return T_vals, Sa_x, Sa_y, Sa_vert
-    
-    # Métodos auxiliares eliminados ya que la lógica está integrada arriba para garantizar paridad.
-
-        """Calcula el factor de amplificación α según NCh433."""
-        if T <= T0:
-            # Rama ascendente: α = 1 + T/T0 * (2.75-1)
-            return 1.0 + (T / T0) * 1.75 if T0 > 0 else 2.75
-        else:
-            # Rama descendente: α = 2.75 * (T0/T)^p
-            return 2.75 * (T0 / T) ** p
 
     def _calc_alpha_vertical(self, T: float, T0: float, p: float, q: float) -> float:
         """Calcula el factor de amplificación α vertical (sin factor r)."""

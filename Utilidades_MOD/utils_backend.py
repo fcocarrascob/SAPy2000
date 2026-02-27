@@ -11,22 +11,6 @@ class SapUtils:
             sap_model: Objeto SapModel opcional ya conectado.
         """
         self.SapModel = sap_model
-        # Intentamos conectar al inicializar solo si no nos pasaron un modelo
-        if self.SapModel is None:
-            self._connect_to_sap()
-
-    def _connect_to_sap(self):
-        try:
-            # Intentar conectar a una instancia activa
-            # GetActiveObject puede lanzar excepción si no encuentra el objeto
-            SapObject = comtypes.client.GetActiveObject("CSI.SAP2000.API.SapObject")
-            self.SapModel = SapObject.SapModel
-            print("Conexión exitosa a la instancia abierta de SAP2000.")
-            return self.SapModel
-        except Exception as e:
-            print(f"Aviso: No se pudo conectar automáticamente a SAP2000: {e}")
-            self.SapModel = None
-            return None
 
     def create_mesh_by_coord(self, width, length, nx, ny, start_x=0.0, start_y=0.0, start_z=0.0, plane="XY", prop_name="Default"):
         """
@@ -45,10 +29,8 @@ class SapUtils:
             list: Lista de nombres de las áreas creadas.
         """
         if self.SapModel is None:
-            # Intentar reconectar si se perdió
-            if self._connect_to_sap() is None:
-                print("No hay conexión con SAP2000.")
-                return []
+            print("No hay conexión con SAP2000.")
+            return []
 
         created_areas = []
         
@@ -184,8 +166,8 @@ class SapUtils:
         
         for i in range(num_points):
             if shape_type.lower() == "círculo":
-                # Ángulo en radianes
-                angle = 2 * math.pi * i / num_points
+                # Ángulo negativo para sentido horario (eje 3 → +Z)
+                angle = -2 * math.pi * i / num_points
                 u = center_u + radius * math.cos(angle)
                 v = center_v + radius * math.sin(angle)
                 coords.append((u, v))
@@ -193,37 +175,37 @@ class SapUtils:
             elif shape_type.lower() == "cuadrado":
                 # Equidistant walking along perimeter
                 # Start at Angle 0 (Right Middle) -> (radius, 0) relative to center
-                # CCW direction: Up -> Left -> Down -> Right -> Up
+                # CW direction: Down -> Left -> Up -> Right (eje 3 → +Z)
                 
                 current_dist = i * step
                 
                 u_local = 0.0
                 v_local = 0.0
                 
-                # Phase 1: Right edge, moving UP (from 0 to radius)
+                # Phase 1: Right edge, moving DOWN (from 0 to -radius)
                 if current_dist < radius:
                     u_local = radius
-                    v_local = current_dist
-                # Phase 2: Top edge, moving LEFT
+                    v_local = -current_dist
+                # Phase 2: Bottom edge, moving LEFT
                 elif current_dist < radius + dim:
                     rem = current_dist - radius
                     u_local = radius - rem
-                    v_local = radius
-                # Phase 3: Left edge, moving DOWN
+                    v_local = -radius
+                # Phase 3: Left edge, moving UP
                 elif current_dist < radius + 2*dim:
                     rem = current_dist - (radius + dim)
                     u_local = -radius
-                    v_local = radius - rem
-                # Phase 4: Bottom edge, moving RIGHT
+                    v_local = -radius + rem
+                # Phase 4: Top edge, moving RIGHT
                 elif current_dist < radius + 3*dim:
                     rem = current_dist - (radius + 2*dim)
                     u_local = -radius + rem
-                    v_local = -radius
-                # Phase 5: Right edge, moving UP (from -radius to 0)
+                    v_local = radius
+                # Phase 5: Right edge, moving DOWN (from +radius to 0)
                 else:
                     rem = current_dist - (radius + 3*dim)
                     u_local = radius
-                    v_local = -radius + rem
+                    v_local = radius - rem
                 
                 u = center_u + u_local
                 v = center_v + v_local
@@ -252,8 +234,7 @@ class SapUtils:
             prop_name (str): Propiedad de área.
         """
         if self.SapModel is None:
-            if self._connect_to_sap() is None:
-                return []
+            return []
 
         print(f"Generando malla con orificio: {inner_shape} -> {outer_shape} en {plane}...")
         

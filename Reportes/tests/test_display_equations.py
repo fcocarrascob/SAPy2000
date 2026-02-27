@@ -420,7 +420,7 @@ class TestDisplayEngineeringFormulas(DisplayEquationTestCase):
         self.assertIn(after, text)
     
     def test_seismic_response_coefficient(self):
-        """Coeficiente de respuesta sísmica NCh433."""
+        """Coeficiente de respuesta sísmica NCh2369:2025."""
         equation = "C = (2.75 S⋅A_0)/(R) ⋅ ((T′)/(T))^n"
         result, before, after = self.insert_with_context(equation, "SEISMIC_C")
         

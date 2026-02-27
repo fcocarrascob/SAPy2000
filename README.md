@@ -35,7 +35,7 @@ Herramientas avanzadas de geometría y mallado.
 Módulo específico para el modelado y generación de geometrías de placas base, pernos y rigidizadores.
 
 ### 5. Generador de Memorias y Reportes (`Reportes`)
-Sistema avanzado para la generación automática de memorias de cálculo en Microsoft Word. **[Ver Guía Detallada](Reportes/GUIA_USUARIO_REPORTES.md)**.
+Sistema avanzado para la generación automática de memorias de cálculo en Microsoft Word. **[Ver Guía Detallada](Reportes/README.md)**.
 
 - **Asistente en Vivo**: Inyecta tablas de datos de SAP2000 (Materiales, Cargas, Secciones) directamente en la posición del cursor de Word.
 - **Generación por Templates**: Crea documentos completos basándose en plantillas JSON personalizables.
