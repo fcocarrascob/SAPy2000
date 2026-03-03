@@ -31,6 +31,7 @@ class BaseModelResult:
     cases_created: int = 0
     combos_created: int = 0
     sections_created: int = 0
+    rebars_created: int = 0
     errors: List[str] = field(default_factory=list)
 
 
@@ -121,7 +122,12 @@ class BaseModelBackend:
             sec_count = self._setup_frame_sections()
             result.sections_created = sec_count
             
-            # 5. Seismic Spectrum & Cases (Horizontal + Vertical)
+            # 5. Rebar Properties
+            report(35, "Creando propiedades de armadura...")
+            rebar_count = self._setup_rebars()
+            result.rebars_created = rebar_count
+            
+            # 6. Seismic Spectrum & Cases (Horizontal + Vertical)
             report(40, "Configurando espectros sísmicos...")
             func_count, case_count = self._setup_seismic_definitions(
                 zone, soil, r_x, r_y, importance, damping, damping_y, xi_v, r_v
@@ -129,12 +135,12 @@ class BaseModelBackend:
             result.functions_created = func_count
             result.cases_created = case_count
             
-            # 6. Combinations (NCh, LRFD, ASD, Envelopes)
+            # 7. Combinations (NCh, LRFD, ASD, Envelopes)
             report(60, "Creando combinaciones de carga...")
             combo_count = self._setup_combinations()
             result.combos_created = combo_count
             
-            # 7. Envelopes
+            # 8. Envelopes
             report(80, "Creando envolventes...")
             self._create_envelopes()
             
@@ -142,6 +148,7 @@ class BaseModelBackend:
             result.message = (
                 f"Modelo base creado: {result.materials_created} materiales, "
                 f"{result.patterns_created} patrones, {result.sections_created} secciones, "
+                f"{result.rebars_created} rebars, "
                 f"{result.functions_created} funciones, {result.cases_created} casos RS, "
                 f"{result.combos_created} combinaciones."
             )
@@ -275,6 +282,29 @@ class BaseModelBackend:
                 sec["name"], sec["material"],
                 sec["t3"], sec["t2"], sec["tf"], sec["tw"],
                 -1, "", ""
+            )
+            if self._ret_ok(ret):
+                count += 1
+        
+        return count
+
+    def _setup_rebars(self) -> int:
+        """Crea propiedades de armadura (rebar) predeterminadas.
+        
+        Returns:
+            Cantidad de rebars creados
+        """
+        if not self.SapModel:
+            return 0
+        
+        count = 0
+        
+        for rebar in DEFAULT_REBARS:
+            # SetProp(Name, Area, Diameter)
+            ret = self.SapModel.PropRebar.SetProp(
+                rebar["name"],
+                rebar["area"],
+                rebar["diameter"]
             )
             if self._ret_ok(ret):
                 count += 1

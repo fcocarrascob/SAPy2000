@@ -1,55 +1,35 @@
 {
   "bolt_dia": 19.0,
-  "H_col": 300.0,
-  "B_col": 200.0,
-  "n_pernos": 4,
+  "H_col": 100.0,
+  "B_col": 100.0,
+  "n_pernos": 2,
   "bolt_centers": [
     [
-      -150.0,
-      200.0,
-      0.0
-    ],
-    [
       -50.0,
-      200.0,
+      100.0,
       0.0
     ],
     [
       50.0,
-      200.0,
-      0.0
-    ],
-    [
-      150.0,
-      200.0,
-      0.0
-    ],
-    [
-      -150.0,
-      -200.0,
+      100.0,
       0.0
     ],
     [
       -50.0,
-      -200.0,
+      -100.0,
       0.0
     ],
     [
       50.0,
-      -200.0,
-      0.0
-    ],
-    [
-      150.0,
-      -200.0,
+      -100.0,
       0.0
     ]
   ],
   "bolt_material": "A992Fy50",
-  "flange_thickness": 18.0,
-  "web_thickness": 8.0,
-  "plate_thickness": 25.0,
-  "include_anchor_chair": true,
+  "flange_thickness": 5.0,
+  "web_thickness": 5.0,
+  "plate_thickness": 20.0,
+  "include_anchor_chair": false,
   "anchor_chair_height": 250.0,
   "anchor_chair_thickness": 25.0
 }
