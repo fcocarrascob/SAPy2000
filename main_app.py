@@ -1,8 +1,14 @@
 import sys
 import os
-from PySide6.QtWidgets import QApplication, QMainWindow, QTabWidget, QMessageBox, QWidget, QLabel, QToolBar
+from PySide6.QtWidgets import (
+    QApplication, QMainWindow, QTabWidget, QMessageBox,
+    QWidget, QLabel, QToolBar, QMenuBar,
+)
 from PySide6.QtGui import QAction
 from sap_interface import SapInterface
+from themes import apply_theme
+from gui_components import ConnectionStatusWidget, StyledButton
+from app_logger import AppLogger
 
 # Import modules as packages
 try:
@@ -14,7 +20,6 @@ try:
     from Fundaciones.fundaciones_gui import FundacionesWidget
 except ImportError as e:
     print(f"Error importing modules: {e}")
-    # Fallback to empty classes to allow app to start and show error
     class CombosWidget(QWidget): pass
     class MeshUtilsWidget(QWidget): pass
     class BasePlateWidget(QWidget): pass
@@ -28,37 +33,89 @@ class UnifiedApp(QMainWindow):
         super().__init__()
         self.setWindowTitle("SAP2000 Automation Suite")
         self.resize(1024, 768)
-        
+        self.logger = AppLogger()
+
         # --- SAP Interface ---
         self.sap_interface = SapInterface()
         self.sap_interface.connectionChanged.connect(self.on_connection_changed)
-        
+
+        # --- Menu Bar ---
+        self._create_menus()
+
         # --- Toolbar ---
         toolbar = QToolBar("Connection")
+        toolbar.setMovable(False)
         self.addToolBar(toolbar)
-        
-        self.action_connect = QAction("🔌 Conectar a SAP2000", self)
-        self.action_connect.triggered.connect(self.sap_interface.connect_to_sap)
-        toolbar.addAction(self.action_connect)
-        
-        self.status_label = QLabel("Estado: Desconectado 🔴  ")
-        self.statusBar().addPermanentWidget(self.status_label)
-        
+
+        self.btn_connect = StyledButton("Conectar a SAP2000", variant="primary")
+        self.btn_connect.clicked.connect(self.sap_interface.connect_to_sap)
+        toolbar.addWidget(self.btn_connect)
+
+        # --- Connection Status en status bar ---
+        self.conn_status = ConnectionStatusWidget()
+        self.statusBar().addPermanentWidget(self.conn_status)
+
         # --- Tabs ---
         self.tabs = QTabWidget()
         self.setCentralWidget(self.tabs)
-        
+
         self.init_tabs()
-        
+        self.logger.info("Aplicación iniciada")
+
+    def _create_menus(self):
+        """Crea la barra de menú con opciones de la aplicación."""
+        menu_bar = self.menuBar()
+
+        # Menú Ver
+        menu_ver = menu_bar.addMenu("Ver")
+
+        action_export_log = QAction("Exportar Logs...", self)
+        action_export_log.triggered.connect(self._export_logs)
+        menu_ver.addAction(action_export_log)
+
+        # Menú Ayuda
+        menu_ayuda = menu_bar.addMenu("Ayuda")
+
+        action_about = QAction("Acerca de", self)
+        action_about.triggered.connect(self._show_about)
+        menu_ayuda.addAction(action_about)
+
+    def _export_logs(self):
+        """Exporta el log a un archivo de texto."""
+        from PySide6.QtWidgets import QFileDialog
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Exportar Logs", "sapy2000_log.txt", "Archivos de texto (*.txt)"
+        )
+        if path:
+            if self.logger.export_to_file(path):
+                QMessageBox.information(self, "Exportar Logs", f"Log exportado a:\n{path}")
+            else:
+                QMessageBox.warning(self, "Error", "No se pudo exportar el log.")
+
+    def _show_about(self):
+        """Muestra el diálogo Acerca de."""
+        QMessageBox.about(
+            self,
+            "Acerca de SAP2000 Automation Suite",
+            "<h3>SAP2000 Automation Suite</h3>"
+            "<p>Herramienta de automatización para CSI SAP2000.</p>"
+            "<p>Automatiza creación de modelos, combinaciones de carga, "
+            "diseño de placas base, fundaciones y más.</p>"
+            "<hr>"
+            "<p><b>Tecnologías:</b> Python · PySide6 · comtypes · SAP2000 OAPI</p>"
+            "<p><b>Normativa:</b> NCh2369:2025 · AISC 360</p>"
+        )
+
     def on_connection_changed(self, connected):
+        self.conn_status.set_connected(connected)
         if connected:
-            self.status_label.setText("Estado: Conectado ✅  ")
-            self.action_connect.setEnabled(False)
-            self.action_connect.setText("Conectado")
+            self.btn_connect.setEnabled(False)
+            self.btn_connect.setText("✅ Conectado")
+            self.logger.success("Conexión establecida con SAP2000")
         else:
-            self.status_label.setText("Estado: Desconectado 🔴  ")
-            self.action_connect.setEnabled(True)
-            self.action_connect.setText("🔌 Conectar a SAP2000")
+            self.btn_connect.setEnabled(True)
+            self.btn_connect.setText("🔌 Conectar a SAP2000")
+            self.logger.warning("Desconectado de SAP2000")
 
     def init_tabs(self):
         # Tab 1: Combinations
@@ -103,12 +160,12 @@ class UnifiedApp(QMainWindow):
         except Exception as e:
             self.tabs.addTab(QLabel(f"Error loading Fundaciones: {e}"), "Fundaciones (Error)")
 
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
-    
-    # Optional: Set a global style or palette here
     app.setStyle("Fusion")
-    
+    apply_theme(app)
+
     window = UnifiedApp()
     window.show()
     sys.exit(app.exec())
