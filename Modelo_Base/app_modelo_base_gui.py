@@ -4,7 +4,7 @@ Replica el diseño de la referencia con parámetros sísmicos NCh detallados.
 """
 
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
+    QApplication, QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
     QComboBox, QDoubleSpinBox, QPushButton, QGroupBox,
     QMessageBox, QGridLayout, QSpacerItem, QSizePolicy,
     QFrame, QProgressBar, QDialog, QSplitter, QTableWidget, 
@@ -28,6 +28,10 @@ from .modelo_base_backend import BaseModelBackend, BaseModelResult
 from .config import AR_BY_ZONE, SOIL_PARAMS, GRAVITY
 from .notas_widget import NotasWidget
 
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from gui_components import StyledButton, LogWidget, ProgressGroup
+from app_logger import AppLogger
 
 class CreateModelWorker(QThread):
     """Worker thread para crear el modelo base sin bloquear la GUI."""
@@ -346,8 +350,7 @@ class ModeloBaseWidget(QWidget):
         else:
             self.btn_preview_spectrum.clicked.connect(self.on_preview_spectrum_click)
 
-        self.btn_create_model = QPushButton("Crear Modelo Base")
-        self.btn_create_model.setStyleSheet("background-color: #2196F3; color: white; font-weight: bold; padding: 6px;")
+        self.btn_create_model = StyledButton("🏗️ Crear Modelo Base", variant="primary")
         self.btn_create_model.clicked.connect(self.on_create_model_click)
 
         btn_layout.addWidget(self.btn_preview_spectrum)
@@ -355,18 +358,13 @@ class ModeloBaseWidget(QWidget):
         
         group_layout.addWidget(self.buttons_widget)
         
-        # 3. Barra de Progreso
-        self.progress_bar = QProgressBar()
-        self.progress_bar.setVisible(False)
-        self.progress_bar.setTextVisible(True)
-        self.progress_bar.setFormat("%p% - %v")
-        group_layout.addWidget(self.progress_bar)
-        
-        # 4. Label de Estado
-        self.lbl_status = QLabel("")
-        self.lbl_status.setAlignment(Qt.AlignCenter)
-        self.lbl_status.setStyleSheet("color: #666; font-style: italic;")
-        group_layout.addWidget(self.lbl_status)
+        # 3. Progreso estandarizado
+        self.progress_group = ProgressGroup("Progreso de Creación")
+        group_layout.addWidget(self.progress_group)
+
+        # 4. Log de operaciones
+        self.log = LogWidget()
+        group_layout.addWidget(self.log)
         
         # (Gráfico eliminado de la interfaz principal, ahora es un pop-up)
 
@@ -418,9 +416,9 @@ class ModeloBaseWidget(QWidget):
             
             # Preparar UI para ejecución
             self.btn_create_model.setEnabled(False)
-            self.progress_bar.setVisible(True)
-            self.progress_bar.setValue(0)
-            self.lbl_status.setText("Iniciando...")
+            self.progress_group.set_visible(True)
+            self.progress_group.set_progress(0, "Iniciando...")
+            self.log.log("Iniciando creación de modelo base...", level="INFO")
             
             # Ejecutar en thread separado
             self.worker = CreateModelWorker(self.backend, params)
@@ -434,24 +432,25 @@ class ModeloBaseWidget(QWidget):
 
     def _on_progress(self, pct: int, msg: str):
         """Actualiza la barra de progreso."""
-        self.progress_bar.setValue(pct)
-        self.lbl_status.setText(msg)
+        self.progress_group.set_progress(pct, msg)
+        self.log.log(msg, level="INFO")
 
     def _on_finished(self, result: BaseModelResult):
         """Maneja la finalización de la creación."""
         self._reset_ui()
-        
+
         if result.success:
+            self.log.log(result.message, level="SUCCESS")
             QMessageBox.information(self, "Éxito", result.message)
         else:
             error_detail = "\n".join(result.errors) if result.errors else result.message
+            self.log.log(f"Error: {error_detail}", level="ERROR")
             QMessageBox.critical(self, "Error", f"Falló la creación:\n{error_detail}")
 
     def _reset_ui(self):
         """Restaura la UI tras la ejecución."""
         self.btn_create_model.setEnabled(True)
-        self.progress_bar.setVisible(False)
-        self.lbl_status.setText("")
+        self.progress_group.reset()
 
     def on_preview_spectrum_click(self):
         """Genera la vista previa del espectro en una ventana emergente."""
@@ -589,3 +588,15 @@ class ModeloBaseWidget(QWidget):
             return 1.0 + (T / Tv0) * 1.5 if Tv0 > 0 else 2.5
         else:
             return 2.5 * (Tv0 / T) ** p
+
+if __name__ == "__main__":
+    import sys
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+    from themes import apply_theme
+
+    app = QApplication(sys.argv)
+    app.setStyle("Fusion")
+    apply_theme(app)
+    window = ModeloBaseWidget()
+    window.show()
+    sys.exit(app.exec())

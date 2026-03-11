@@ -11,9 +11,10 @@ Refactorizar `Combinations_Carga` y `Modelo_Base` para usar la nueva infraestruc
 
 ### Step-by-Step Instructions
 
+
 #### Step 3.1: Migrar `Combinations_Carga/combos_backend.py` — Integrar check_ret_code y Logger
 
-- [ ] Reemplazar el contenido completo de `Combinations_Carga/combos_backend.py` con el código siguiente:
+- [x] Reemplazar el contenido completo de `Combinations_Carga/combos_backend.py` con el código siguiente:
 
 ```python
 """Backend de Combinaciones de Carga — Lógica pura para SAP2000 API."""
@@ -209,11 +210,17 @@ class ComboBackend:
 - [ ] La clase usa `check_ret_code()` en lugar de verificación manual `ret[-1] == 0`
 - [ ] Los mensajes de error usan `self.logger` en lugar de `print()`
 
+##### Step 3.1 Verification Checklist
+- [x] Sin errores de importación: `python -c "from Combinations_Carga.combos_backend import ComboBackend; print('OK')"`
+- [x] La clase usa `check_ret_code()` en lugar de verificación manual `ret[-1] == 0`
+- [x] Los mensajes de error usan `self.logger` en lugar de `print()`
+
 ---
+
 
 #### Step 3.2: Migrar `Combinations_Carga/app_combos_gui.py` — Integrar StyledButton y LogWidget
 
-- [ ] Reemplazar el contenido completo de `Combinations_Carga/app_combos_gui.py` con el código siguiente:
+- [x] Reemplazar el contenido completo de `Combinations_Carga/app_combos_gui.py` con el código siguiente:
 
 ```python
 """GUI de Combinaciones de Carga — Widget para gestionar combos en SAP2000."""
@@ -457,11 +464,18 @@ if __name__ == "__main__":
 - [ ] LogWidget visible en la parte inferior del widget
 - [ ] Label informativo usa property `role=info` (estilo del tema)
 
+##### Step 3.2 Verification Checklist
+- [ ] Sin errores: `python -m Combinations_Carga.app_combos_gui` (la ventana se abre con el tema)
+- [ ] Botones "📥 Leer de SAP2000" (azul primary) y "📤 Enviar a SAP2000" (verde success) con estilo correcto
+- [ ] LogWidget visible en la parte inferior del widget
+- [ ] Label informativo usa property `role=info` (estilo del tema)
+
 ---
+
 
 #### Step 3.3: Migrar `Modelo_Base/app_modelo_base_gui.py` — Integrar Componentes Estandarizados
 
-- [ ] Aplicar las siguientes modificaciones en `Modelo_Base/app_modelo_base_gui.py`:
+- [x] Aplicar las siguientes modificaciones en `Modelo_Base/app_modelo_base_gui.py`:
 
 **Cambio 1 — Agregar imports de infraestructura** (al inicio del archivo, después de los imports existentes de PySide6):
 
@@ -630,11 +644,19 @@ if __name__ == "__main__":
 - [ ] El `LogWidget` registra los mensajes de progreso y resultado
 - [ ] Los demás controles (ComboBox, SpinBox, etc.) heredan el estilo del tema global
 
+##### Step 3.3 Verification Checklist
+- [ ] Sin errores al ejecutar `python -m Modelo_Base.app_modelo_base_gui`
+- [x] El botón "🏗️ Crear Modelo Base" tiene estilo primary (azul)
+- [ ] El `ProgressGroup` aparece durante la creación del modelo
+- [ ] El `LogWidget` registra los mensajes de progreso y resultado
+- [ ] Los demás controles (ComboBox, SpinBox, etc.) heredan el estilo del tema global
+
 ---
+
 
 #### Step 3.4: Migrar `Modelo_Base/modelo_base_backend.py` — Integrar check_ret_code y Logger
 
-- [ ] Aplicar las siguientes modificaciones en `Modelo_Base/modelo_base_backend.py`:
+- [x] Aplicar las siguientes modificaciones en `Modelo_Base/modelo_base_backend.py`:
 
 **Cambio 1 — Agregar imports de infraestructura** (al inicio del archivo, después de los imports existentes):
 
@@ -666,6 +688,10 @@ Esto mantiene compatibilidad con todo el código existente que llama `self._ret_
 ##### Step 3.4 Verification Checklist
 - [ ] Sin errores: `python -c "from Modelo_Base.modelo_base_backend import BaseModelBackend; print('OK')"`
 - [ ] El método `_ret_ok` ahora delega a `check_ret_code` centralizado
+
+##### Step 3.4 Verification Checklist
+- [x] Sin errores: `python -c "from Modelo_Base.modelo_base_backend import BaseModelBackend; print('OK')"`
+- [x] El método `_ret_ok` ahora delega a `check_ret_code` centralizado
 
 ---
 

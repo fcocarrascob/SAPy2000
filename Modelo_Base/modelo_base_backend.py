@@ -10,6 +10,12 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Infrastructure imports
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from app_logger import AppLogger
+from sap_utils_common import check_ret_code
+
 # Dependiendo de cómo se ejecute, el import relativo puede fallar si no es un paquete
 # Asumimos que la app corre desde el root y esto es un módulo.
 from .config import (
@@ -38,19 +44,11 @@ class BaseModelResult:
 class BaseModelBackend:
     def __init__(self, sap_model):
         self.SapModel = sap_model
+        self.logger = AppLogger()
 
     def _ret_ok(self, ret: Any) -> bool:
-        """Verifica si el retorno de una llamada COM es exitoso (0).
-        
-        Maneja tanto enteros directos como tuplas (comtypes devuelve tupla
-        si hay argumentos [out], con el código de retorno al final).
-        """
-        try:
-            if isinstance(ret, (list, tuple)):
-                return ret[-1] == 0
-            return ret == 0
-        except Exception:
-            return False
+        """Wrapper sobre check_ret_code centralizado."""
+        return check_ret_code(ret)
 
     def create_base_model(
         self, 
