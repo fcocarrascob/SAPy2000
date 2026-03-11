@@ -13,7 +13,7 @@ Aplicar las transformaciones de estandarización a los 3 módulos restantes: `Fu
 
 #### Step 4.1: Migrar `Fundaciones/fundaciones_backend.py` — Integrar check_ret_code y Logger
 
-- [ ] Aplicar las siguientes modificaciones en `Fundaciones/fundaciones_backend.py`:
+- [x] Aplicar las siguientes modificaciones en `Fundaciones/fundaciones_backend.py`:
 
 **Cambio 1 — Agregar imports de infraestructura** (al inicio del archivo):
 
@@ -89,7 +89,7 @@ if check_ret_code(ret):
 
 #### Step 4.2: Migrar `Fundaciones/fundaciones_gui.py` — Integrar Componentes Estandarizados
 
-- [ ] Aplicar las siguientes modificaciones en `Fundaciones/fundaciones_gui.py`:
+- [x] Aplicar las siguientes modificaciones en `Fundaciones/fundaciones_gui.py`:
 
 **Cambio 1 — Agregar imports de infraestructura** (después de los imports de PySide6):
 
@@ -225,7 +225,7 @@ if __name__ == "__main__":
 
 #### Step 4.3: Migrar `Placa_Base/placabase_backend.py` — Integrar check_ret_code y Logger
 
-- [ ] Aplicar las siguientes modificaciones en `Placa_Base/placabase_backend.py`:
+- [x] Aplicar las siguientes modificaciones en `Placa_Base/placabase_backend.py`:
 
 **Cambio 1 — Agregar imports de infraestructura** (al inicio del archivo):
 
@@ -278,7 +278,7 @@ def _check_ret(self, ret, success_msg="", error_msg="") -> bool:
 
 #### Step 4.4: Migrar `Placa_Base/app_placabase_gui.py` — Integrar Componentes Estandarizados
 
-- [ ] Aplicar las siguientes modificaciones en `Placa_Base/app_placabase_gui.py`:
+- [x] Aplicar las siguientes modificaciones en `Placa_Base/app_placabase_gui.py`:
 
 **Cambio 1 — Agregar imports de infraestructura** (después de los imports de PySide6):
 
@@ -378,7 +378,7 @@ if __name__ == '__main__':
 
 #### Step 4.5: Migrar `Utilidades_MOD/utils_backend.py` — Integrar check_ret_code y Logger
 
-- [ ] Aplicar las siguientes modificaciones en `Utilidades_MOD/utils_backend.py`:
+- [x] Aplicar las siguientes modificaciones en `Utilidades_MOD/utils_backend.py`:
 
 **Cambio 1 — Agregar imports de infraestructura** (al inicio):
 
@@ -425,7 +425,7 @@ if check_ret_code(ret):
 
 #### Step 4.6: Migrar `Utilidades_MOD/app_utils_gui.py` — Integrar Componentes Estandarizados
 
-- [ ] Aplicar las siguientes modificaciones en `Utilidades_MOD/app_utils_gui.py`:
+- [x] Aplicar las siguientes modificaciones en `Utilidades_MOD/app_utils_gui.py`:
 
 **Cambio 1 — Agregar imports de infraestructura** (después de los imports de PySide6):
 

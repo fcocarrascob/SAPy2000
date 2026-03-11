@@ -1,5 +1,8 @@
 import comtypes.client
-import sys
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from app_logger import AppLogger
+from sap_utils_common import check_ret_code, get_materials_by_type
 
 class FundacionesBackend:
     """
@@ -22,6 +25,7 @@ class FundacionesBackend:
         # Constantes para tipos de material (según API SAP2000)
         self.eMatType_Concrete = 2
         self.eMatType_Rebar = 6
+        self.logger = AppLogger()
     
     def get_base_joints(self):
         """
@@ -31,7 +35,7 @@ class FundacionesBackend:
             list: Lista de nombres de joints en la base
         """
         if not self.SapModel:
-            print("No hay conexión con SAP2000.")
+            self.logger.warning("No hay conexión con SAP2000")
             return []
         
         try:
@@ -65,30 +69,7 @@ class FundacionesBackend:
         
         try:
             # Obtener todos los materiales
-            ret = self.SapModel.PropMaterial.GetNameList()
-            if ret[-1] != 0:
-                print("Error obteniendo lista de materiales")
-                return []
-            
-            count = ret[0]
-            all_materials = ret[1] if count > 0 else []
-            
-            concrete_materials = []
-            
-            # Filtrar solo materiales de tipo Concrete
-            for mat_name in all_materials:
-                try:
-                    # GetMaterial retorna (MatType, Color, Notes, GUID, RetCode)
-                    ret_mat = self.SapModel.PropMaterial.GetMaterial(mat_name)
-                    if ret_mat[-1] == 0:  # RetCode exitoso
-                        mat_type = ret_mat[0]  # MatType es el primer elemento
-                        if mat_type == self.eMatType_Concrete:
-                            concrete_materials.append(mat_name)
-                except Exception as e:
-                    print(f"Error verificando material {mat_name}: {e}")
-                    continue
-            
-            return concrete_materials
+            return get_materials_by_type(self.SapModel, self.eMatType_Concrete)
             
         except Exception as e:
             print(f"Error en get_concrete_materials: {e}")
@@ -102,39 +83,15 @@ class FundacionesBackend:
             list: Lista de nombres de materiales de acero de refuerzo
         """
         if not self.SapModel:
-            print("No hay conexión con SAP2000.")
+            self.logger.warning("No hay conexión con SAP2000")
+            return []
+
+        try:
+            return get_materials_by_type(self.SapModel, self.eMatType_Rebar)
+        except Exception as e:
+            self.logger.error(f"Error en get_rebar_materials: {e}")
             return []
         
-        try:
-            # Obtener todos los materiales
-            ret = self.SapModel.PropMaterial.GetNameList()
-            if ret[-1] != 0:
-                print("Error obteniendo lista de materiales")
-                return []
-            
-            count = ret[0]
-            all_materials = ret[1] if count > 0 else []
-            
-            rebar_materials = []
-            
-            # Filtrar solo materiales de tipo Rebar
-            for mat_name in all_materials:
-                try:
-                    # GetMaterial retorna (MatType, Color, Notes, GUID, RetCode)
-                    ret_mat = self.SapModel.PropMaterial.GetMaterial(mat_name)
-                    if ret_mat[-1] == 0:  # RetCode exitoso
-                        mat_type = ret_mat[0]  # MatType es el primer elemento
-                        if mat_type == self.eMatType_Rebar:
-                            rebar_materials.append(mat_name)
-                except Exception as e:
-                    print(f"Error verificando material {mat_name}: {e}")
-                    continue
-            
-            return rebar_materials
-            
-        except Exception as e:
-            print(f"Error en get_rebar_materials: {e}")
-            return []
     
     def get_rebar_sizes(self):
         """
@@ -144,7 +101,7 @@ class FundacionesBackend:
             list: Lista de nombres/tamaños de barras disponibles
         """
         if not self.SapModel:
-            print("No hay conexión con SAP2000.")
+            self.logger.warning("No hay conexión con SAP2000")
             return []
         
         try:
@@ -178,8 +135,8 @@ class FundacionesBackend:
         try:
             # Obtener todas las secciones de Frame
             ret = self.SapModel.PropFrame.GetNameList()
-            if ret[-1] != 0:
-                print("Error obteniendo lista de secciones de Frame")
+            if not check_ret_code(ret):
+                self.logger.error("Error obteniendo lista de secciones de Frame")
                 return []
             
             count = ret[0]
@@ -193,12 +150,10 @@ class FundacionesBackend:
                     # Obtener propiedades de la sección para verificar material
                     # PropFrame.GetMaterial retorna (MatProp, RetCode)
                     ret_mat = self.SapModel.PropFrame.GetMaterial(sec_name)
-                    if ret_mat[-1] == 0:  # RetCode exitoso
+                    if check_ret_code(ret_mat):
                         mat_name = ret_mat[0]
-                        
-                        # Verificar si el material es de tipo Concrete
                         ret_mat_type = self.SapModel.PropMaterial.GetMaterial(mat_name)
-                        if ret_mat_type[-1] == 0:
+                        if check_ret_code(ret_mat_type):
                             mat_type = ret_mat_type[0]
                             if mat_type == self.eMatType_Concrete:
                                 concrete_sections.append(sec_name)
@@ -220,14 +175,14 @@ class FundacionesBackend:
             list: Lista de nombres de secciones de Shell
         """
         if not self.SapModel:
-            print("No hay conexión con SAP2000.")
+            self.logger.warning("No hay conexión con SAP2000")
             return []
         
         try:
             # Obtener todas las secciones de Area
             ret = self.SapModel.PropArea.GetNameList()
-            if ret[-1] != 0:
-                print("Error obteniendo lista de secciones de Area")
+            if not check_ret_code(ret):
+                self.logger.error("Error obteniendo lista de secciones de Area")
                 return []
             
             count = ret[0]
@@ -249,15 +204,15 @@ class FundacionesBackend:
             dict: Diccionario con 'name', 'x', 'y', 'z' o None si no hay selección
         """
         if not self.SapModel:
-            print("No hay conexión con SAP2000.")
+            self.logger.warning("No hay conexión con SAP2000")
             return None
         
         try:
             # 1. Obtener objetos seleccionados
             # GetSelected retorna (NumberItems, ObjectTypes, ObjectNames, RetCode)
             ret_sel = self.SapModel.SelectObj.GetSelected(0, [], [])
-            
-            if ret_sel[-1] != 0:
+
+            if not check_ret_code(ret_sel):
                 return None
             
             num_items = ret_sel[0]
@@ -281,8 +236,8 @@ class FundacionesBackend:
             # 2. Obtener coordenadas del punto
             # GetCoordCartesian retorna (x, y, z, RetCode)
             ret_coord = self.SapModel.PointObj.GetCoordCartesian(point_name, 0.0, 0.0, 0.0, "Global")
-            
-            if ret_coord[-1] == 0:
+
+            if check_ret_code(ret_coord):
                 return {
                     "name": point_name,
                     "x": ret_coord[0],
@@ -308,7 +263,7 @@ class FundacionesBackend:
             tuple: (width, height) en mm, o None si no se puede determinar
         """
         if not self.SapModel:
-            print("No hay conexión con SAP2000.")
+            self.logger.warning("No hay conexión con SAP2000")
             return None
         
         try:
@@ -322,53 +277,45 @@ class FundacionesBackend:
             # Para Section Designer (SD), usar GetSDSection
             # PropFrame.GetSDSection retorna (NameSD, RetCode)
             ret_sd = self.SapModel.PropFrame.GetSDSection(section_name, "")
-            
-            if ret_sd[-1] == 0 and ret_sd[0]:
+
+            if check_ret_code(ret_sd) and ret_sd[0]:
                 # Es una sección SD, obtener dimensiones del bounding box
                 sd_name = ret_sd[0]
-                
-                # GetRectangle devuelve info de sección rectangular SD
-                # Pero como puede ser compleja, usamos GetSectionProps para obtener dimensiones generales
-                # GetSectionProps(Name, Area, As2, As3, Torsion, I22, I33, S22, S33, Z22, Z33, R22, R33, RetCode)
+
+                # Intentamos obtener propiedades generales de la sección
                 ret_props = self.SapModel.PropFrame.GetSectionProps(section_name)
-                
-                if ret_props[-1] == 0:
-                    # Para secciones SD rectangulares, estimamos dimensiones desde el momento de inercia
-                    # I = b*h^3/12, pero sin saber la relación exacta, usamos aproximación
-                    # En su lugar, intentamos GetRebarSD para ver si es pedestal con refuerzo
-                    
-                    # Mejor enfoque: usar GetAllSDShapes para obtener las formas del SD
-                    # GetAllSDShapes retorna (NumberNames, ShapeNames, ShapeTypes, DesignTypes, Color, RetCode)
+                if check_ret_code(ret_props):
+                    # Intentar obtener las formas SD asociadas
                     ret_shapes = self.SapModel.PropFrame.SDShape.GetAllSDShapes(sd_name, 0, [], [], [], [])
-                    
-                    if ret_shapes[-1] == 0 and ret_shapes[0] > 0:
+
+                    if check_ret_code(ret_shapes) and ret_shapes[0] > 0:
                         shape_names = ret_shapes[1]
                         shape_types = ret_shapes[2]
-                        
+
                         # Buscar la forma rectangular principal (tipo "Rectangular")
                         for i, shape_name in enumerate(shape_names):
                             shape_type = shape_types[i]
-                            
+
                             # Tipo 1 = Rectangular
                             if shape_type == 1:
                                 # GetRectangle(SDName, ShapeName, NameMat, SSOverwrite, CenterX, CenterY, H, W, Rotation, Color, RetCode)
                                 ret_rect = self.SapModel.PropFrame.SDShape.GetRectangle(sd_name, shape_name)
-                                
-                                if ret_rect[-1] == 0:
+
+                                if check_ret_code(ret_rect):
                                     # ret_rect = (NameMat, SSOverwrite, CenterX, CenterY, H, W, Rotation, Color, RetCode)
                                     height = ret_rect[4]  # H
                                     width = ret_rect[5]   # W
-                                    
+
                                     # Restaurar unidades
                                     self.SapModel.SetPresentUnits(current_units)
-                                    
+
                                     return (width, height)
             
             # Si no es SD o no se pudo obtener, intentar como sección rectangular estándar
             # GetRectangle retorna (FileName, MatProp, t3, t2, Color, Notes, GUID, RetCode)
             ret_rect_std = self.SapModel.PropFrame.GetRectangle(section_name)
-            
-            if ret_rect_std[-1] == 0:
+
+            if check_ret_code(ret_rect_std):
                 height = ret_rect_std[2]  # t3
                 width = ret_rect_std[3]   # t2
                 
@@ -382,7 +329,7 @@ class FundacionesBackend:
             return None
             
         except Exception as e:
-            print(f"Error obteniendo dimensiones de sección {section_name}: {e}")
+            self.logger.error(f"Error obteniendo dimensiones de sección {section_name}: {e}")
             try:
                 self.SapModel.SetPresentUnits(current_units)
             except:

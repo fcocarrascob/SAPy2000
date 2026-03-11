@@ -5,6 +5,11 @@ from PySide6.QtWidgets import (QApplication, QWidget, QLabel, QVBoxLayout,
                                QTextEdit, QLineEdit, QGridLayout, QHBoxLayout, QTabWidget)
 from PySide6.QtCore import Qt
 
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from gui_components import StyledButton, LogWidget
+from themes import COLORS
+
 # Importar backend
 try:
     from .fundaciones_backend import FundacionesBackend
@@ -41,11 +46,7 @@ class FundacionesWidget(QWidget):
         
         # --- Tab Widget ---
         self.tab_widget = QTabWidget()
-        self.tab_widget.setStyleSheet("""
-            QTabWidget::pane { border: 1px solid #bdc3c7; }
-            QTabBar::tab { padding: 8px 20px; font-weight: bold; }
-            QTabBar::tab:selected { background: #3498db; color: white; }
-        """)
+        # Estilos de tabs manejados por tema global (themes.py)
         
         # ========== PESTAÑA 1: DEFINICIONES ==========
         tab_definiciones = QWidget()
@@ -131,10 +132,9 @@ class FundacionesWidget(QWidget):
         spacing_layout.addStretch()
         layout_ped.addRow("Refuerzo:", spacing_layout)
         
-        self.btn_create_section = QPushButton("✨ Crear Sección Pedestal")
+        self.btn_create_section = StyledButton("✨ Crear Sección Pedestal", variant="primary")
         self.btn_create_section.clicked.connect(self.create_pedestal_section)
         self.btn_create_section.setEnabled(False)
-        self.btn_create_section.setStyleSheet("font-weight: bold; padding: 8px;")
         layout_ped.addRow("", self.btn_create_section)
         
         group_pedestales.setLayout(layout_ped)
@@ -155,14 +155,13 @@ class FundacionesWidget(QWidget):
         self.edit_zapata_thickness.setMaximumWidth(100)
         layout_zap.addRow("Espesor (mm):", self.edit_zapata_thickness)
         
-        self.btn_create_zapata = QPushButton("✨ Crear Secciones Shell")
+        self.btn_create_zapata = StyledButton("✨ Crear Secciones Shell", variant="primary")
         self.btn_create_zapata.clicked.connect(self.create_zapata_sections)
         self.btn_create_zapata.setEnabled(False)
-        self.btn_create_zapata.setStyleSheet("font-weight: bold; padding: 8px;")
         layout_zap.addRow("", self.btn_create_zapata)
         
         info_label = QLabel("💡 Se crearán 2 secciones con colores diferentes")
-        info_label.setStyleSheet("color: #7f8c8d; font-style: italic; font-size: 9pt;")
+        info_label.setProperty("role", "info")
         layout_zap.addRow(info_label)
         
         group_zapatas.setLayout(layout_zap)
@@ -202,7 +201,7 @@ class FundacionesWidget(QWidget):
         coords_layout.addWidget(self.edit_origen_z)
         coords_layout.addWidget(QLabel("mm"))
         
-        self.btn_get_coords = QPushButton("📍 Obtener de Nodo Seleccionado")
+        self.btn_get_coords = StyledButton("📍 Obtener de Nodo Seleccionado", variant="secondary")
         self.btn_get_coords.clicked.connect(self.fetch_coords)
         self.btn_get_coords.setEnabled(False)
         coords_layout.addWidget(self.btn_get_coords)
@@ -226,7 +225,7 @@ class FundacionesWidget(QWidget):
         self.combo_seccion_frame.setToolTip("Sección para el elemento Frame (pedestal)")
         frame_section_layout.addWidget(self.combo_seccion_frame)
         
-        self.btn_reload_frame = QPushButton("🔄")
+        self.btn_reload_frame = StyledButton("🔄", variant="secondary")
         self.btn_reload_frame.setMaximumWidth(40)
         self.btn_reload_frame.setToolTip("Actualizar secciones de Frame disponibles")
         self.btn_reload_frame.clicked.connect(self.load_sections)
@@ -270,7 +269,7 @@ class FundacionesWidget(QWidget):
         self.combo_seccion_shell.setToolTip("Sección Shell para la losa debajo del pedestal")
         shell_section_layout.addWidget(self.combo_seccion_shell)
         
-        self.btn_reload_shell = QPushButton("🔄")
+        self.btn_reload_shell = StyledButton("🔄", variant="secondary")
         self.btn_reload_shell.setMaximumWidth(40)
         self.btn_reload_shell.setToolTip("Actualizar secciones de Shell disponibles")
         self.btn_reload_shell.clicked.connect(self.load_sections)
@@ -310,25 +309,9 @@ class FundacionesWidget(QWidget):
         layout_mod.addWidget(group_opciones)
         
         # --- Botón Modelar ---
-        self.btn_modelar_fundacion = QPushButton("🏗️ MODELAR FUNDACIÓN COMPLETA")
+        self.btn_modelar_fundacion = StyledButton("🏗️ MODELAR FUNDACIÓN COMPLETA", variant="success")
         self.btn_modelar_fundacion.clicked.connect(self.model_foundation)
         self.btn_modelar_fundacion.setEnabled(False)
-        self.btn_modelar_fundacion.setStyleSheet("""
-            QPushButton {
-                font-size: 12pt;
-                font-weight: bold;
-                padding: 12px;
-                background-color: #27ae60;
-                color: white;
-                border-radius: 5px;
-            }
-            QPushButton:hover {
-                background-color: #229954;
-            }
-            QPushButton:disabled {
-                background-color: #95a5a6;
-            }
-        """)
         layout_mod.addWidget(self.btn_modelar_fundacion)
         
         layout_mod.addStretch()
@@ -340,8 +323,7 @@ class FundacionesWidget(QWidget):
         group_log = QGroupBox("Log de Operaciones")
         layout_log = QVBoxLayout()
         
-        self.log_text = QTextEdit()
-        self.log_text.setReadOnly(True)
+        self.log_text = LogWidget()
         self.log_text.setMaximumHeight(120)
         layout_log.addWidget(self.log_text)
         
@@ -959,19 +941,33 @@ class FundacionesWidget(QWidget):
     
     def log(self, message):
         """Agrega un mensaje al log."""
-        self.log_text.append(message)
+        # Delegar al LogWidget (permite level, timestamp)
+        try:
+            self.log_text.log(message)
+        except Exception:
+            # Fallback simple
+            try:
+                self.log_text.append(message)
+            except Exception:
+                pass
 
 
 # Ejecución standalone
 if __name__ == "__main__":
+    import sys
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+    from themes import apply_theme
+
     print("Ejecutando Fundaciones GUI en modo standalone...")
     
     app = QApplication(sys.argv)
-    
+    app.setStyle("Fusion")
+    apply_theme(app)
+
     # Crear widget sin sap_interface (se conectará vía GetActiveObject en backend)
     window = FundacionesWidget()
     window.setWindowTitle("Fundaciones - Modo Standalone")
-    window.resize(800, 600)
+    window.resize(900, 700)
     window.show()
     
     sys.exit(app.exec())

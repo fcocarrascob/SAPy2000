@@ -6,6 +6,10 @@ import comtypes.client
 from dataclasses import dataclass, field
 from typing import List, Tuple, Optional, Any
 
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from app_logger import AppLogger
+from sap_utils_common import check_ret_code
+
 # --- Configuration Data Class ---
 @dataclass
 class PlateConfig:
@@ -88,7 +92,7 @@ class PlateConfig:
 class BasePlateBackend:
     def __init__(self, sap_model=None, logger=None):
         self.SapModel = sap_model
-        self.logger = logger
+        self.logger = logger or AppLogger()
         self.config = PlateConfig()
 
     def log(self, message):
@@ -121,17 +125,12 @@ class BasePlateBackend:
         self.run()
 
     def _check_ret(self, ret, success_msg="", error_msg="") -> bool:
-        code = -1
-        if isinstance(ret, int):
-            code = ret
-        elif hasattr(ret, '__getitem__') and len(ret) > 0:
-            code = ret[-1]
-        
-        if code == 0:
+        if check_ret_code(ret):
             if success_msg:
                 self.log(success_msg)
             return True
         else:
+            code = ret[-1] if isinstance(ret, (tuple, list)) and len(ret) > 0 else ret
             if error_msg:
                 self.log(f"{error_msg} (Code: {code})")
             return False
