@@ -82,7 +82,7 @@ class BasePlateWidget(QWidget):
         self.bolt_material_combo.setToolTip("Material para la sección Frame del perno. Se actualiza al conectar con SAP2000.")
 
         self.log = LogWidget()
-        self.log.setMaximumHeight(200)
+        self.log.setFixedHeight(120)
 
         self.run_btn = StyledButton('🚀 Guardar y Ejecutar', variant="success")
 
@@ -181,27 +181,31 @@ class BasePlateWidget(QWidget):
         grp_chair.setLayout(chair_layout)
         main_form_layout.addWidget(grp_chair)
 
-        # 5. Salida / Log
-        grp_out = QGroupBox("5. Salida / Log")
-        out_layout = QVBoxLayout()
-        
-        btn_row = QHBoxLayout()
-        btn_row.addWidget(self.run_btn)
-        out_layout.addLayout(btn_row)
-        
-        out_layout.addWidget(self.log)
+        # 5. Calcular
+        grp_out = QGroupBox("5. Calcular")
+        out_layout = QHBoxLayout()
+        out_layout.addWidget(self.run_btn)
+        out_layout.addStretch()
         grp_out.setLayout(out_layout)
         main_form_layout.addWidget(grp_out)
 
         # crear preview a la derecha
         self.preview = PreviewWidget(self)
 
-        main_layout = QHBoxLayout()
-        # Left side is now the ScrollArea
-        main_layout.addWidget(self.scroll_area, 1)
-        main_layout.addWidget(self.preview, 1)
+        content_layout = QHBoxLayout()
+        content_layout.addWidget(self.scroll_area, 1)
+        content_layout.addWidget(self.preview, 1)
 
-        self.setLayout(main_layout)
+        # --- Log Area (fuera del scroll, ancho completo) ---
+        grp_log = QGroupBox("Log de Operaciones")
+        log_grp_layout = QVBoxLayout()
+        log_grp_layout.addWidget(self.log)
+        grp_log.setLayout(log_grp_layout)
+
+        outer_layout = QVBoxLayout()
+        outer_layout.addLayout(content_layout, 1)
+        outer_layout.addWidget(grp_log)
+        self.setLayout(outer_layout)
 
         # load existing config if present
         if os.path.exists(CONFIG_PATH):
@@ -603,6 +607,13 @@ class PreviewWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setMinimumSize(QSize(300, 300))
+
+    def sizeHint(self):
+        return QSize(400, 400)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.update()
 
     def paintEvent(self, event):
         painter = QPainter(self)

@@ -218,11 +218,11 @@ class ModeloBaseWidget(QWidget):
 
     def init_ui(self):
         # Layout Principal
-        main_layout = QHBoxLayout(self)
+        outer_layout = QVBoxLayout(self)
 
         # --- Splitter principal: Config (izq) | Notas (der) ---
         self.main_splitter = QSplitter(Qt.Horizontal)
-        main_layout.addWidget(self.main_splitter)
+        outer_layout.addWidget(self.main_splitter, 1)
 
         # Panel izquierdo — toda la configuración existente
         config_panel = QWidget()
@@ -362,15 +362,10 @@ class ModeloBaseWidget(QWidget):
         self.progress_group = ProgressGroup("Progreso de Creación")
         group_layout.addWidget(self.progress_group)
 
-        # 4. Log de operaciones
-        self.log = LogWidget()
-        group_layout.addWidget(self.log)
-        
         # (Gráfico eliminado de la interfaz principal, ahora es un pop-up)
 
         # Agregar grupo al panel de config
         config_layout.addWidget(self.base_model_group)
-        config_layout.addStretch()
 
         # Panel derecho — Notas
         self.notas_widget = NotasWidget()
@@ -380,6 +375,15 @@ class ModeloBaseWidget(QWidget):
         self.main_splitter.setSizes([550, 400])
         self.main_splitter.setCollapsible(0, False)  # Config no colapsable
         self.main_splitter.setCollapsible(1, True)   # Notas colapsable
+
+        # --- Log Area (fuera del splitter, ancho completo) ---
+        grp_log = QGroupBox("Log de Operaciones")
+        log_layout = QVBoxLayout()
+        self.log = LogWidget()
+        self.log.setFixedHeight(120)
+        log_layout.addWidget(self.log)
+        grp_log.setLayout(log_layout)
+        outer_layout.addWidget(grp_log)
 
     def on_create_model_click(self):
         """Manejador para crear el modelo."""

@@ -328,9 +328,13 @@ class BaseMeshWidget(QWidget):
         layout.addLayout(btn_layout)
         
         # --- Log ---
+        grp_log = QGroupBox("Log de Operaciones")
+        grp_log_layout = QVBoxLayout()
         self.log_text = LogWidget()
-        self.log_text.setMaximumHeight(200)
-        layout.addWidget(self.log_text)
+        self.log_text.setFixedHeight(120)
+        grp_log_layout.addWidget(self.log_text)
+        grp_log.setLayout(grp_log_layout)
+        layout.addWidget(grp_log)
 
     def log(self, message):
         if self.log_text:

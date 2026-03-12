@@ -2,7 +2,8 @@ import sys
 import os
 from PySide6.QtWidgets import (QApplication, QWidget, QLabel, QVBoxLayout, 
                                QGroupBox, QFormLayout, QComboBox, QPushButton,
-                               QTextEdit, QLineEdit, QGridLayout, QHBoxLayout, QTabWidget)
+                               QTextEdit, QLineEdit, QGridLayout, QHBoxLayout, QTabWidget,
+                               QScrollArea)
 from PySide6.QtCore import Qt
 
 import sys, os
@@ -50,8 +51,16 @@ class FundacionesWidget(QWidget):
         
         # ========== PESTAÑA 1: DEFINICIONES ==========
         tab_definiciones = QWidget()
-        layout_def = QVBoxLayout(tab_definiciones)
+        tab_def_layout = QVBoxLayout(tab_definiciones)
+        tab_def_layout.setContentsMargins(0, 0, 0, 0)
+
+        scroll_def = QScrollArea()
+        scroll_def.setWidgetResizable(True)
+        scroll_def.setFrameShape(QScrollArea.Shape.NoFrame)
+        scroll_content_def = QWidget()
+        layout_def = QVBoxLayout(scroll_content_def)
         layout_def.setSpacing(15)
+        layout_def.setContentsMargins(8, 8, 8, 8)
         
         # --- Materiales Compartidos ---
         group_materiales = QGroupBox("Materiales")
@@ -168,12 +177,22 @@ class FundacionesWidget(QWidget):
         layout_def.addWidget(group_zapatas)
         
         layout_def.addStretch()
+        scroll_def.setWidget(scroll_content_def)
+        tab_def_layout.addWidget(scroll_def)
         self.tab_widget.addTab(tab_definiciones, "📋 Definiciones")
         
         # ========== PESTAÑA 2: MODELAR ==========
         tab_modelar = QWidget()
-        layout_mod = QVBoxLayout(tab_modelar)
+        tab_mod_layout = QVBoxLayout(tab_modelar)
+        tab_mod_layout.setContentsMargins(0, 0, 0, 0)
+
+        scroll_mod = QScrollArea()
+        scroll_mod.setWidgetResizable(True)
+        scroll_mod.setFrameShape(QScrollArea.Shape.NoFrame)
+        scroll_content_mod = QWidget()
+        layout_mod = QVBoxLayout(scroll_content_mod)
         layout_mod.setSpacing(15)
+        layout_mod.setContentsMargins(8, 8, 8, 8)
         
         # --- Ubicación ---
         group_ubicacion = QGroupBox("📍 Ubicación")
@@ -315,6 +334,8 @@ class FundacionesWidget(QWidget):
         layout_mod.addWidget(self.btn_modelar_fundacion)
         
         layout_mod.addStretch()
+        scroll_mod.setWidget(scroll_content_mod)
+        tab_mod_layout.addWidget(scroll_mod)
         self.tab_widget.addTab(tab_modelar, "🏗️ Modelar")
         
         main_layout.addWidget(self.tab_widget)
@@ -324,7 +345,7 @@ class FundacionesWidget(QWidget):
         layout_log = QVBoxLayout()
         
         self.log_text = LogWidget()
-        self.log_text.setMaximumHeight(120)
+        self.log_text.setFixedHeight(120)
         layout_log.addWidget(self.log_text)
         
         group_log.setLayout(layout_log)

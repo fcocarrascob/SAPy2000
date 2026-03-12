@@ -5,6 +5,7 @@ from PySide6.QtWidgets import (
     QWidget, QLabel, QToolBar, QMenuBar,
 )
 from PySide6.QtGui import QAction
+from PySide6.QtCore import QSettings, Qt
 from sap_interface import SapInterface
 from themes import apply_theme
 from gui_components import ConnectionStatusWidget, StyledButton
@@ -32,8 +33,10 @@ class UnifiedApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("SAP2000 Automation Suite")
+        self.setMinimumSize(800, 600)
         self.resize(1024, 768)
         self.logger = AppLogger()
+        self._settings = QSettings("SAPy2000", "UnifiedApp")
 
         # --- SAP Interface ---
         self.sap_interface = SapInterface()
@@ -60,6 +63,7 @@ class UnifiedApp(QMainWindow):
         self.setCentralWidget(self.tabs)
 
         self.init_tabs()
+        self._restore_geometry()
         self.logger.info("Aplicación iniciada")
 
     def _create_menus(self):
@@ -105,6 +109,28 @@ class UnifiedApp(QMainWindow):
             "<p><b>Tecnologías:</b> Python · PySide6 · comtypes · SAP2000 OAPI</p>"
             "<p><b>Normativa:</b> NCh2369:2025 · AISC 360</p>"
         )
+
+    def _restore_geometry(self):
+        """Restaura tamaño y estado de ventana guardados."""
+        geometry = self._settings.value("geometry")
+        state = self._settings.value("windowState")
+        if geometry:
+            self.restoreGeometry(geometry)
+        if state:
+            self.restoreState(state)
+
+    def closeEvent(self, event):
+        """Guarda geometría antes de cerrar."""
+        self._settings.setValue("geometry", self.saveGeometry())
+        self._settings.setValue("windowState", self.saveState())
+        super().closeEvent(event)
+
+    def changeEvent(self, event):
+        """Fuerza actualización del layout al restaurar desde minimizado."""
+        super().changeEvent(event)
+        if event.type() == event.Type.WindowStateChange:
+            if not (self.windowState() & Qt.WindowMinimized):
+                self.centralWidget().updateGeometry()
 
     def on_connection_changed(self, connected):
         self.conn_status.set_connected(connected)
