@@ -13,7 +13,7 @@ Agregar capa de validación de inputs, mejorar feedback al usuario con confirmac
 
 #### Step 6.1: Agregar Validadores a `gui_components.py`
 
-- [ ] Agregar la clase `InputValidator` al final de `gui_components.py`:
+ - [x] Agregar la clase `InputValidator` al final de `gui_components.py`:
 
 ```python
 # ======================================================================
@@ -108,7 +108,7 @@ class InputValidator:
 
 #### Step 6.2: Agregar Función Helper de Confirmación a `gui_components.py`
 
-- [ ] Agregar al final de `gui_components.py`:
+ - [x] Agregar al final de `gui_components.py`:
 
 ```python
 # ======================================================================
@@ -164,7 +164,7 @@ def show_validation_errors(parent, errors: list):
 
 #### Step 6.3: Agregar Validación Pre-Ejecución en `Modelo_Base/app_modelo_base_gui.py`
 
-- [ ] En el método `on_create_model_click`, agregar validación con confirmación detallada:
+ - [x] En el método `on_create_model_click`, agregar validación con confirmación detallada:
 
 Buscar (al inicio del método, después de la validación de conexión):
 ```python
@@ -209,7 +209,7 @@ Reemplazar con:
 
 #### Step 6.4: Agregar Validación Pre-Ejecución en `Fundaciones/fundaciones_gui.py`
 
-- [ ] En el método `create_pedestal_section`, agregar validación de inputs antes de llamar al backend:
+ - [x] En el método `create_pedestal_section`, agregar validación de inputs antes de llamar al backend:
 
 Agregar al inicio del método (después de verificar conexión):
 ```python
@@ -258,7 +258,7 @@ Agregar antes de llamar al backend:
 
 #### Step 6.5: Agregar Validación Pre-Ejecución en `Utilidades_MOD/app_utils_gui.py`
 
-- [ ] En el método de generar malla rectangular, agregar validación:
+ - [x] En el método de generar malla rectangular, agregar validación:
 
 Agregar antes de llamar al backend:
 ```python
@@ -295,7 +295,7 @@ Agregar antes de llamar al backend:
 
 #### Step 6.6: Agregar Validación en `Combinations_Carga/app_combos_gui.py`
 
-- [ ] En `send_to_sap`, agregar validación de conexión antes de enviar:
+ - [x] En `send_to_sap`, agregar validación de conexión antes de enviar:
 
 Buscar (al inicio de `send_to_sap`):
 ```python

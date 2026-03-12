@@ -485,6 +485,26 @@ class RectangularMeshWidget(BaseMeshWidget):
             plane = self.plane_combo.currentText()
             prop = self.prop_edit.text()
 
+            from gui_components import InputValidator, show_validation_errors
+
+            errors = []
+            ok, msg = InputValidator.validate_positive(self.width_edit.text(), "Ancho")
+            if not ok:
+                errors.append(msg)
+            ok, msg = InputValidator.validate_positive(self.length_edit.text(), "Largo")
+            if not ok:
+                errors.append(msg)
+            ok, msg = InputValidator.validate_numeric(self.nx_edit.text(), "Divisiones X", min_val=1, max_val=200)
+            if not ok:
+                errors.append(msg)
+            ok, msg = InputValidator.validate_numeric(self.ny_edit.text(), "Divisiones Y", min_val=1, max_val=200)
+            if not ok:
+                errors.append(msg)
+
+            if errors:
+                show_validation_errors(self, errors)
+                return
+
             if self.plane_combo.currentIndex() < 0 or plane.strip() == "":
                 self.log("⚠️ Seleccione un plano antes de generar la malla.")
                 return

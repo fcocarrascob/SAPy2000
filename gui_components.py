@@ -181,3 +181,125 @@ class ConnectionStatusWidget(QWidget):
             )
             self._label.setText("Desconectado")
             self._label.setStyleSheet(f"color: {COLORS['text_secondary']};")
+
+
+# ======================================================================
+# InputValidator
+# ======================================================================
+
+class InputValidator:
+    """
+    Validadores reutilizables para inputs de formularios.
+
+    Uso:
+        ok, msg = InputValidator.validate_numeric("12.5", min_val=0, max_val=100)
+        ok, msg = InputValidator.validate_required("")
+        ok, msg = InputValidator.validate_positive("0")
+    """
+
+    @staticmethod
+    def validate_required(value: str, field_name: str = "Campo") -> tuple:
+        """Valida que el valor no esté vacío."""
+        if not value or not str(value).strip():
+            return False, f"{field_name} es requerido."
+        return True, ""
+
+    @staticmethod
+    def validate_numeric(
+        value: str, field_name: str = "Valor",
+        min_val: float = None, max_val: float = None,
+    ) -> tuple:
+        """Valida que el valor sea numérico y esté dentro del rango."""
+        if not value or not str(value).strip():
+            return False, f"{field_name} es requerido."
+        try:
+            num = float(value)
+        except (ValueError, TypeError):
+            return False, f"{field_name} debe ser un número válido."
+
+        if min_val is not None and num < min_val:
+            return False, f"{field_name} debe ser ≥ {min_val}."
+        if max_val is not None and num > max_val:
+            return False, f"{field_name} debe ser ≤ {max_val}."
+        return True, ""
+
+    @staticmethod
+    def validate_positive(value: str, field_name: str = "Valor") -> tuple:
+        """Valida que el valor sea un número positivo (> 0)."""
+        ok, msg = InputValidator.validate_numeric(value, field_name)
+        if not ok:
+            return ok, msg
+        if float(value) <= 0:
+            return False, f"{field_name} debe ser mayor que 0."
+        return True, ""
+
+    @staticmethod
+    def validate_coordinates(x: str, y: str, z: str) -> tuple:
+        """Valida que las tres coordenadas sean números válidos."""
+        for label, val in [("X", x), ("Y", y), ("Z", z)]:
+            ok, msg = InputValidator.validate_numeric(val, field_name=f"Coordenada {label}")
+            if not ok:
+                return False, msg
+        return True, ""
+
+    @staticmethod
+    def validate_batch(validations: list) -> tuple:
+        """
+        Ejecuta múltiples validaciones y retorna el primer error.
+
+        Args:
+            validations: Lista de tuplas (ok: bool, msg: str)
+
+        Returns:
+            (True, "") si todo pasó, o (False, primer_error) si alguno falla.
+        """
+        for ok, msg in validations:
+            if not ok:
+                return False, msg
+        return True, ""
+
+
+# ======================================================================
+# Helpers de Diálogo
+# ======================================================================
+
+from PySide6.QtWidgets import QMessageBox
+
+
+def confirm_action(parent, title: str, message: str, detail: str = "") -> bool:
+    """
+    Muestra un diálogo de confirmación antes de una operación importante.
+
+    Args:
+        parent: Widget padre para el diálogo
+        title: Título del diálogo
+        message: Mensaje principal
+        detail: Texto de detalle (opcional, aparece en área expandible)
+
+    Returns:
+        True si el usuario confirma, False si cancela.
+    """
+    box = QMessageBox(parent)
+    box.setWindowTitle(title)
+    box.setText(message)
+    box.setIcon(QMessageBox.Question)
+    box.setStandardButtons(QMessageBox.Yes | QMessageBox.No)
+    box.setDefaultButton(QMessageBox.No)
+    if detail:
+        box.setDetailedText(detail)
+    return box.exec() == QMessageBox.Yes
+
+
+def show_validation_errors(parent, errors: list):
+    """
+    Muestra un diálogo con los errores de validación.
+
+    Args:
+        parent: Widget padre
+        errors: Lista de strings con mensajes de error
+    """
+    if not errors:
+        return
+    msg = "Se encontraron los siguientes problemas:\n\n"
+    msg += "\n".join(f"• {e}" for e in errors)
+    QMessageBox.warning(parent, "Validación", msg)

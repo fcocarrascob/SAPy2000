@@ -175,6 +175,20 @@ class CombosWidget(QWidget):
             )
             return
 
+        # Verificar conexión activa
+        if not self.sap_interface or not self.sap_interface.is_connected():
+            QMessageBox.warning(self, "Desconectado", "No hay conexión activa con SAP2000.")
+            return
+
+        from gui_components import confirm_action
+        rows = self.table.rowCount()
+        if not confirm_action(
+            self,
+            "Enviar Combinaciones",
+            f"Se enviarán {rows} combinaciones a SAP2000.\n¿Continuar?",
+        ):
+            return
+
         data_to_send = []
         rows = self.table.rowCount()
 

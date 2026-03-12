@@ -388,13 +388,24 @@ class ModeloBaseWidget(QWidget):
             QMessageBox.warning(self, "Desconectado", "No hay conexión activa con SAP2000.")
             return
 
-        # Confirmación
-        res = QMessageBox.warning(
-            self, "Advertencia", 
-            "Esto BORRARÁ el modelo actual y creará uno nuevo.\n¿Continuar?",
-            QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+        # Confirmación con resumen de parámetros
+        from gui_components import confirm_action
+        zone = int(self.combo_zone.currentText())
+        soil = self.combo_soil.currentText()
+        summary = (
+            f"Zona Sísmica: {zone}\n"
+            f"Tipo de Suelo: {soil}\n"
+            f"Factor I: {self.spin_importance.value()}\n"
+            f"Rx: {self.spin_R_x.value()}, Ry: {self.spin_R_y.value()}\n"
+            f"Rv: {self.spin_vert_R.value()}\n"
+            f"ξx: {self.spin_damp_x.value()}, ξy: {self.spin_damp_y.value()}, ξv: {self.spin_vert_damp.value()}"
         )
-        if res != QMessageBox.Yes:
+        if not confirm_action(
+            self,
+            "Crear Modelo Base",
+            "Esto BORRARÁ el modelo actual y creará uno nuevo con los siguientes parámetros.\n¿Continuar?",
+            detail=summary,
+        ):
             return
 
         # Leer parámetros GUI

@@ -491,6 +491,29 @@ class FundacionesWidget(QWidget):
         if not self.sap_interface or not self.sap_interface.SapModel:
             self.log("⚠️ No hay conexión con SAP2000")
             return
+
+        from gui_components import InputValidator, show_validation_errors
+
+        errors = []
+        ok, msg = InputValidator.validate_required(self.edit_section_name.text(), "Nombre de sección")
+        if not ok:
+            errors.append(msg)
+        ok, msg = InputValidator.validate_positive(self.edit_width.text(), "Ancho")
+        if not ok:
+            errors.append(msg)
+        ok, msg = InputValidator.validate_positive(self.edit_height.text(), "Alto")
+        if not ok:
+            errors.append(msg)
+        ok, msg = InputValidator.validate_positive(self.edit_spacing.text(), "Espaciamiento")
+        if not ok:
+            errors.append(msg)
+        ok, msg = InputValidator.validate_positive(self.edit_cover.text(), "Recubrimiento")
+        if not ok:
+            errors.append(msg)
+
+        if errors:
+            show_validation_errors(self, errors)
+            return
         
         try:
             # Crear backend si no existe
@@ -771,6 +794,14 @@ class FundacionesWidget(QWidget):
             # Crear backend si no existe
             if not self.backend:
                 self.backend = FundacionesBackend(self.sap_interface.SapModel)
+
+            from gui_components import confirm_action
+            if not confirm_action(
+                self,
+                "Modelar Fundación",
+                "Se creará la fundación completa con los parámetros definidos.\n¿Continuar?",
+            ):
+                return
             
             # Obtener valores de los inputs
             try:
