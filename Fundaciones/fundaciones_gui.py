@@ -89,10 +89,6 @@ class FundacionesWidget(QWidget):
         layout_ped.setFieldGrowthPolicy(QFormLayout.FieldsStayAtSizeHint)
         layout_ped.setVerticalSpacing(8)
         
-        self.edit_section_name = QLineEdit("PED_01")
-        self.edit_section_name.setMaximumWidth(150)
-        layout_ped.addRow("Nombre:", self.edit_section_name)
-        
         # Dimensiones en horizontal
         dims_layout = QHBoxLayout()
         self.edit_width = QLineEdit("500")
@@ -108,6 +104,17 @@ class FundacionesWidget(QWidget):
         dims_layout.addWidget(QLabel("mm"))
         dims_layout.addStretch()
         layout_ped.addRow("Dimensiones:", dims_layout)
+
+        # Conectar señales para auto-generación del nombre
+        self.edit_width.textChanged.connect(self.update_pedestal_section_name)
+        self.edit_height.textChanged.connect(self.update_pedestal_section_name)
+
+        # Nombre (read-only, auto-generado)
+        self.edit_section_name = QLineEdit("PED_500x500")
+        self.edit_section_name.setMaximumWidth(150)
+        self.edit_section_name.setReadOnly(True)
+        self.edit_section_name.setToolTip("Nombre auto-generado a partir de las dimensiones ingresadas")
+        layout_ped.addRow("Nombre:", self.edit_section_name)
         
         # Refuerzo
         self.combo_corner_bars = QComboBox()
@@ -155,14 +162,19 @@ class FundacionesWidget(QWidget):
         layout_zap.setFieldGrowthPolicy(QFormLayout.FieldsStayAtSizeHint)
         layout_zap.setVerticalSpacing(8)
         
-        self.edit_zapata_name = QLineEdit("LOSA_")
-        self.edit_zapata_name.setMaximumWidth(150)
-        self.edit_zapata_name.setToolTip("Se crearán: LOSA_ (gris claro) y LOSA_PED (gris oscuro)")
-        layout_zap.addRow("Nombre Base:", self.edit_zapata_name)
-        
         self.edit_zapata_thickness = QLineEdit("300")
         self.edit_zapata_thickness.setMaximumWidth(100)
         layout_zap.addRow("Espesor (mm):", self.edit_zapata_thickness)
+
+        # Conectar señal para auto-generación del nombre
+        self.edit_zapata_thickness.textChanged.connect(self.update_zapata_section_name)
+
+        # Nombre (read-only, auto-generado)
+        self.edit_zapata_name = QLineEdit("LOSA_300")
+        self.edit_zapata_name.setMaximumWidth(150)
+        self.edit_zapata_name.setReadOnly(True)
+        self.edit_zapata_name.setToolTip("Nombre auto-generado. Se crearán: LOSA_300 (gris claro) y LOSA_300PED (gris oscuro)")
+        layout_zap.addRow("Nombre Base:", self.edit_zapata_name)
         
         self.btn_create_zapata = StyledButton("✨ Crear Secciones Shell", variant="primary")
         self.btn_create_zapata.clicked.connect(self.create_zapata_sections)
@@ -242,6 +254,7 @@ class FundacionesWidget(QWidget):
         self.combo_seccion_frame.setEditable(True)
         self.combo_seccion_frame.addItem("-- Sin conexión a SAP2000 --")
         self.combo_seccion_frame.setToolTip("Sección para el elemento Frame (pedestal)")
+        self.combo_seccion_frame.currentTextChanged.connect(self.on_frame_section_changed)
         frame_section_layout.addWidget(self.combo_seccion_frame)
         
         self.btn_reload_frame = StyledButton("🔄", variant="secondary")
@@ -280,6 +293,24 @@ class FundacionesWidget(QWidget):
         dims_ped_layout.addStretch()
         layout_comp.addRow("Dimensión Pedestal:", dims_ped_layout)
         
+        # Sección Shell Zapata con botón de actualización
+        shell_zapata_layout = QHBoxLayout()
+        self.combo_seccion_shell_zapata = QComboBox()
+        self.combo_seccion_shell_zapata.setEditable(True)
+        self.combo_seccion_shell_zapata.addItem("-- Sin conexión a SAP2000 --")
+        self.combo_seccion_shell_zapata.setToolTip("Sección Shell para la losa de la zapata")
+        self.combo_seccion_shell_zapata.currentTextChanged.connect(self.on_shell_zapata_section_changed)
+        shell_zapata_layout.addWidget(self.combo_seccion_shell_zapata)
+
+        self.btn_reload_shell_zapata = StyledButton("🔄", variant="secondary")
+        self.btn_reload_shell_zapata.setMaximumWidth(40)
+        self.btn_reload_shell_zapata.setToolTip("Actualizar secciones de Shell disponibles")
+        self.btn_reload_shell_zapata.clicked.connect(self.load_sections)
+        self.btn_reload_shell_zapata.setEnabled(False)
+        shell_zapata_layout.addWidget(self.btn_reload_shell_zapata)
+
+        layout_comp.addRow("Sección Losa-Zapata:", shell_zapata_layout)
+
         # Sección Shell con botón de actualización
         shell_section_layout = QHBoxLayout()
         self.combo_seccion_shell = QComboBox()
@@ -295,7 +326,7 @@ class FundacionesWidget(QWidget):
         self.btn_reload_shell.setEnabled(False)
         shell_section_layout.addWidget(self.btn_reload_shell)
         
-        layout_comp.addRow("Sección Zapata:", shell_section_layout)
+        layout_comp.addRow("Sección Losa-Pedestal:", shell_section_layout)
         
         # Espesor Zapata
         self.edit_espesor_zapata = QLineEdit("300")
@@ -323,7 +354,16 @@ class FundacionesWidget(QWidget):
         mesh_layout.addWidget(self.edit_mesh_ny)
         mesh_layout.addStretch()
         layout_opc.addRow("Malla de Losa:", mesh_layout)
-        
+
+        vuelo_layout = QHBoxLayout()
+        self.edit_vuelo = QLineEdit("500")
+        self.edit_vuelo.setMaximumWidth(80)
+        self.edit_vuelo.setToolTip("Distancia que la zapata sobresale del pedestal en todos los lados")
+        vuelo_layout.addWidget(self.edit_vuelo)
+        vuelo_layout.addWidget(QLabel("mm"))
+        vuelo_layout.addStretch()
+        layout_opc.addRow("Vuelo Zapata:", vuelo_layout)
+
         group_opciones.setLayout(layout_opc)
         layout_mod.addWidget(group_opciones)
         
@@ -354,6 +394,48 @@ class FundacionesWidget(QWidget):
         self.log("Módulo de Fundaciones iniciado")
         self.log("💡 Pestaña 'Definiciones': Crear secciones | Pestaña 'Modelar': Crear fundación")
     
+    def on_frame_section_changed(self, name: str):
+        """Al seleccionar una sección Frame tipo PED_ANCHOxALTO, rellena las dimensiones del pedestal."""
+        import re
+        match = re.match(r'^PED_(\d+(?:\.\d+)?)x(\d+(?:\.\d+)?)$', name.strip(), re.IGNORECASE)
+        if match:
+            self.edit_ancho_pedestal.setText(match.group(2))
+            self.edit_alto_pedestal.setText(match.group(1))
+
+    def on_shell_zapata_section_changed(self, name: str):
+        """Al seleccionar una sección Shell tipo LOSA_ESPESOR, rellena el espesor de zapata."""
+        import re
+        match = re.match(r'^LOSA_(\d+(?:\.\d+)?)$', name.strip(), re.IGNORECASE)
+        if match:
+            self.edit_espesor_zapata.setText(match.group(1))
+
+    def update_zapata_section_name(self):
+        """Auto-genera el nombre base de la sección zapata a partir del Espesor."""
+        espesor = self.edit_zapata_thickness.text().strip()
+        try:
+            val = float(espesor)
+            espesor_str = str(int(val)) if val == int(val) else espesor
+        except ValueError:
+            espesor_str = espesor if espesor else "?"
+        self.edit_zapata_name.setText(f"LOSA_{espesor_str}")
+
+    def update_pedestal_section_name(self):
+        """Auto-genera el nombre de la sección pedestal a partir de Ancho y Alto."""
+        ancho = self.edit_width.text().strip()
+        alto = self.edit_height.text().strip()
+        # Formatear como enteros si son valores numéricos enteros
+        try:
+            ancho_val = float(ancho)
+            ancho_str = str(int(ancho_val)) if ancho_val == int(ancho_val) else ancho
+        except ValueError:
+            ancho_str = ancho if ancho else "?"
+        try:
+            alto_val = float(alto)
+            alto_str = str(int(alto_val)) if alto_val == int(alto_val) else alto
+        except ValueError:
+            alto_str = alto if alto else "?"
+        self.edit_section_name.setText(f"PED_{ancho_str}x{alto_str}")
+
     def on_connection_changed(self, connected):
         """
         Se ejecuta cuando cambia el estado de conexión con SAP2000.
@@ -366,6 +448,7 @@ class FundacionesWidget(QWidget):
         self.btn_get_coords.setEnabled(connected)
         self.btn_modelar_fundacion.setEnabled(connected)
         self.btn_reload_frame.setEnabled(connected)
+        self.btn_reload_shell_zapata.setEnabled(connected)
         self.btn_reload_shell.setEnabled(connected)
         
         if connected:
@@ -383,6 +466,8 @@ class FundacionesWidget(QWidget):
             # Resetear secciones
             self.combo_seccion_frame.clear()
             self.combo_seccion_frame.addItem("-- Sin conexión a SAP2000 --")
+            self.combo_seccion_shell_zapata.clear()
+            self.combo_seccion_shell_zapata.addItem("-- Sin conexión a SAP2000 --")
             self.combo_seccion_shell.clear()
             self.combo_seccion_shell.addItem("-- Sin conexión a SAP2000 --")
             
@@ -614,16 +699,6 @@ class FundacionesWidget(QWidget):
                 self.log(f"✅ Sección {section_name} creada exitosamente!")
                 self.log("   Revise el Section Designer en SAP2000")
                 self.log("=" * 60)
-                
-                # Incrementar nombre para próxima sección
-                # Extraer número al final si existe
-                import re
-                match = re.search(r'(\d+)$', section_name)
-                if match:
-                    num = int(match.group(1))
-                    base_name = section_name[:match.start()]
-                    next_name = f"{base_name}{num + 1:02d}"
-                    self.edit_section_name.setText(next_name)
             else:
                 self.log("❌ Error al crear la sección. Revise el log para detalles")
                 
@@ -672,26 +747,30 @@ class FundacionesWidget(QWidget):
             # --- Cargar secciones de Shell ---
             self.log("Obteniendo secciones de Shell del modelo...")
             shell_sections = self.backend.get_shell_sections()
-            
-            # Guardar selección actual
+
+            # Guardar selecciones actuales
+            current_shell_zapata = self.combo_seccion_shell_zapata.currentText()
             current_shell = self.combo_seccion_shell.currentText()
-            
-            # Actualizar combo de Shell
+
+            # Actualizar combo Losa-Zapata
+            self.combo_seccion_shell_zapata.clear()
+            # Actualizar combo Losa-Pedestal
             self.combo_seccion_shell.clear()
-            
+
             if shell_sections:
                 for sec_name in shell_sections:
+                    self.combo_seccion_shell_zapata.addItem(sec_name)
                     self.combo_seccion_shell.addItem(sec_name)
-                
-                # Restaurar selección previa si existe
+
+                idx = self.combo_seccion_shell_zapata.findText(current_shell_zapata)
+                self.combo_seccion_shell_zapata.setCurrentIndex(idx if idx >= 0 else 0)
+
                 idx = self.combo_seccion_shell.findText(current_shell)
-                if idx >= 0:
-                    self.combo_seccion_shell.setCurrentIndex(idx)
-                else:
-                    self.combo_seccion_shell.setCurrentIndex(0)
-                
+                self.combo_seccion_shell.setCurrentIndex(idx if idx >= 0 else 0)
+
                 self.log(f"✓ {len(shell_sections)} secciones de Shell encontradas")
             else:
+                self.combo_seccion_shell_zapata.addItem("-- No hay secciones de Shell --")
                 self.combo_seccion_shell.addItem("-- No hay secciones de Shell --")
                 self.log("⚠️ No se encontraron secciones de Shell en el modelo")
                 
@@ -788,15 +867,6 @@ class FundacionesWidget(QWidget):
                 self.log(f"   • {section_name_1}")
                 self.log(f"   • {section_name_2}")
                 self.log("=" * 60)
-                
-                # Incrementar nombre para próxima sección
-                import re
-                match = re.search(r'(\d+)$', base_name)
-                if match:
-                    num = int(match.group(1))
-                    base_prefix = base_name[:match.start()]
-                    next_name = f"{base_prefix}{num + 1:02d}"
-                    self.edit_zapata_name.setText(next_name)
             else:
                 self.log("❌ Error al crear las secciones. Revise el log para detalles")
                 
@@ -835,21 +905,31 @@ class FundacionesWidget(QWidget):
                 espesor_zapata = float(self.edit_espesor_zapata.text())
                 mesh_nx = int(self.edit_mesh_nx.text())
                 mesh_ny = int(self.edit_mesh_ny.text())
+                vuelo = float(self.edit_vuelo.text())
             except ValueError:
                 self.log("❌ Las coordenadas, dimensiones, espesor y divisiones de malla deben ser valores numéricos")
                 return
-            
-            # Obtener sección del frame y shell
+
+            # Obtener secciones
             frame_section = self.combo_seccion_frame.currentText().strip()
             shell_section = self.combo_seccion_shell.currentText().strip()
-            
+            shell_section_zapata = self.combo_seccion_shell_zapata.currentText().strip()
+
             # Validaciones
             if "--" in frame_section or not frame_section:
                 self.log("❌ Debe seleccionar una sección de Frame válida")
                 return
-            
+
             if "--" in shell_section or not shell_section:
-                self.log("❌ Debe seleccionar una sección de Zapata válida")
+                self.log("❌ Debe seleccionar una sección de Losa-Pedestal válida")
+                return
+
+            if "--" in shell_section_zapata or not shell_section_zapata:
+                self.log("❌ Debe seleccionar una sección de Losa-Zapata válida")
+                return
+
+            if vuelo <= 0:
+                self.log("❌ El vuelo de la zapata debe ser mayor a cero")
                 return
             
             if altura_pedestal <= 0:
@@ -876,8 +956,10 @@ class FundacionesWidget(QWidget):
             self.log(f"  Dimensiones Pedestal: {ancho_seccion:.0f} x {alto_seccion:.0f} mm")
             self.log(f"  Espesor Zapata: {espesor_zapata} mm")
             self.log(f"  Malla Losa: {mesh_nx} x {mesh_ny}")
+            self.log(f"  Vuelo Zapata: {vuelo} mm")
             self.log(f"  Sección Frame: {frame_section}")
-            self.log(f"  Sección Shell: {shell_section}")
+            self.log(f"  Sección Losa-Pedestal: {shell_section}")
+            self.log(f"  Sección Losa-Zapata: {shell_section_zapata}")
             self.log("-" * 60)
             
             # --- PASO 1: Crear Frame de Pedestal ---
@@ -957,29 +1039,39 @@ class FundacionesWidget(QWidget):
             )
             
             if created_areas:
-                self.log(f"   ✅ Losa creada: {len(created_areas)} elementos")
+                self.log(f"   ✅ Losa-Pedestal creada: {len(created_areas)} elementos")
             else:
-                self.log("   ⚠️ Advertencia: No se pudieron crear elementos de losa")
-            
+                self.log("   ⚠️ Advertencia: No se pudieron crear elementos de losa-pedestal")
+
+            # --- PASO 5: Crear Anillo Perimetral (Losa-Zapata) ---
+            self.log(f"5️⃣ Creando Anillo Perimetral (Losa-Zapata):")
+            self.log(f"   Vuelo: {vuelo} mm")
+            self.log(f"   Sección: {shell_section_zapata}")
+
+            ring_areas = self.backend.create_zapata_perimeter_ring(
+                center_x=x,
+                center_y=y,
+                z=z4,
+                inner_width=ancho_seccion,
+                inner_height=alto_seccion,
+                vuelo=vuelo,
+                shell_section=shell_section_zapata,
+                nx=mesh_nx,
+                ny=mesh_ny
+            )
+
+            if ring_areas:
+                self.log(f"   ✅ Anillo creado: {len(ring_areas)} elementos")
+            else:
+                self.log("   ⚠️ Advertencia: No se pudieron crear elementos del anillo")
+
             # Resumen final
             self.log("=" * 60)
             self.log("🎉 ¡Fundación modelada exitosamente!")
             self.log(f"   • Frame: {frame_name} (sección: {frame_section})")
             self.log(f"   • Link: {link_name} (propiedad: {link_prop_name})")
-            self.log(f"   • Losa: {len(created_areas)} elementos (sección: {shell_section})")
-            self.log("=" * 60)
-            
-            if created_areas:
-                self.log(f"   ✅ Losa creada: {len(created_areas)} elementos")
-            else:
-                self.log("   ⚠️ Advertencia: No se pudieron crear elementos de losa")
-            
-            # Resumen final
-            self.log("=" * 60)
-            self.log("🎉 ¡Fundación modelada exitosamente!")
-            self.log(f"   • Frame: {frame_name} (sección: {frame_section})")
-            self.log(f"   • Link: {link_name} (propiedad: {link_prop_name})")
-            self.log(f"   • Losa: {len(created_areas)} elementos (sección: {shell_section})")
+            self.log(f"   • Losa-Pedestal: {len(created_areas)} elementos (sección: {shell_section})")
+            self.log(f"   • Losa-Zapata: {len(ring_areas)} elementos (sección: {shell_section_zapata})")
             self.log("=" * 60)
             
         except Exception as e:

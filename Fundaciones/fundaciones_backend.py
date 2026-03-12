@@ -929,6 +929,104 @@ class FundacionesBackend:
             return []
 
 
+    def create_zapata_perimeter_ring(self, center_x, center_y, z, inner_width, inner_height,
+                                     vuelo, shell_section, nx=4, ny=4):
+        """
+        Crea el anillo perimetral de shells alrededor de la losa interior del pedestal.
+
+        Genera 8 zonas:
+          - Franja Sur  (inner_width × vuelo)  → dividida nx × 1
+          - Franja Norte (inner_width × vuelo) → dividida nx × 1
+          - Franja Oeste (vuelo × inner_height) → dividida 1 × ny
+          - Franja Este  (vuelo × inner_height) → dividida 1 × ny
+          - 4 esquinas  (vuelo × vuelo)         → sin dividir
+
+        Returns:
+            list: Nombres de las áreas creadas
+        """
+        if not self.SapModel:
+            print("No hay conexión con SAP2000.")
+            return []
+
+        try:
+            current_units = self.SapModel.GetPresentUnits()
+            self.SapModel.SetPresentUnits(7)  # tonf_mm_C
+
+            # Límites de la losa interior
+            xl = center_x - inner_width / 2.0
+            xr = center_x + inner_width / 2.0
+            yb = center_y - inner_height / 2.0
+            yt = center_y + inner_height / 2.0
+
+            # Límites exteriores con vuelo
+            xl_o = xl - vuelo
+            xr_o = xr + vuelo
+            yb_o = yb - vuelo
+            yt_o = yt + vuelo
+
+            zs4 = [z, z, z, z]
+            created_areas = []
+
+            print(f"Creando anillo perimetral de zapata...")
+            print(f"  Losa interior: {inner_width}x{inner_height} mm")
+            print(f"  Vuelo: {vuelo} mm")
+            print(f"  Divisiones: {nx}x{ny}")
+            print(f"  Sección: {shell_section}")
+
+            def _add(xs, ys, label):
+                ret = self.SapModel.AreaObj.AddByCoord(
+                    4, xs, ys, zs4, "", shell_section, "", "Global"
+                )
+                if isinstance(ret, (list, tuple)) and ret[-1] == 0:
+                    name = str(ret[0])
+                    created_areas.append(name)
+                    return name
+                print(f"  ⚠️ Error creando área {label}: código {ret[-1] if isinstance(ret,(list,tuple)) else ret}")
+                return None
+
+            def _divide(name, n1, n2):
+                if not name or (n1 == 1 and n2 == 1):
+                    return
+                try:
+                    self.SapModel.EditArea.Divide(name, 1, 0, [], n1, n2)
+                except Exception as e:
+                    print(f"  ⚠️ Error dividiendo {name}: {e}")
+
+            # Franja Sur: xl→xr, yb_o→yb  (dividida nx×1)
+            _divide(_add([xl, xr, xr, xl], [yb_o, yb_o, yb,  yb ], "Sur"),   nx, 1)
+            # Franja Norte: xl→xr, yt→yt_o (dividida nx×1)
+            _divide(_add([xl, xr, xr, xl], [yt,  yt,  yt_o, yt_o], "Norte"), nx, 1)
+            # Franja Oeste: xl_o→xl, yb→yt (dividida 1×ny)
+            _divide(_add([xl_o, xl,  xl,  xl_o], [yb, yb, yt, yt], "Oeste"), 1, ny)
+            # Franja Este:  xr→xr_o, yb→yt (dividida 1×ny)
+            _divide(_add([xr,  xr_o, xr_o, xr],  [yb, yb, yt, yt], "Este"),  1, ny)
+            # Esquinas (sin dividir)
+            _add([xl_o, xl,  xl,  xl_o], [yb_o, yb_o, yb,  yb ], "SW")
+            _add([xr,  xr_o, xr_o, xr ], [yb_o, yb_o, yb,  yb ], "SE")
+            _add([xl_o, xl,  xl,  xl_o], [yt,   yt,  yt_o, yt_o], "NW")
+            _add([xr,  xr_o, xr_o, xr ], [yt,   yt,  yt_o, yt_o], "NE")
+
+            print(f"✓ Anillo perimetral creado: {len(created_areas)} áreas")
+
+            try:
+                self.SapModel.View.RefreshView(0, False)
+            except:
+                pass
+
+            self.SapModel.SetPresentUnits(current_units)
+            return created_areas
+
+        except Exception as e:
+            print(f"Error en create_zapata_perimeter_ring: {e}")
+            import traceback
+            traceback.print_exc()
+            try:
+                self.SapModel.SetPresentUnits(current_units)
+            except:
+                pass
+            return []
+
+
 # Test standalone
 if __name__ == "__main__":
     print("=== Test Fundaciones Backend ===")
