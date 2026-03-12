@@ -888,14 +888,15 @@ class FundacionesBackend:
                         # Manejo robusto del retorno (Regla de Oro)
                         ret_code = -1
                         area_name = ""
-                        
+
                         if isinstance(ret, (list, tuple)):
                             ret_code = ret[-1]
-                            if len(ret) > 1:
-                                area_name = str(ret[0])
+                            # AddByCoord returns (x[], y[], z[], Name, RetCode)
+                            if len(ret) >= 5:
+                                area_name = str(ret[3])
                         elif isinstance(ret, int):
                             ret_code = ret
-                        
+
                         if ret_code == 0:
                             if area_name:
                                 created_areas.append(area_name)
@@ -977,8 +978,9 @@ class FundacionesBackend:
                 ret = self.SapModel.AreaObj.AddByCoord(
                     4, xs, ys, zs4, "", shell_section, "", "Global"
                 )
+                # AddByCoord returns (x[], y[], z[], Name, RetCode)
                 if isinstance(ret, (list, tuple)) and ret[-1] == 0:
-                    name = str(ret[0])
+                    name = str(ret[3]) if len(ret) >= 5 else str(ret[0])
                     created_areas.append(name)
                     return name
                 print(f"  ⚠️ Error creando área {label}: código {ret[-1] if isinstance(ret,(list,tuple)) else ret}")
@@ -1025,6 +1027,64 @@ class FundacionesBackend:
             except:
                 pass
             return []
+
+    def assign_balasto_spring(self, area_names: list, ks: float) -> int:
+        """
+        Asigna módulo de balasto como resorte de área (cara inferior) a una lista de shells.
+
+        Llama a AreaObj.SetSpring con:
+          - MyType = 1              (Spring simple)
+          - s = ks                  (rigidez por unidad de área [F/L³])
+          - SimpleSpringType = 2    (solo compresión)
+          - Face = -1               (cara inferior)
+          - SpringLocalOneType = 2  (normal a la cara)
+          - Outward = True          (apunta hacia fuera, hacia el suelo)
+          - Replace = True          (reemplaza springs existentes)
+
+        Args:
+            area_names: lista de nombres de objetos área
+            ks: módulo de balasto en las unidades activas del modelo
+
+        Returns:
+            int: número de áreas procesadas exitosamente
+        """
+        if not self.SapModel:
+            return 0
+
+        current_units = self.SapModel.GetPresentUnits()
+        self.SapModel.SetPresentUnits(14)  # kgf_cm_C
+
+        vec = [0.0, 0.0, 0.0]
+        ok_count = 0
+
+        for name in area_names:
+            try:
+                ret = self.SapModel.AreaObj.SetSpring(
+                    str(name),  # Name
+                    1,          # MyType: simple spring
+                    float(ks),  # s: stiffness per unit area [kgf/cm³]
+                    2,          # SimpleSpringType: compression only
+                    "",         # LinkProp
+                    -1,         # Face: bottom face
+                    2,          # SpringLocalOneType: normal to face
+                    1,          # Dir (no aplica cuando SpringLocalOneType=2)
+                    True,       # Outward
+                    vec,        # Vec (no aplica cuando SpringLocalOneType=2)
+                    0.0,        # Ang
+                    True,       # Replace
+                    "Local",    # CSys
+                    0           # ItemType: Object
+                )
+                if isinstance(ret, (list, tuple)):
+                    if ret[-1] == 0:
+                        ok_count += 1
+                elif ret == 0:
+                    ok_count += 1
+            except Exception as exc:
+                print(f"  [balasto] Excepción en área '{name}': {exc}")
+
+        self.SapModel.SetPresentUnits(current_units)
+        return ok_count
 
 
 # Test standalone

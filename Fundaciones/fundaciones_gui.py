@@ -333,6 +333,12 @@ class FundacionesWidget(QWidget):
         self.edit_espesor_zapata.setMaximumWidth(100)
         self.edit_espesor_zapata.setToolTip("Espesor de la zapata (para cálculo de link)")
         layout_comp.addRow("Espesor Zapata (mm):", self.edit_espesor_zapata)
+
+        # Módulo de balasto
+        self.edit_balasto = QLineEdit("5")
+        self.edit_balasto.setMaximumWidth(100)
+        self.edit_balasto.setToolTip("Módulo de balasto ks [kgf/cm³] asignado a la cara inferior de todos los shells de la fundación")
+        layout_comp.addRow("Módulo Balasto ks (kgf/cm³):", self.edit_balasto)
         
         group_componentes.setLayout(layout_comp)
         layout_mod.addWidget(group_componentes)
@@ -903,6 +909,7 @@ class FundacionesWidget(QWidget):
                 ancho_seccion = float(self.edit_ancho_pedestal.text())
                 alto_seccion = float(self.edit_alto_pedestal.text())
                 espesor_zapata = float(self.edit_espesor_zapata.text())
+                ks = float(self.edit_balasto.text())  # Convertir de tonf/m³ a kgf/cm³
                 mesh_nx = int(self.edit_mesh_nx.text())
                 mesh_ny = int(self.edit_mesh_ny.text())
                 vuelo = float(self.edit_vuelo.text())
@@ -944,6 +951,10 @@ class FundacionesWidget(QWidget):
                 self.log("❌ El espesor de la zapata debe ser mayor a cero")
                 return
             
+            if ks <= 0:
+                self.log("❌ El módulo de balasto debe ser mayor a cero")
+                return
+
             if mesh_nx <= 0 or mesh_ny <= 0:
                 self.log("❌ Las divisiones de malla deben ser mayores a cero")
                 return
@@ -960,6 +971,7 @@ class FundacionesWidget(QWidget):
             self.log(f"  Sección Frame: {frame_section}")
             self.log(f"  Sección Losa-Pedestal: {shell_section}")
             self.log(f"  Sección Losa-Zapata: {shell_section_zapata}")
+            self.log(f"  Módulo Balasto: {ks} kgf/cm³")
             self.log("-" * 60)
             
             # --- PASO 1: Crear Frame de Pedestal ---
@@ -1065,6 +1077,17 @@ class FundacionesWidget(QWidget):
             else:
                 self.log("   ⚠️ Advertencia: No se pudieron crear elementos del anillo")
 
+            # --- PASO 6: Asignar Módulo de Balasto ---
+            all_shell_areas = (created_areas or []) + (ring_areas or [])
+            self.log(f"6️⃣ Asignando módulo de balasto ks={ks} kgf/cm³ a {len(all_shell_areas)} shells:")
+
+            ok_springs = self.backend.assign_balasto_spring(all_shell_areas, ks)
+
+            if ok_springs == len(all_shell_areas):
+                self.log(f"   ✅ Balasto asignado a {ok_springs} shells")
+            else:
+                self.log(f"   ⚠️ Balasto asignado a {ok_springs}/{len(all_shell_areas)} shells")
+
             # Resumen final
             self.log("=" * 60)
             self.log("🎉 ¡Fundación modelada exitosamente!")
@@ -1072,6 +1095,7 @@ class FundacionesWidget(QWidget):
             self.log(f"   • Link: {link_name} (propiedad: {link_prop_name})")
             self.log(f"   • Losa-Pedestal: {len(created_areas)} elementos (sección: {shell_section})")
             self.log(f"   • Losa-Zapata: {len(ring_areas)} elementos (sección: {shell_section_zapata})")
+            self.log(f"   • Balasto ks={ks} kgf/cm³ asignado a {ok_springs} shells")
             self.log("=" * 60)
             
         except Exception as e:
