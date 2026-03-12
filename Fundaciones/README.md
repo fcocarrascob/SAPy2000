@@ -133,3 +133,16 @@ backend = FundacionesBackend()  # Debe conectar internamente si es necesario
 4. Integración con módulo de Reportes para generar memorias
 5. Exportar resultados a Excel
 6. Visualización gráfica de distribución de cargas
+
+## Infraestructura Utilizada
+
+- **StyledButton** — Botones de acción (primary, secondary)
+- **LogWidget** — Log de operaciones con timestamp
+- **check_ret_code** — Validación de retornos API SAP2000
+- **AppLogger** — Logging en backend
+
+## Ejecutar Standalone
+
+```bash
+python -m Fundaciones.fundaciones_gui
+```

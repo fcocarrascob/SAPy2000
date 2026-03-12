@@ -13,7 +13,7 @@ Crear documentación completa de estándares de desarrollo (`CODING_STANDARDS.md
 
 #### Step 7.1: Crear `docs/CODING_STANDARDS.md`
 
-- [ ] Crear el archivo `docs/CODING_STANDARDS.md` con el contenido siguiente:
+- [x] Crear el archivo `docs/CODING_STANDARDS.md` con el contenido siguiente:
 
 ```markdown
 # Estándares de Desarrollo — SAP2000 Automation Suite
@@ -306,14 +306,14 @@ if __name__ == "__main__":
 ```
 
 ##### Step 7.1 Verification Checklist
-- [ ] El archivo `docs/CODING_STANDARDS.md` existe y es legible
-- [ ] Los ejemplos de código son correctos y consistentes con la implementación actual
+- [x] El archivo `docs/CODING_STANDARDS.md` existe y es legible
+- [x] Los ejemplos de código son correctos y consistentes con la implementación actual
 
 ---
 
 #### Step 7.2: Actualizar `README.md` principal
 
-- [ ] Reemplazar el contenido de `README.md` en la raíz del proyecto con:
+- [x] Reemplazar el contenido de `README.md` en la raíz del proyecto con:
 
 ```markdown
 # SAP2000 Automation Suite
@@ -411,14 +411,14 @@ if check_ret_code(ret):                 # RetCode siempre es el último
 ```
 
 ##### Step 7.2 Verification Checklist
-- [ ] El `README.md` principal refleja la estructura actual del proyecto
-- [ ] Las secciones listadas de infraestructura coinciden con los archivos creados
+- [x] El `README.md` principal refleja la estructura actual del proyecto
+- [x] Las secciones listadas de infraestructura coinciden con los archivos creados
 
 ---
 
 #### Step 7.3: Actualizar READMEs de Módulos
 
-- [ ] Actualizar `Combinations_Carga/README.md` agregando sección de infraestructura:
+- [x] Actualizar `Combinations_Carga/README.md` agregando sección de infraestructura:
 
 Agregar al final del archivo:
 ```markdown
@@ -437,7 +437,7 @@ python -m Combinations_Carga.app_combos_gui
 ```
 ```
 
-- [ ] Actualizar `Modelo_Base/README.md` agregando sección de infraestructura:
+- [x] Actualizar `Modelo_Base/README.md` agregando sección de infraestructura:
 
 Agregar al final:
 ```markdown
@@ -458,19 +458,19 @@ python -m Modelo_Base.app_modelo_base_gui
 ```
 ```
 
-- [ ] Actualizar `Fundaciones/README.md` agregando sección equivalente
-- [ ] Actualizar `Placa_Base/README.md` agregando sección equivalente
-- [ ] Actualizar `Utilidades_MOD/README.md` agregando sección equivalente
+- [x] Actualizar `Fundaciones/README.md` agregando sección equivalente
+- [x] Actualizar `Placa_Base/README.md` agregando sección equivalente
+- [x] Actualizar `Utilidades_MOD/README.md` agregando sección equivalente
 
 ##### Step 7.3 Verification Checklist
-- [ ] Cada README de módulo menciona los componentes de infraestructura utilizados
-- [ ] Los comandos de ejecución standalone son correctos
+- [x] Cada README de módulo menciona los componentes de infraestructura utilizados
+- [x] Los comandos de ejecución standalone son correctos
 
 ---
 
 #### Step 7.4: Actualizar `.github/copilot-instructions.md`
 
-- [ ] Agregar sección sobre la infraestructura nueva al final antes de la sección "Convenciones":
+- [x] Agregar sección sobre la infraestructura nueva al final antes de la sección "Convenciones":
 
 ```markdown
 
@@ -502,8 +502,8 @@ btn = StyledButton("📥 Leer", variant="primary")
 ```
 
 ##### Step 7.4 Verification Checklist
-- [ ] Las copilot-instructions reflejan la nueva infraestructura
-- [ ] Copilot podrá usar estos componentes al generar código nuevo
+- [x] Las copilot-instructions reflejan la nueva infraestructura
+- [x] Copilot podrá usar estos componentes al generar código nuevo
 
 ---
 

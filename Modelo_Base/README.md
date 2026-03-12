@@ -117,6 +117,21 @@ python main_app.py
 # → Pestaña "Modelo Base"
 ```
 
+## Infraestructura Utilizada
+
+- **StyledButton** — Botón "🏗️ Crear Modelo Base" (primary)
+- **ProgressGroup** — Barra de progreso durante creación
+- **LogWidget** — Log paso a paso de la creación
+- **check_ret_code** — Validación de retornos API
+- **AppLogger** — Logging en backend
+- **confirm_action** — Confirmación con detalle de parámetros
+
+## Ejecutar Standalone
+
+```bash
+python -m Modelo_Base.app_modelo_base_gui
+```
+
 ## Dependencias
 
 - `comtypes` (API SAP2000)

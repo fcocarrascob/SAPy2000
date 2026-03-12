@@ -119,6 +119,19 @@ La pestaña **"Utilidades de Modelado"** en `main_app.py` presenta las 4 sub-pes
 python Utilidades_MOD/app_utils_gui.py
 ```
 
+## Infraestructura Utilizada
+
+- **StyledButton** — Botones de generación y consulta (primary, secondary)
+- **LogWidget** — Log de operaciones con timestamp
+- **check_ret_code** — Validación de retornos API SAP2000
+- **AppLogger** — Logging en backend
+
+## Ejecutar Standalone
+
+```bash
+python -m Utilidades_MOD.app_utils_gui
+```
+
 ## Dependencias
 
 - `comtypes` (API SAP2000)

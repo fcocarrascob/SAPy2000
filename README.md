@@ -1,87 +1,95 @@
-# Herramientas de Automatización para SAP2000
+# SAP2000 Automation Suite
 
-Este proyecto proporciona un conjunto de herramientas en Python para automatizar tareas en CSI SAP2000 utilizando la OAPI (Open Application Programming Interface) a través de la librería `comtypes`. La aplicación sigue una arquitectura modular y unificada, integrando múltiples herramientas en una sola interfaz gráfica con pestañas.
+Suite de automatización para CSI SAP2000 con interfaz gráfica PySide6.
 
-## Características Principales
+Automatiza creación de modelos, combinaciones de carga, diseño de placas base,
+fundaciones y más, conectándose a SAP2000 vía COM (comtypes).
 
-*   **Aplicación Unificada**: Una sola ventana (`main_app.py`) que gestiona todas las herramientas.
-*   **Conexión Centralizada**: Gestión eficiente de la conexión a SAP2000 (OAPI) compartida entre todos los módulos.
-*   **Arquitectura Modular**: Fácil escalabilidad para añadir nuevas funcionalidades sin afectar las existentes.
+## Tecnologías
 
-## Componentes del Sistema
+- **Python 3.10+**
+- **PySide6** — Interfaz gráfica
+- **comtypes** — Automatización COM SAP2000
+- **Normativa** — NCh2369:2025, AISC 360
 
-### 1. Aplicación Principal (`main_app.py`)
-El punto de entrada de la aplicación. Gestiona la barra de herramientas, la conexión global a SAP2000 y aloja las interfaces de los módulos en pestañas.
+## Arquitectura
 
-### 2. Generador de Modelo Base (`Modelo_Base`)
-Herramienta para inicializar modelos estandarizados.
-- Creación automática de materiales y perfiles predefinidos.
-- Generación de patrones de carga y combinaciones (NCh3171 y NCh2369:2025).
-- Configuración de espectros sísmicos según normativa chilena (NCh2369:2025).
+```
+main_app.py              ← Punto de entrada (QMainWindow con pestañas)
+sap_interface.py         ← Singleton de conexión SAP2000
+themes.py                ← Paleta de colores y tema visual
+gui_components.py        ← Componentes reutilizables (StyledButton, LogWidget, etc.)
+sap_utils_common.py      ← Utilidades compartidas para SAP API
+app_logger.py            ← Sistema de logging unificado
 
-### 3. Gestor de Combinaciones de Carga (`Combinations_Carga`)
-Interfaz tipo Excel para gestionar combinaciones de carga.
-- Lectura y escritura de combinaciones ("Upsert").
-- Soporte para ASD/LRFD y tipos de combinación (Lineal, Envolvente).
-- Visualización en cuadrícula.
+Combinations_Carga/      ← Gestor de combinaciones de carga
+Modelo_Base/             ← Creación de modelo base NCh2369
+Fundaciones/             ← Diseño de fundaciones
+Placa_Base/              ← Diseño de placa base
+Utilidades_MOD/          ← Mallas, tablas y herramientas
+Reportes/                ← Reportes (en transición a PANDOC)
 
-### 3. Utilidades de Mallado (`Utilidades_MOD`)
-Herramientas avanzadas de geometría y mallado.
-- Generación de mallas rectangulares.
-- Creación de huecos circulares en elementos de área.
-- Vista previa en tiempo real.
-
-### 4. Diseño de Placa Base (`Placa_Base`)
-Módulo específico para el modelado y generación de geometrías de placas base, pernos y rigidizadores.
-
-### 5. Generador de Memorias y Reportes (`Reportes`)
-Sistema avanzado para la generación automática de memorias de cálculo en Microsoft Word. **[Ver Guía Detallada](Reportes/README.md)**.
-
-- **Asistente en Vivo**: Inyecta tablas de datos de SAP2000 (Materiales, Cargas, Secciones) directamente en la posición del cursor de Word.
-- **Generación por Templates**: Crea documentos completos basándose en plantillas JSON personalizables.
-- **Librería de Contenido (Snippets)**:
-    - Gestión completa (Crear, Editar, Eliminar) de bloques de texto y ecuaciones.
-    - **Editor de Ecuaciones Visual**: "Ribbon" intuitivo para insertar fórmulas complejas (Matrices, Integrales, etc.).
-    - Soporte para **Ecuaciones Inline** (ej: `$E=mc^2$`) dentro del texto.
-    - Renderizado nativo en Word usando **UnicodeMath**.
-
-## Requisitos
-
-- **Software**: CSI SAP2000 (v20+ recomendado) y **Microsoft Word**.
-- **Python**: 3.13+.
-- **Librerías**:
-    - `comtypes`: Interfaz COM (SAP2000 y Word).
-    - `PySide6`: Interfaz Gráfica (Qt).
-
-Instalación de dependencias:
-```bash
-pip install comtypes PySide6
+API/                     ← Documentación de referencia CSI OAPI
+docs/                    ← Guías de desarrollo
 ```
 
-## Uso
-
-1. Abra SAP2000 y cargue un modelo (o inicie uno nuevo).
-2. Ejecute la aplicación principal:
+## Instalación
 
 ```bash
-python main_app.py
+pip install PySide6 comtypes
+pip install matplotlib  # Opcional, para vista previa de espectros
 ```
-3. Navegue por las pestañas para usar las distintas herramientas.
 
-## Arquitectura Técnica
+## Ejecución
 
-El proyecto utiliza una arquitectura de **Inyección de Dependencias** para compartir la instancia de SAP2000:
+```bash
+# Aplicación completa
+python -m main_app
 
-1.  **`SapInterface` (Singleton-like)**:
-    - Ubicado en `sap_interface.py`.
-    - Mantiene una única referencia activa al objeto COM de SAP2000 (`SapModel`).
-    - Emite señales (`connectionChanged`) cuando el estado de la conexión varía.
+# Módulos individuales (standalone)
+python -m Combinations_Carga.app_combos_gui
+python -m Modelo_Base.app_modelo_base_gui
+python -m Fundaciones.fundaciones_gui
+python -m Placa_Base.app_placabase_gui
+python -m Utilidades_MOD.app_utils_gui
+```
 
-2.  **Módulos (Paquetes)**:
-    - Cada herramienta es un paquete de Python con su propio `__init__.py`.
-    - **Backend**: Clases agnósticas de la GUI (ej. `CombosBackend`) que reciben `sap_model` en su constructor.
-    - **Frontend**: Widgets de PySide6 que reciben `sap_interface` para coordinar la conexión.
+## Módulos
 
+| Módulo | Descripción |
+|--------|-------------|
+| **Combinaciones de Carga** | Lee/escribe combinaciones LRFD/ASD desde SAP2000 |
+| **Modelo Base** | Crea modelo NCh2369:2025 con materiales, espectros y combos |
+| **Fundaciones** | Diseño de pedestales con Section Designer + zapatas |
+| **Placa Base** | Diseño de placa base con pernos de anclaje |
+| **Utilidades** | Generación de mallas, visualización de tablas SAP |
+| **Reportes** | En transición a PANDOC (placeholder) |
+
+## Infraestructura Compartida
+
+| Archivo | Propósito |
+|---------|-----------|
+| `themes.py` | Tema visual modo claro, paleta de colores, stylesheet global |
+| `gui_components.py` | StyledButton, LogWidget, ProgressGroup, ConnectionStatusWidget, InputValidator |
+| `sap_utils_common.py` | check_ret_code, safe_sap_call, get_materials_by_type, create_point_safe |
+| `app_logger.py` | AppLogger singleton con niveles INFO/SUCCESS/WARNING/ERROR |
+
+## Desarrollo
+
+Consultar [docs/CODING_STANDARDS.md](docs/CODING_STANDARDS.md) para estándares completos.
+
+### Regla de Oro — Retornos comtypes
+
+```python
+ret = SapModel.LoadCases.GetNameList()  # → (count, names_tuple, RetCode)
+if check_ret_code(ret):                 # RetCode siempre es el último
+    count, names = ret[0], ret[1]
+```
+
+### Patrón de Inyección
+
+- **Backend**: recibe `sap_model` en constructor
+- **GUI Widget**: recibe `sap_interface`, conecta `connectionChanged` signal
 3.  **Patrón de Desarrollo**:
     - **Backend Unitario**: Permite probar la lógica sin GUI instanciando el backend y pasándole un modelo.
     - **GUI Decoplada**: La interfaz gráfica no contiene lógica de negocio compleja, solo presentación.

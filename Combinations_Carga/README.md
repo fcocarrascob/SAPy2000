@@ -96,3 +96,16 @@ python Combinations_Carga/combos_backend.py
 
 - `comtypes` (indirecta vía `sap_model`)
 - `PySide6` (GUI)
+
+## Infraestructura Utilizada
+
+- **StyledButton** — Botones con variantes (primary para leer, success para enviar)
+- **LogWidget** — Log de operaciones con timestamp
+- **check_ret_code** — Validación de retornos API SAP2000
+- **AppLogger** — Logging en backend
+
+## Ejecutar Standalone
+
+```bash
+python -m Combinations_Carga.app_combos_gui
+```

@@ -91,6 +91,32 @@ El módulo `Reportes/` usa `WordService` (comtypes → Word.Application):
 - Símbolos: `\alpha` → `α`, `\sum` → `∑` (diccionario `UNICODEMATH_SYMBOLS`)
 - Snippets: JSON en `Reportes/library/` con estructura `{category, snippets: [{id, title, content}]}`
 
+## Infraestructura Compartida (Step 1)
+
+La aplicación cuenta con infraestructura centralizada en la raíz:
+
+- **`themes.py`**: Tema visual modo claro. `apply_theme(app)` configura QPalette + stylesheet global. Diccionario `COLORS` con paleta completa. `BUTTON_STYLES` con variantes.
+- **`gui_components.py`**: Componentes reutilizables:
+  - `StyledButton(text, variant)` — variants: 'primary', 'success', 'warning', 'secondary'
+  - `LogWidget()` — QTextEdit de log con `.log(msg, level)` y auto-scroll
+  - `ProgressGroup(title)` — QGroupBox con QProgressBar + label de estado
+  - `ConnectionStatusWidget()` — Indicador visual de conexión
+  - `InputValidator` — Validadores: `validate_numeric()`, `validate_required()`, `validate_positive()`, `validate_coordinates()`
+  - `confirm_action(parent, title, msg)` — Diálogo de confirmación
+  - `show_validation_errors(parent, errors)` — Muestra errores de validación
+- **`sap_utils_common.py`**: `check_ret_code(ret)`, `safe_sap_call()`, `get_materials_by_type()`, `create_point_safe()`
+- **`app_logger.py`**: `AppLogger` singleton con `.info()`, `.success()`, `.warning()`, `.error()`
+
+### NO usar estilos inline — usar StyledButton y COLORS del tema
+
+```python
+# ✗ Incorrecto
+btn.setStyleSheet("background-color: #2196F3; color: white;")
+
+# ✓ Correcto
+btn = StyledButton("📥 Leer", variant="primary")
+```
+
 ## Convenciones
 
 - Usar `self.SapModel` (mayúscula) para consistencia con API CSI
