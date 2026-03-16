@@ -1,6 +1,9 @@
 import comtypes.client
-import sys
+import sys, os
 import math
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from app_logger import AppLogger
+from sap_utils_common import check_ret_code
 
 class SapUtils:
     def __init__(self, sap_model=None):
@@ -11,6 +14,7 @@ class SapUtils:
             sap_model: Objeto SapModel opcional ya conectado.
         """
         self.SapModel = sap_model
+        self.logger = AppLogger()
 
     def create_mesh_by_coord(self, width, length, nx, ny, start_x=0.0, start_y=0.0, start_z=0.0, plane="XY", prop_name="Default"):
         """
@@ -29,7 +33,7 @@ class SapUtils:
             list: Lista de nombres de las áreas creadas.
         """
         if self.SapModel is None:
-            print("No hay conexión con SAP2000.")
+            self.logger.warning("No hay conexión con SAP2000")
             return []
 
         created_areas = []
@@ -50,7 +54,7 @@ class SapUtils:
         d1 = width / nx
         d2 = length / ny
         
-        print(f"Generando malla {nx}x{ny} en plano {plane} (d1={d1:.2f}, d2={d2:.2f})...")
+        self.logger.info(f"Generando malla {nx}x{ny} en plano {plane} (d1={d1:.2f}, d2={d2:.2f})...")
         
         # Bloquear pantalla para mejorar rendimiento (opcional, pero recomendado para muchas operaciones)
         # self.SapModel.SetModelIsLocked(False) 
@@ -92,26 +96,20 @@ class SapUtils:
                     
                     # Manejo robusto del retorno (Regla de Oro)
                     # ret puede ser un int (solo código) o una tupla/lista
-                    ret_code = -1
                     area_name = ""
-                    
-                    if isinstance(ret, (list, tuple)):
-                        ret_code = ret[-1]
-                        if len(ret) > 1:
+                    if check_ret_code(ret):
+                        if isinstance(ret, (list, tuple)) and len(ret) > 1:
                             area_name = str(ret[0])
-                    elif isinstance(ret, int):
-                        ret_code = ret
-                    
-                    if ret_code == 0:
                         if area_name:
                             created_areas.append(area_name)
                     else:
-                        print(f"Error creando área en celda ({i},{j}): Código {ret_code}")
+                        code = ret[-1] if isinstance(ret, (list, tuple)) and len(ret) > 0 else ret
+                        self.logger.error(f"Error creando área en celda ({i},{j}): Código {code}")
                         
                 except Exception as e:
-                    print(f"Excepción en celda ({i},{j}): {e}")
+                    self.logger.error(f"Excepción en celda ({i},{j}): {e}")
                     
-        print(f"Se crearon {len(created_areas)} áreas en {plane}.")
+        self.logger.success(f"Se crearon {len(created_areas)} áreas en {plane}.")
         
         # Refrescar vista
         try:
@@ -129,13 +127,14 @@ class SapUtils:
             # AddCartesian(x, y, z, Name, UserName, CSys, ...)
             # Retorna [Name, RetCode]
             ret = self.SapModel.PointObj.AddCartesian(x, y, z, "", name, "Global")
-            if isinstance(ret, (list, tuple)) and ret[-1] == 0:
-                return str(ret[0])
+            if check_ret_code(ret):
+                if isinstance(ret, (list, tuple)) and len(ret) > 1:
+                    return str(ret[0])
+                return name
             elif isinstance(ret, int) and ret == 0:
-                # Caso raro donde no devuelve nombre, pero asumimos éxito (no ideal)
-                return name 
+                return name
         except Exception as e:
-            print(f"Error creando punto ({x},{y},{z}): {e}")
+            self.logger.error(f"Error creando punto ({x},{y},{z}): {e}")
         return None
 
     def create_area_by_points(self, points, prop_name="Default"):
@@ -143,10 +142,11 @@ class SapUtils:
         try:
             # AddByPoint(NumberPoints, PointNames, Name, PropName, UserName)
             ret = self.SapModel.AreaObj.AddByPoint(len(points), points, "", prop_name, "")
-            if isinstance(ret, (list, tuple)) and ret[-1] == 0:
-                return str(ret[0])
+            if check_ret_code(ret):
+                if isinstance(ret, (list, tuple)) and len(ret) > 1:
+                    return str(ret[0])
         except Exception as e:
-            print(f"Error creando área con puntos {points}: {e}")
+            self.logger.error(f"Error creando área con puntos {points}: {e}")
         return None
 
     def _get_shape_coords_2d(self, shape_type, center_u, center_v, dim, num_points):
@@ -236,7 +236,7 @@ class SapUtils:
         if self.SapModel is None:
             return []
 
-        print(f"Generando malla con orificio: {inner_shape} -> {outer_shape} en {plane}...")
+        self.logger.info(f"Generando malla con orificio: {inner_shape} -> {outer_shape} en {plane}...")
         
         # 1. Definir centro local (u, v) relativo al origen (esquina)
         # Asumimos que el origen es la esquina inferior izquierda del bounding box externo
@@ -336,7 +336,7 @@ class SapUtils:
                     if aname:
                         created_areas.append(aname)
         
-        print(f"Se crearon {len(created_areas)} áreas con orificio.")
+        self.logger.success(f"Se crearon {len(created_areas)} áreas con orificio.")
         try:
             self.SapModel.View.RefreshView(0, False)
         except:
@@ -358,7 +358,7 @@ class SapUtils:
         try:
             ret_sel = self.SapModel.SelectObj.GetSelected(0, [], [])
             # ret_sel[-1] es RetCode
-            if ret_sel[-1] != 0: 
+            if not check_ret_code(ret_sel): 
                 return None
             
             num_items = ret_sel[0]
@@ -384,8 +384,8 @@ class SapUtils:
             # 2. Obtener coordenadas
             # GetCoordCartesian(Name, x, y, z, CSys)
             ret_coord = self.SapModel.PointObj.GetCoordCartesian(point_name, 0.0, 0.0, 0.0, "Global")
-            
-            if ret_coord[-1] == 0:
+
+            if check_ret_code(ret_coord):
                 # Retorna [x, y, z, RetCode]
                 return {
                     "name": point_name,
@@ -395,7 +395,7 @@ class SapUtils:
                 }
                 
         except Exception as e:
-            print(f"Error obteniendo selección: {e}")
+            self.logger.error(f"Error obteniendo selección: {e}")
             
         return None
 

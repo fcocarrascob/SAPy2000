@@ -333,6 +333,10 @@ DEFAULT_REBARS = [
     {"name": "Rebar_φ8", "area": 0.000050, "diameter": 0.008, "material": "A36"},
     {"name": "Rebar_φ10", "area": 0.000079, "diameter": 0.010, "material": "A36"},
     {"name": "Rebar_φ12", "area": 0.000113, "diameter": 0.012, "material": "A36"},
+    {"name": "Rebar_φ16", "area": 0.000201, "diameter": 0.016, "material": "A36"},
+    {"name": "Rebar_φ18", "area": 0.000254, "diameter": 0.018, "material": "A36"},
+    {"name": "Rebar_φ22", "area": 0.000380, "diameter": 0.022, "material": "A36"},
+    {"name": "Rebar_φ25", "area": 0.000491, "diameter": 0.025, "material": "A36"},
 ]
 
 # Perfiles I (W shapes)

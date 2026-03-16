@@ -5,9 +5,14 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QLine
                                QTextEdit, QPushButton, QVBoxLayout, QHBoxLayout, 
                                QComboBox, QGroupBox, QGridLayout, QFormLayout, QTabWidget,
                                QTextBrowser, QTableWidget, QTableWidgetItem, QHeaderView,
-                               QListWidget, QAbstractItemView, QListWidgetItem)
+                               QListWidget, QAbstractItemView, QListWidgetItem, QScrollArea)
 from PySide6.QtGui import QPainter, QPen, QColor, QBrush
 from PySide6.QtCore import Qt, QUrl
+
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from gui_components import StyledButton, LogWidget
+from themes import COLORS
 
 # Importar backend
 try:
@@ -24,7 +29,7 @@ class PreviewWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setMinimumSize(300, 300)
-        self.setStyleSheet("background-color: white; border: 1px solid #999;")
+        self.setStyleSheet(f"background-color: {COLORS['bg_base']}; border: 1px solid {COLORS['border']};")
         self.mode = None
         self.data = {}
 
@@ -311,7 +316,7 @@ class BaseMeshWidget(QWidget):
         # --- Botones ---
         btn_layout = QHBoxLayout()
         
-        self.generate_btn = QPushButton("Generar Malla")
+        self.generate_btn = StyledButton("🔧 Generar Malla", variant="primary")
         self.generate_btn.clicked.connect(self.generate_mesh)
 
         # Habilitación inicial depende del estado actual, se puede gestionar mejor
@@ -323,13 +328,23 @@ class BaseMeshWidget(QWidget):
         layout.addLayout(btn_layout)
         
         # --- Log ---
-        self.log_text = QTextEdit()
-        self.log_text.setReadOnly(True)
-        layout.addWidget(self.log_text)
+        grp_log = QGroupBox("Log de Operaciones")
+        grp_log_layout = QVBoxLayout()
+        self.log_text = LogWidget()
+        self.log_text.setFixedHeight(120)
+        grp_log_layout.addWidget(self.log_text)
+        grp_log.setLayout(grp_log_layout)
+        layout.addWidget(grp_log)
 
     def log(self, message):
         if self.log_text:
-            self.log_text.append(message)
+            try:
+                self.log_text.log(message, level="INFO")
+            except Exception:
+                try:
+                    self.log_text.append(message)
+                except Exception:
+                    pass
 
     def ensure_connection(self):
         if not self.backend or not self.backend.SapModel:
@@ -403,7 +418,7 @@ class RectangularMeshWidget(BaseMeshWidget):
         self.plane_combo.addItems(["XY", "XZ", "YZ"])
         self.plane_combo.setCurrentIndex(-1)  # Sin selección inicial
         
-        self.btn_get_coords = QPushButton("Obtener Coordenadas")
+        self.btn_get_coords = StyledButton("📍 Obtener Coordenadas", variant="secondary")
         self.btn_get_coords.clicked.connect(self.fetch_coords)
         
         loc_layout.addWidget(QLabel("Propiedad Área:"), 0, 2)
@@ -473,6 +488,26 @@ class RectangularMeshWidget(BaseMeshWidget):
             sz = float(self.start_z.text())
             plane = self.plane_combo.currentText()
             prop = self.prop_edit.text()
+
+            from gui_components import InputValidator, show_validation_errors
+
+            errors = []
+            ok, msg = InputValidator.validate_positive(self.width_edit.text(), "Ancho")
+            if not ok:
+                errors.append(msg)
+            ok, msg = InputValidator.validate_positive(self.length_edit.text(), "Largo")
+            if not ok:
+                errors.append(msg)
+            ok, msg = InputValidator.validate_numeric(self.nx_edit.text(), "Divisiones X", min_val=1, max_val=200)
+            if not ok:
+                errors.append(msg)
+            ok, msg = InputValidator.validate_numeric(self.ny_edit.text(), "Divisiones Y", min_val=1, max_val=200)
+            if not ok:
+                errors.append(msg)
+
+            if errors:
+                show_validation_errors(self, errors)
+                return
 
             if self.plane_combo.currentIndex() < 0 or plane.strip() == "":
                 self.log("⚠️ Seleccione un plano antes de generar la malla.")
@@ -573,7 +608,7 @@ class HoleMeshWidget(BaseMeshWidget):
         self.plane_combo.addItems(["XY", "XZ", "YZ"])
         self.plane_combo.setCurrentIndex(-1)  # Sin selección inicial
         
-        self.btn_get_coords = QPushButton("Obtener Coordenadas")
+        self.btn_get_coords = StyledButton("📍 Obtener Coordenadas", variant="secondary")
         self.btn_get_coords.clicked.connect(self.fetch_coords)
         
         loc_layout.addWidget(QLabel("Propiedad Área:"), 0, 2)
@@ -587,11 +622,18 @@ class HoleMeshWidget(BaseMeshWidget):
         
         params_layout.addStretch()
         
+        # Wrap params in a scroll area
+        scroll_area = QScrollArea()
+        scroll_area.setWidget(params_widget)
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.setFrameShape(QScrollArea.NoFrame)
+        
         # Right side: Preview
         self.preview = PreviewWidget()
         
-        top_layout.addWidget(params_widget, 1)
-        top_layout.addWidget(self.preview, 1)
+        top_layout.addWidget(scroll_area, 3)
+        top_layout.addWidget(self.preview, 2)
         
         main_layout.addLayout(top_layout)
         
@@ -738,7 +780,6 @@ class CheckableListGroup(QGroupBox):
         # Estilo compacto para botones
         for btn in [self.btn_all, self.btn_none]:
             btn.setMaximumHeight(20)
-            btn.setStyleSheet("font-size: 10px; padding: 2px;")
             
         self.btn_all.clicked.connect(self.select_all)
         self.btn_none.clicked.connect(self.select_none)
@@ -814,13 +855,12 @@ class ResultsTableWidget(QWidget):
         self.combo_tables.setMinimumWidth(300)
         self.combo_tables.setPlaceholderText("Seleccione una tabla...")
         
-        self.btn_refresh = QPushButton("↻ Actualizar Lista")
+        self.btn_refresh = StyledButton("🔄 Actualizar Lista", variant="secondary")
         self.btn_refresh.setToolTip("Recargar tablas y listas de carga desde SAP2000")
         self.btn_refresh.clicked.connect(self.load_available_data)
-        
-        self.btn_load = QPushButton("Cargar Tabla")
+
+        self.btn_load = StyledButton("📥 Cargar Tabla", variant="primary")
         self.btn_load.clicked.connect(self.load_table_data)
-        self.btn_load.setStyleSheet("font-weight: bold;")
         
         controls_layout.addWidget(QLabel("Tabla:"))
         controls_layout.addWidget(self.combo_tables)
@@ -932,7 +972,7 @@ class ResultsTableWidget(QWidget):
                 self.table_widget.setItem(0, 0, QTableWidgetItem("No se pudieron cargar datos (Vacío o Error). Verifica la selección de Cargas/Combos."))
         finally:
             self.btn_load.setEnabled(True)
-            self.btn_load.setText("Cargar Tabla")
+            self.btn_load.setText("📥 Cargar Tabla")
 
     def setup_table(self, headers, data):
         self.table_widget.setColumnCount(len(headers))

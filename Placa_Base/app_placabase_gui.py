@@ -7,6 +7,11 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QLine
 from PySide6.QtGui import QPainter, QColor, QPen, QBrush
 from PySide6.QtCore import QSize, QRectF, Qt
 
+import sys, os
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+from gui_components import StyledButton, LogWidget
+from themes import COLORS
+
 # Import backend
 from .placabase_backend import BasePlateBackend
 
@@ -58,8 +63,8 @@ class BasePlateWidget(QWidget):
         self.centers_table = QTableWidget(0, 3)
         self.centers_table.setHorizontalHeaderLabels(['X', 'Y', 'Z'])
         self.centers_table.horizontalHeader().setStretchLastSection(True)
-        self.add_row_btn = QPushButton('Agregar fila')
-        self.remove_row_btn = QPushButton('Eliminar fila')
+        self.add_row_btn = StyledButton('➕ Agregar fila', variant="secondary")
+        self.remove_row_btn = StyledButton('➖ Eliminar fila', variant="secondary")
         self.add_row_btn.clicked.connect(self.add_row)
         self.remove_row_btn.clicked.connect(self.remove_selected_row)
 
@@ -67,7 +72,7 @@ class BasePlateWidget(QWidget):
         self.per_row_combo = QComboBox()
         for n in (2, 3, 4, 5):
             self.per_row_combo.addItem(str(n), n)
-        self.generate_preset_btn = QPushButton('Generar posiciones (preset)')
+        self.generate_preset_btn = StyledButton('Generar posiciones (preset)', variant="secondary")
         self.generate_preset_btn.clicked.connect(self.generate_preset_positions)
 
         # Material del perno (Frame) — ComboBox que se llena desde el modelo SAP2000
@@ -76,10 +81,10 @@ class BasePlateWidget(QWidget):
         self.bolt_material_combo.addItem("A36")
         self.bolt_material_combo.setToolTip("Material para la sección Frame del perno. Se actualiza al conectar con SAP2000.")
 
-        self.log = QTextEdit()
-        self.log.setReadOnly(True)
+        self.log = LogWidget()
+        self.log.setFixedHeight(120)
 
-        self.run_btn = QPushButton('Guardar y Ejecutar')
+        self.run_btn = StyledButton('🚀 Guardar y Ejecutar', variant="success")
 
         self.run_btn.clicked.connect(self.run_script)
         
@@ -176,27 +181,31 @@ class BasePlateWidget(QWidget):
         grp_chair.setLayout(chair_layout)
         main_form_layout.addWidget(grp_chair)
 
-        # 5. Salida / Log
-        grp_out = QGroupBox("5. Salida / Log")
-        out_layout = QVBoxLayout()
-        
-        btn_row = QHBoxLayout()
-        btn_row.addWidget(self.run_btn)
-        out_layout.addLayout(btn_row)
-        
-        out_layout.addWidget(self.log)
+        # 5. Calcular
+        grp_out = QGroupBox("5. Calcular")
+        out_layout = QHBoxLayout()
+        out_layout.addWidget(self.run_btn)
+        out_layout.addStretch()
         grp_out.setLayout(out_layout)
         main_form_layout.addWidget(grp_out)
 
         # crear preview a la derecha
         self.preview = PreviewWidget(self)
 
-        main_layout = QHBoxLayout()
-        # Left side is now the ScrollArea
-        main_layout.addWidget(self.scroll_area, 1)
-        main_layout.addWidget(self.preview, 1)
+        content_layout = QHBoxLayout()
+        content_layout.addWidget(self.scroll_area, 1)
+        content_layout.addWidget(self.preview, 1)
 
-        self.setLayout(main_layout)
+        # --- Log Area (fuera del scroll, ancho completo) ---
+        grp_log = QGroupBox("Log de Operaciones")
+        log_grp_layout = QVBoxLayout()
+        log_grp_layout.addWidget(self.log)
+        grp_log.setLayout(log_grp_layout)
+
+        outer_layout = QVBoxLayout()
+        outer_layout.addLayout(content_layout, 1)
+        outer_layout.addWidget(grp_log)
+        self.setLayout(outer_layout)
 
         # load existing config if present
         if os.path.exists(CONFIG_PATH):
@@ -275,7 +284,10 @@ class BasePlateWidget(QWidget):
                         self.centers_table.setItem(r, 1, QTableWidgetItem(str(c[1])))
                         self.centers_table.setItem(r, 2, QTableWidgetItem(str(c[2] if len(c) > 2 else 0.0)))
             except Exception as e:
-                self.log.append(f'No se pudo leer config existente: {e}')
+                try:
+                    self.log.log(f'No se pudo leer config existente: {e}', level="ERROR")
+                except Exception:
+                    pass
 
         # actualizar A/B según bolt_dia inicial
         self.update_A_B_display()
@@ -331,12 +343,12 @@ class BasePlateWidget(QWidget):
         self.run_btn.setEnabled(connected)
         if connected:
             self.run_btn.setToolTip("Guardar configuración y ejecutar en SAP2000")
-            self.run_btn.setText("Guardar y Ejecutar")
+            self.run_btn.setText("🚀 Guardar y Ejecutar")
             # Cargar materiales del modelo al conectar
             self.load_materials_from_model()
         else:
             self.run_btn.setToolTip("Conecte SAP2000 para ejecutar")
-            self.run_btn.setText("Guardar y Ejecutar (Sin Conexión)")
+            self.run_btn.setText("🚀 Guardar y Ejecutar (Sin Conexión)")
 
     def load_materials_from_model(self):
         """Lee los materiales definidos en el modelo SAP2000 y los carga en el ComboBox."""
@@ -360,13 +372,25 @@ class BasePlateWidget(QWidget):
                     self.bolt_material_combo.setCurrentIndex(idx)
                 elif self.bolt_material_combo.count() > 0:
                     self.bolt_material_combo.setCurrentIndex(0)
-                self.log.append(f"Materiales cargados del modelo: {self.bolt_material_combo.count()} disponibles.")
+                try:
+                    self.log.log(f"Materiales cargados del modelo: {self.bolt_material_combo.count()} disponibles.", level="INFO")
+                except Exception:
+                    pass
         except Exception as e:
-            self.log.append(f"No se pudieron cargar materiales del modelo: {e}")
+            try:
+                self.log.log(f"No se pudieron cargar materiales del modelo: {e}", level="ERROR")
+            except Exception:
+                pass
 
     def log_message(self, message):
         """Append message to log and force UI update."""
-        self.log.append(message)
+        try:
+            self.log.log(message, level="INFO")
+        except Exception:
+            try:
+                self.log.append(message)
+            except Exception:
+                pass
         QApplication.processEvents()
 
     def toggle_chair_inputs(self, checked):
@@ -424,7 +448,10 @@ class BasePlateWidget(QWidget):
         try:
             with open(CONFIG_PATH, 'w', encoding='utf-8') as fh:
                 json.dump(cfg, fh, indent=2)
-            self.log.append(f'Config guardada en {CONFIG_PATH}')
+            try:
+                self.log.log(f'Config guardada en {CONFIG_PATH}', level="SUCCESS")
+            except Exception:
+                pass
             # actualizar A/B tras guardar
             self.update_A_B_display()
             self.preview.update()
@@ -438,7 +465,10 @@ class BasePlateWidget(QWidget):
         if not ok:
             return
         
-        self.log.append('Iniciando ejecución de Placa Base...')
+        try:
+            self.log.log('Iniciando ejecución de Placa Base...', level="INFO")
+        except Exception:
+            pass
         
         # Refrescar materiales antes de ejecutar (por si se agregaron en SAP)
         self.load_materials_from_model()
@@ -453,11 +483,17 @@ class BasePlateWidget(QWidget):
             self.log_message("✅ Ejecución finalizada correctamente.")
 
         except Exception as e:
-            self.log.append(f"❌ Error durante la ejecución: {str(e)}")
+            try:
+                self.log.log(f"❌ Error durante la ejecución: {str(e)}", level="ERROR")
+            except Exception:
+                pass
             # Solo mostrar traceback si NO es el error de conexión conocido (por si acaso)
             if "No hay conexión" not in str(e):
                 import traceback
-                self.log.append(traceback.format_exc())
+                try:
+                    self.log.log(traceback.format_exc(), level="ERROR")
+                except Exception:
+                    pass
 
     def add_row(self):
         r = self.centers_table.rowCount()
@@ -571,6 +607,13 @@ class PreviewWidget(QWidget):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setMinimumSize(QSize(300, 300))
+
+    def sizeHint(self):
+        return QSize(400, 400)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.update()
 
     def paintEvent(self, event):
         painter = QPainter(self)

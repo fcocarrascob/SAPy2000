@@ -1,3 +1,21 @@
+# Step 2: Migración Módulo Central — main_app.py y sap_interface.py
+
+## Goal
+Aplicar el nuevo sistema de temas a la ventana principal, agregar `ConnectionStatusWidget` en la barra de estado, integrar logging y agregar menú "Acerca de".
+
+## Prerequisites
+- Step 1 completado y commiteado (archivos `themes.py`, `gui_components.py`, `sap_utils_common.py`, `app_logger.py` disponibles)
+- Branch: `feature/standardization-gui-ux`
+
+---
+
+### Step-by-Step Instructions
+
+#### Step 2.1: Actualizar `main_app.py` — Integrar Tema y Componentes
+
+- [ ] Reemplazar el contenido completo de `main_app.py` con el código siguiente:
+
+```python
 import sys
 import os
 from PySide6.QtWidgets import (
@@ -5,7 +23,6 @@ from PySide6.QtWidgets import (
     QWidget, QLabel, QToolBar, QMenuBar,
 )
 from PySide6.QtGui import QAction
-from PySide6.QtCore import QSettings, Qt
 from sap_interface import SapInterface
 from themes import apply_theme
 from gui_components import ConnectionStatusWidget, StyledButton
@@ -33,10 +50,8 @@ class UnifiedApp(QMainWindow):
     def __init__(self):
         super().__init__()
         self.setWindowTitle("SAP2000 Automation Suite")
-        self.setMinimumSize(800, 600)
         self.resize(1024, 768)
         self.logger = AppLogger()
-        self._settings = QSettings("SAPy2000", "UnifiedApp")
 
         # --- SAP Interface ---
         self.sap_interface = SapInterface()
@@ -50,7 +65,7 @@ class UnifiedApp(QMainWindow):
         toolbar.setMovable(False)
         self.addToolBar(toolbar)
 
-        self.btn_connect = StyledButton("Conectar a SAP2000", variant="primary")
+        self.btn_connect = StyledButton("🔌 Conectar a SAP2000", variant="primary")
         self.btn_connect.clicked.connect(self.sap_interface.connect_to_sap)
         toolbar.addWidget(self.btn_connect)
 
@@ -63,7 +78,6 @@ class UnifiedApp(QMainWindow):
         self.setCentralWidget(self.tabs)
 
         self.init_tabs()
-        self._restore_geometry()
         self.logger.info("Aplicación iniciada")
 
     def _create_menus(self):
@@ -109,28 +123,6 @@ class UnifiedApp(QMainWindow):
             "<p><b>Tecnologías:</b> Python · PySide6 · comtypes · SAP2000 OAPI</p>"
             "<p><b>Normativa:</b> NCh2369:2025 · AISC 360</p>"
         )
-
-    def _restore_geometry(self):
-        """Restaura tamaño y estado de ventana guardados."""
-        geometry = self._settings.value("geometry")
-        state = self._settings.value("windowState")
-        if geometry:
-            self.restoreGeometry(geometry)
-        if state:
-            self.restoreState(state)
-
-    def closeEvent(self, event):
-        """Guarda geometría antes de cerrar."""
-        self._settings.setValue("geometry", self.saveGeometry())
-        self._settings.setValue("windowState", self.saveState())
-        super().closeEvent(event)
-
-    def changeEvent(self, event):
-        """Fuerza actualización del layout al restaurar desde minimizado."""
-        super().changeEvent(event)
-        if event.type() == event.Type.WindowStateChange:
-            if not (self.windowState() & Qt.WindowMinimized):
-                self.centralWidget().updateGeometry()
 
     def on_connection_changed(self, connected):
         self.conn_status.set_connected(connected)
@@ -195,3 +187,96 @@ if __name__ == "__main__":
     window = UnifiedApp()
     window.show()
     sys.exit(app.exec())
+```
+
+##### Step 2.1 Verification Checklist
+- [ ] No errores de importación al ejecutar `python -m main_app`
+- [ ] La ventana principal muestra el tema visual con colores profesionales
+- [ ] La barra de estado contiene el indicador de conexión con punto rojo "Desconectado"
+- [ ] El toolbar tiene el botón "🔌 Conectar a SAP2000" con estilo primary (azul)
+- [ ] Menú "Ver" contiene "Exportar Logs..."
+- [ ] Menú "Ayuda" contiene "Acerca de" y muestra un diálogo con información
+
+---
+
+#### Step 2.2: Actualizar `sap_interface.py` — Integrar Logger
+
+- [ ] Reemplazar el contenido completo de `sap_interface.py` con el código siguiente:
+
+```python
+import sys
+import comtypes.client
+from PySide6.QtCore import QObject, Signal
+from app_logger import AppLogger
+
+
+class SapInterface(QObject):
+    """
+    Gestiona la conexión única con la API de SAP2000.
+    Emite señales cuando el estado de la conexión cambia.
+    """
+    connectionChanged = Signal(bool)
+
+    def __init__(self):
+        super().__init__()
+        self.SapModel = None
+        self.SapObject = None
+        self.logger = AppLogger()
+
+    def connect_to_sap(self):
+        """Intenta conectar a una instancia activa de SAP2000."""
+        try:
+            self.logger.info("Intentando conectar a SAP2000...")
+            self.SapObject = comtypes.client.GetActiveObject("CSI.SAP2000.API.SapObject")
+            self.SapModel = self.SapObject.SapModel
+
+            # Verificar conexión con llamada simple
+            self.SapModel.GetModelFilename()
+
+            self.logger.success("Conexión exitosa con SAP2000")
+            self.connectionChanged.emit(True)
+            return True
+        except Exception as e:
+            self.logger.error(f"No se pudo conectar a SAP2000: {e}")
+            self.SapModel = None
+            self.SapObject = None
+            self.connectionChanged.emit(False)
+            return False
+
+    def disconnect(self):
+        """Limpia la referencia a la conexión."""
+        self.SapModel = None
+        self.SapObject = None
+        self.connectionChanged.emit(False)
+        self.logger.info("Desconectado de SAP2000")
+
+    def reconnect(self):
+        """Intenta reconectar a SAP2000 (útil si se pierde la conexión)."""
+        self.logger.info("Intentando reconectar...")
+        self.SapModel = None
+        self.SapObject = None
+        return self.connect_to_sap()
+
+    def is_connected(self):
+        return self.SapModel is not None
+```
+
+##### Step 2.2 Verification Checklist
+- [ ] Sin errores de importación al ejecutar `python -c "from sap_interface import SapInterface; print('OK')"`
+- [ ] El `SapInterface` ahora tiene método `reconnect()`
+- [ ] Los mensajes de conexión se log-ean con formato de timestamp vía `AppLogger`
+
+---
+
+#### Step 2 STOP & COMMIT
+
+**STOP & COMMIT:** Agent must stop here and wait for the user to test, stage, and commit the change.
+
+Commit sugerido:
+```
+feat: apply theme and connection status to main_app, integrate logger in sap_interface
+```
+
+Archivos modificados:
+- `main_app.py`
+- `sap_interface.py`

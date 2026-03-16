@@ -140,6 +140,19 @@ python Placa_Base/placabase_backend.py
 python Placa_Base/app_placabase_gui.py
 ```
 
+## Infraestructura Utilizada
+
+- **StyledButton** — Botón "🏗️ Save & Execute" (success)
+- **LogWidget** — Log de ejecución con timestamp
+- **check_ret_code** — Validación de retornos API SAP2000
+- **AppLogger** — Logging en backend
+
+## Ejecutar Standalone
+
+```bash
+python -m Placa_Base.app_placabase_gui
+```
+
 ## Dependencias
 
 - `comtypes` (API SAP2000)
