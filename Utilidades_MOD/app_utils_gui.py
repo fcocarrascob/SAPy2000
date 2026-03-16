@@ -5,7 +5,7 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QLine
                                QTextEdit, QPushButton, QVBoxLayout, QHBoxLayout, 
                                QComboBox, QGroupBox, QGridLayout, QFormLayout, QTabWidget,
                                QTextBrowser, QTableWidget, QTableWidgetItem, QHeaderView,
-                               QListWidget, QAbstractItemView, QListWidgetItem)
+                               QListWidget, QAbstractItemView, QListWidgetItem, QScrollArea)
 from PySide6.QtGui import QPainter, QPen, QColor, QBrush
 from PySide6.QtCore import Qt, QUrl
 
@@ -622,11 +622,18 @@ class HoleMeshWidget(BaseMeshWidget):
         
         params_layout.addStretch()
         
+        # Wrap params in a scroll area
+        scroll_area = QScrollArea()
+        scroll_area.setWidget(params_widget)
+        scroll_area.setWidgetResizable(True)
+        scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        scroll_area.setFrameShape(QScrollArea.NoFrame)
+        
         # Right side: Preview
         self.preview = PreviewWidget()
         
-        top_layout.addWidget(params_widget, 1)
-        top_layout.addWidget(self.preview, 1)
+        top_layout.addWidget(scroll_area, 3)
+        top_layout.addWidget(self.preview, 2)
         
         main_layout.addLayout(top_layout)
         
