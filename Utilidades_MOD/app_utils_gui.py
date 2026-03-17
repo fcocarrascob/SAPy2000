@@ -6,8 +6,8 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QLine
                                QComboBox, QGroupBox, QGridLayout, QFormLayout, QTabWidget,
                                QTextBrowser, QTableWidget, QTableWidgetItem, QHeaderView,
                                QListWidget, QAbstractItemView, QListWidgetItem, QScrollArea)
-from PySide6.QtGui import QPainter, QPen, QColor, QBrush
-from PySide6.QtCore import Qt, QUrl
+from PySide6.QtGui import QPainter, QPen, QColor, QBrush, QFont
+from PySide6.QtCore import Qt, QUrl, QTimer
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -16,14 +16,14 @@ from themes import COLORS
 
 # Importar backend
 try:
-    from .utils_backend import SapUtils
+    from .utils_backend import SapUtils, SteelSectionCalc, SlendernessClassifier, SECTION_TYPES, STEEL_MATERIALS
 except ImportError:
     try:
-        from utils_backend import SapUtils
+        from utils_backend import SapUtils, SteelSectionCalc, SlendernessClassifier, SECTION_TYPES, STEEL_MATERIALS
     except ImportError:
         # Fallback si se ejecuta desde otro directorio
         sys.path.append(os.path.dirname(__file__))
-        from utils_backend import SapUtils
+        from utils_backend import SapUtils, SteelSectionCalc, SlendernessClassifier, SECTION_TYPES, STEEL_MATERIALS
 
 class PreviewWidget(QWidget):
     def __init__(self, parent=None):
@@ -995,6 +995,779 @@ class ResultsTableWidget(QWidget):
         self.table_widget.resizeColumnsToContents()
 
 
+class SectionPreviewWidget(QWidget):
+    """Widget de previsualización de sección transversal de acero."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setMinimumSize(300, 300)
+        self.setStyleSheet(f"background-color: {COLORS['bg_base']}; border: 1px solid {COLORS['border']};")
+        self.section_type = None
+        self.dims = {}
+
+    def update_section(self, section_type, dims):
+        self.section_type = section_type
+        self.dims = dict(dims or {})
+        self.update()
+
+    def _draw_rect(self, painter, x, y, w, h):
+        painter.drawRect(int(round(x)), int(round(y)), int(round(w)), int(round(h)))
+
+    def _draw_dim(self, painter, p1, p2, text, offset=20):
+        x1, y1 = p1
+        x2, y2 = p2
+        dx = x2 - x1
+        dy = y2 - y1
+        length = math.sqrt(dx * dx + dy * dy)
+        if length <= 1e-9:
+            return
+
+        nx = -dy / length
+        ny = dx / length
+
+        cx1 = x1 + nx * offset
+        cy1 = y1 + ny * offset
+        cx2 = x2 + nx * offset
+        cy2 = y2 + ny * offset
+
+        painter.setPen(QPen(QColor(90, 90, 90), 1))
+        painter.drawLine(int(x1), int(y1), int(cx1), int(cy1))
+        painter.drawLine(int(x2), int(y2), int(cx2), int(cy2))
+        painter.drawLine(int(cx1), int(cy1), int(cx2), int(cy2))
+
+        tick = 4
+        ux = dx / length * tick
+        uy = dy / length * tick
+        painter.drawLine(int(cx1 - ux), int(cy1 - uy), int(cx1 + ux), int(cy1 + uy))
+        painter.drawLine(int(cx2 - ux), int(cy2 - uy), int(cx2 + ux), int(cy2 + uy))
+
+        painter.drawText(
+            int((cx1 + cx2) * 0.5 - 60),
+            int((cy1 + cy2) * 0.5 - 12),
+            120,
+            24,
+            Qt.AlignCenter,
+            text,
+        )
+
+    def _max_dim(self):
+        d = self.dims
+        t = self.section_type
+        if t == "W":
+            return max(d.get("d", 0), d.get("bf", 0), d.get("bf_bot", 0) or d.get("bf", 0))
+        if t == "C":
+            return max(d.get("d", 0), d.get("bf", 0))
+        if t == "L":
+            return max(d.get("d", 0), d.get("b", 0))
+        if t == "HSS_RECT":
+            return max(d.get("H", 0), d.get("B", 0))
+        if t == "HSS_ROUND":
+            return d.get("OD", 0)
+        if t == "2L":
+            return max(d.get("d", 0), 2 * d.get("b", 0) + d.get("sep", 0))
+        if t == "2C":
+            return max(d.get("d", 0), 2 * d.get("bf", 0) + d.get("sep", 0))
+        if t == "WT":
+            return max(d.get("d", 0), d.get("bf", 0))
+        return 0
+
+    def paintEvent(self, event):
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.fillRect(self.rect(), QColor(COLORS["bg_base"]))
+
+        if not self.section_type or not self.dims:
+            painter.setPen(QPen(QColor(COLORS["text_secondary"]), 1))
+            painter.setFont(QFont("Segoe UI", 10))
+            painter.drawText(self.rect(), Qt.AlignCenter, "Sin previsualización")
+            return
+
+        max_dim = self._max_dim()
+        if max_dim <= 0:
+            return
+
+        scale = min(self.width(), self.height()) * 0.6 / max_dim
+        cx = self.width() * 0.5
+        cy = self.height() * 0.5
+
+        painter.setPen(QPen(QColor(COLORS["primary"]), 2))
+        painter.setBrush(QBrush(QColor(200, 220, 240)))
+        painter.setFont(QFont("Segoe UI", 8))
+
+        draw_map = {
+            "W": self._draw_w,
+            "C": self._draw_channel,
+            "L": self._draw_angle,
+            "HSS_RECT": self._draw_hss_rect,
+            "HSS_ROUND": self._draw_hss_round,
+            "2L": self._draw_double_angle,
+            "2C": self._draw_double_channel,
+            "WT": self._draw_tee,
+        }
+        draw_fn = draw_map.get(self.section_type)
+        if draw_fn:
+            draw_fn(painter, cx, cy, scale, self.dims)
+
+    def _draw_w(self, painter, cx, cy, scale, dims):
+        d = dims.get("d", 0)
+        bf = dims.get("bf", 0)
+        tf = dims.get("tf", 0)
+        tw = dims.get("tw", 0)
+        bf_bot = dims.get("bf_bot", 0) or bf
+        tfb = dims.get("tfb", 0) or tf
+        if min(d, bf, tf, tw, bf_bot, tfb) <= 0:
+            return
+
+        top = cy - d * scale / 2.0
+        bot = cy + d * scale / 2.0
+        self._draw_rect(painter, cx - bf * scale / 2.0, top, bf * scale, tf * scale)
+        self._draw_rect(painter, cx - tw * scale / 2.0, top + tf * scale, tw * scale, (d - tf - tfb) * scale)
+        self._draw_rect(painter, cx - bf_bot * scale / 2.0, bot - tfb * scale, bf_bot * scale, tfb * scale)
+
+        self._draw_dim(painter, (cx + bf * scale / 2.0, top), (cx + bf * scale / 2.0, bot), f"d={d:g}", 20)
+        self._draw_dim(painter, (cx - bf * scale / 2.0, top), (cx + bf * scale / 2.0, top), f"bf={bf:g}", -24)
+        self._draw_dim(painter, (cx - bf * scale / 2.0, top), (cx - bf * scale / 2.0, top + tf * scale), f"tf={tf:g}", -20)
+        self._draw_dim(painter, (cx - tw * scale / 2.0, cy), (cx + tw * scale / 2.0, cy), f"tw={tw:g}", 20)
+        if abs(bf_bot - bf) > 1e-9:
+            self._draw_dim(painter, (cx - bf_bot * scale / 2.0, bot), (cx + bf_bot * scale / 2.0, bot), f"bf_bot={bf_bot:g}", 24)
+
+    def _draw_channel(self, painter, cx, cy, scale, dims):
+        d = dims.get("d", 0)
+        bf = dims.get("bf", 0)
+        tf = dims.get("tf", 0)
+        tw = dims.get("tw", 0)
+        if min(d, bf, tf, tw) <= 0:
+            return
+
+        left = cx - bf * scale / 2.0
+        top = cy - d * scale / 2.0
+        bot = cy + d * scale / 2.0
+        self._draw_rect(painter, left, top, tw * scale, d * scale)
+        self._draw_rect(painter, left, top, bf * scale, tf * scale)
+        self._draw_rect(painter, left, bot - tf * scale, bf * scale, tf * scale)
+
+        self._draw_dim(painter, (left + bf * scale, top), (left + bf * scale, bot), f"d={d:g}", 20)
+        self._draw_dim(painter, (left, top), (left + bf * scale, top), f"bf={bf:g}", -24)
+        self._draw_dim(painter, (left + bf * scale, top), (left + bf * scale, top + tf * scale), f"tf={tf:g}", 18)
+        self._draw_dim(painter, (left, cy), (left + tw * scale, cy), f"tw={tw:g}", 20)
+
+    def _draw_angle(self, painter, cx, cy, scale, dims):
+        d = dims.get("d", 0)
+        b = dims.get("b", 0)
+        t = dims.get("t", 0)
+        if min(d, b, t) <= 0:
+            return
+
+        left = cx - b * scale / 2.0
+        top = cy - d * scale / 2.0
+        bot = cy + d * scale / 2.0
+        self._draw_rect(painter, left, top, t * scale, d * scale)
+        self._draw_rect(painter, left, bot - t * scale, b * scale, t * scale)
+
+        self._draw_dim(painter, (left + b * scale, top), (left + b * scale, bot), f"d={d:g}", 20)
+        self._draw_dim(painter, (left, bot), (left + b * scale, bot), f"b={b:g}", 24)
+        self._draw_dim(painter, (left, top), (left + t * scale, top), f"t={t:g}", -22)
+
+    def _draw_hss_rect(self, painter, cx, cy, scale, dims):
+        h = dims.get("H", 0)
+        b = dims.get("B", 0)
+        t = dims.get("t", 0)
+        if min(h, b, t) <= 0 or h <= 2 * t or b <= 2 * t:
+            return
+
+        x0 = cx - b * scale / 2.0
+        y0 = cy - h * scale / 2.0
+        self._draw_rect(painter, x0, y0, b * scale, h * scale)
+
+        painter.setBrush(QBrush(Qt.white))
+        self._draw_rect(
+            painter,
+            x0 + t * scale,
+            y0 + t * scale,
+            (b - 2 * t) * scale,
+            (h - 2 * t) * scale,
+        )
+        painter.setBrush(QBrush(QColor(200, 220, 240)))
+
+        self._draw_dim(painter, (x0 + b * scale, y0), (x0 + b * scale, y0 + h * scale), f"H={h:g}", 20)
+        self._draw_dim(painter, (x0, y0), (x0 + b * scale, y0), f"B={b:g}", -24)
+        self._draw_dim(painter, (x0, y0), (x0 + t * scale, y0), f"t={t:g}", -20)
+
+    def _draw_hss_round(self, painter, cx, cy, scale, dims):
+        od = dims.get("OD", 0)
+        t = dims.get("t", 0)
+        if min(od, t) <= 0 or od <= 2 * t:
+            return
+
+        r_out = od * scale / 2.0
+        r_in = (od - 2 * t) * scale / 2.0
+        painter.drawEllipse(int(cx - r_out), int(cy - r_out), int(2 * r_out), int(2 * r_out))
+
+        painter.setBrush(QBrush(Qt.white))
+        painter.drawEllipse(int(cx - r_in), int(cy - r_in), int(2 * r_in), int(2 * r_in))
+        painter.setBrush(QBrush(QColor(200, 220, 240)))
+
+        self._draw_dim(painter, (cx - r_out, cy), (cx + r_out, cy), f"OD={od:g}", 24)
+        self._draw_dim(painter, (cx + r_in, cy), (cx + r_out, cy), f"t={t:g}", -20)
+
+    def _draw_double_angle(self, painter, cx, cy, scale, dims):
+        d = dims.get("d", 0)
+        b = dims.get("b", 0)
+        t = dims.get("t", 0)
+        sep = dims.get("sep", 0)
+        if min(d, b, t) <= 0 or sep < 0:
+            return
+
+        top = cy - d * scale / 2.0
+        bot = cy + d * scale / 2.0
+        gap = sep * scale
+
+        xr = cx + gap / 2.0
+        self._draw_rect(painter, xr, top, t * scale, d * scale)
+        self._draw_rect(painter, xr, bot - t * scale, b * scale, t * scale)
+
+        xl = cx - gap / 2.0
+        self._draw_rect(painter, xl - t * scale, top, t * scale, d * scale)
+        self._draw_rect(painter, xl - b * scale, bot - t * scale, b * scale, t * scale)
+
+        self._draw_dim(painter, (xr + b * scale, top), (xr + b * scale, bot), f"d={d:g}", 18)
+        self._draw_dim(painter, (xr, bot), (xr + b * scale, bot), f"b={b:g}", 22)
+        self._draw_dim(painter, (xr, top), (xr + t * scale, top), f"t={t:g}", -20)
+        self._draw_dim(painter, (xl, cy), (xr, cy), f"sep={sep:g}", 20)
+
+    def _draw_double_channel(self, painter, cx, cy, scale, dims):
+        d = dims.get("d", 0)
+        bf = dims.get("bf", 0)
+        tf = dims.get("tf", 0)
+        tw = dims.get("tw", 0)
+        sep = dims.get("sep", 0)
+        if min(d, bf, tf, tw) <= 0 or sep < 0:
+            return
+
+        top = cy - d * scale / 2.0
+        bot = cy + d * scale / 2.0
+        gap = sep * scale
+
+        xl = cx - gap / 2.0
+        self._draw_rect(painter, xl - tw * scale, top, tw * scale, d * scale)
+        self._draw_rect(painter, xl - bf * scale, top, bf * scale, tf * scale)
+        self._draw_rect(painter, xl - bf * scale, bot - tf * scale, bf * scale, tf * scale)
+
+        xr = cx + gap / 2.0
+        self._draw_rect(painter, xr, top, tw * scale, d * scale)
+        self._draw_rect(painter, xr, top, bf * scale, tf * scale)
+        self._draw_rect(painter, xr, bot - tf * scale, bf * scale, tf * scale)
+
+        self._draw_dim(painter, (xr + bf * scale, top), (xr + bf * scale, bot), f"d={d:g}", 18)
+        self._draw_dim(painter, (xr, top), (xr + bf * scale, top), f"bf={bf:g}", -22)
+        self._draw_dim(painter, (xr + bf * scale, top), (xr + bf * scale, top + tf * scale), f"tf={tf:g}", 18)
+        self._draw_dim(painter, (xr, cy), (xr + tw * scale, cy), f"tw={tw:g}", 20)
+        self._draw_dim(painter, (xl, cy), (xr, cy), f"sep={sep:g}", 24)
+
+    def _draw_tee(self, painter, cx, cy, scale, dims):
+        d = dims.get("d", 0)
+        bf = dims.get("bf", 0)
+        tf = dims.get("tf", 0)
+        tw = dims.get("tw", 0)
+        if min(d, bf, tf, tw) <= 0 or d <= tf:
+            return
+
+        top = cy - d * scale / 2.0
+        stem_h = d - tf
+        self._draw_rect(painter, cx - bf * scale / 2.0, top, bf * scale, tf * scale)
+        self._draw_rect(painter, cx - tw * scale / 2.0, top + tf * scale, tw * scale, stem_h * scale)
+
+        self._draw_dim(painter, (cx + bf * scale / 2.0, top), (cx + bf * scale / 2.0, top + d * scale), f"d={d:g}", 20)
+        self._draw_dim(painter, (cx - bf * scale / 2.0, top), (cx + bf * scale / 2.0, top), f"bf={bf:g}", -24)
+        self._draw_dim(painter, (cx + bf * scale / 2.0, top), (cx + bf * scale / 2.0, top + tf * scale), f"tf={tf:g}", 18)
+        self._draw_dim(painter, (cx - tw * scale / 2.0, cy), (cx + tw * scale / 2.0, cy), f"tw={tw:g}", 20)
+
+
+class FrameSectionWidget(QWidget):
+    def __init__(self, parent=None, sap_interface=None):
+        super().__init__(parent)
+        self.sap_interface = sap_interface
+        self.backend = None
+        self._recalc_timer = None
+        self.dim_edits = {}
+        self.prop_value_labels = {}
+        self.last_props = None
+        self.last_slenderness = None
+
+        initial_model = self.sap_interface.SapModel if self.sap_interface else None
+        self.backend = SapUtils(sap_model=initial_model)
+
+        if self.sap_interface:
+            self.sap_interface.connectionChanged.connect(self.on_connection_changed)
+
+        self.init_ui()
+        self._recalculate()
+
+    def init_ui(self):
+        main_layout = QVBoxLayout(self)
+
+        top_layout = QHBoxLayout()
+        left_layout = QVBoxLayout()
+
+        type_group = QGroupBox("Tipo de Sección")
+        type_layout = QVBoxLayout(type_group)
+        self.type_combo = QComboBox()
+        for key, cfg in SECTION_TYPES.items():
+            self.type_combo.addItem(cfg.get("display", key), userData=key)
+        self.type_combo.currentIndexChanged.connect(self._on_type_changed)
+        type_layout.addWidget(self.type_combo)
+        left_layout.addWidget(type_group)
+
+        dims_group = QGroupBox("Dimensiones (unidades del modelo)")
+        self.dims_form = QFormLayout(dims_group)
+        left_layout.addWidget(dims_group)
+
+        material_group = QGroupBox("Material")
+        material_layout = QVBoxLayout(material_group)
+        self.material_source_combo = QComboBox()
+        self.material_source_combo.addItems(["Predefinido", "Del Modelo SAP2000"])
+        self.material_source_combo.currentTextChanged.connect(self._on_material_source_changed)
+        material_layout.addWidget(self.material_source_combo)
+
+        self.material_combo = QComboBox()
+        self.material_combo.currentTextChanged.connect(self._on_material_changed)
+        material_layout.addWidget(self.material_combo)
+
+        mat_form = QFormLayout()
+        self.fy_edit = QLineEdit("345")
+        self.e_edit = QLineEdit("200000")
+        self.fu_edit = QLineEdit("450")
+        self.fy_edit.textChanged.connect(self._schedule_recalc)
+        self.e_edit.textChanged.connect(self._schedule_recalc)
+        self.fu_edit.textChanged.connect(self._schedule_recalc)
+        mat_form.addRow("Fy (MPa):", self.fy_edit)
+        mat_form.addRow("E (MPa):", self.e_edit)
+        mat_form.addRow("Fu (MPa):", self.fu_edit)
+        material_layout.addLayout(mat_form)
+        left_layout.addWidget(material_group)
+
+        name_group = QGroupBox("Nombre de Sección")
+        name_layout = QVBoxLayout(name_group)
+        self.name_edit = QLineEdit()
+        name_layout.addWidget(self.name_edit)
+        left_layout.addWidget(name_group)
+
+        left_scroll_content = QWidget()
+        left_scroll_content.setLayout(left_layout)
+        left_scroll = QScrollArea()
+        left_scroll.setWidget(left_scroll_content)
+        left_scroll.setWidgetResizable(True)
+        left_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        left_scroll.setFrameShape(QScrollArea.NoFrame)
+
+        self.preview_widget = SectionPreviewWidget()
+
+        # --- Properties as vertical list (middle column) ---
+        props_group = QGroupBox("Propiedades de la Sección")
+        props_inner_layout = QVBoxLayout()
+        props_inner_layout.setSpacing(2)
+        value_font = QFont("Consolas", 10)
+        value_font.setStyleHint(QFont.Monospace)
+
+        keys = ["A", "Ix", "Iy", "rx", "ry", "J", "Sx_top", "Sx_bot", "Sy", "Zx", "Zy", "Cw"]
+        labels = {
+            "A": "A", "Ix": "Ix", "Iy": "Iy", "rx": "rx", "ry": "ry", "J": "J",
+            "Sx_top": "Sx_top", "Sx_bot": "Sx_bot", "Sy": "Sy",
+            "Zx": "Zx", "Zy": "Zy", "Cw": "Cw",
+        }
+        for key in keys:
+            row_layout = QHBoxLayout()
+            row_layout.setSpacing(4)
+            name_label = QLabel(f"{labels[key]}:")
+            name_label.setFixedWidth(55)
+            val_lbl = QLabel("--")
+            val_lbl.setFont(value_font)
+            val_lbl.setAlignment(Qt.AlignRight | Qt.AlignVCenter)
+            row_layout.addWidget(name_label)
+            row_layout.addWidget(val_lbl)
+            props_inner_layout.addLayout(row_layout)
+            self.prop_value_labels[key] = val_lbl
+        props_inner_layout.addStretch(1)
+
+        props_scroll_content = QWidget()
+        props_scroll_content.setLayout(props_inner_layout)
+        props_scroll = QScrollArea()
+        props_scroll.setWidget(props_scroll_content)
+        props_scroll.setWidgetResizable(True)
+        props_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        props_group_layout = QVBoxLayout(props_group)
+        props_group_layout.setContentsMargins(4, 4, 4, 4)
+        props_group_layout.addWidget(props_scroll)
+
+        # --- Three-column top layout ---
+        top_layout.addWidget(left_scroll, 2)
+        top_layout.addWidget(props_group, 1)
+        top_layout.addWidget(self.preview_widget, 2)
+        main_layout.addLayout(top_layout)
+
+        slender_group = QGroupBox("Clasificación de Esbeltez - AISC 360-16")
+        slender_layout = QVBoxLayout(slender_group)
+        self.slenderness_table = QTableWidget(0, 8)
+        self.slenderness_table.setHorizontalHeaderLabels([
+            "Elemento",
+            "λ",
+            "Fórmula",
+            "λp",
+            "λr (Flexión)",
+            "Clasif. Flexión",
+            "λr (Compresión)",
+            "Clasif. Compresión",
+        ])
+        self.slenderness_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
+        self.slenderness_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        slender_layout.addWidget(self.slenderness_table)
+
+        self.overall_label = QLabel("Clasificación Global - Flexión: -- | Compresión: --")
+        self.overall_label.setStyleSheet(
+            f"padding: 6px; border: 1px solid {COLORS['border']};"
+            f"background-color: {COLORS['bg_base']}; color: {COLORS['text_primary']}; font-weight: bold;"
+        )
+        slender_layout.addWidget(self.overall_label)
+        main_layout.addWidget(slender_group)
+
+        actions_layout = QHBoxLayout()
+        self.import_btn = StyledButton("📤 Importar a SAP2000", variant="success")
+        self.copy_btn = StyledButton("📋 Copiar Resultados", variant="secondary")
+        self.import_btn.clicked.connect(self._on_import)
+        self.copy_btn.clicked.connect(self._on_copy)
+        actions_layout.addWidget(self.import_btn)
+        actions_layout.addWidget(self.copy_btn)
+        main_layout.addLayout(actions_layout)
+
+        self.log_widget = LogWidget()
+        self.log_widget.setFixedHeight(100)
+        main_layout.addWidget(self.log_widget)
+
+        self._on_material_source_changed(self.material_source_combo.currentText())
+        self._on_type_changed()
+        self.on_connection_changed(bool(self.backend.SapModel))
+
+    def _clear_form_layout(self, layout):
+        while layout.count():
+            item = layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+
+    def _on_type_changed(self):
+        self._clear_form_layout(self.dims_form)
+        self.dim_edits = {}
+
+        section_type = self.type_combo.currentData()
+        section_cfg = SECTION_TYPES.get(section_type, {})
+        for key, label, default in section_cfg.get("params", []):
+            edit = QLineEdit(str(default))
+            edit.textChanged.connect(self._on_dims_changed)
+            self.dims_form.addRow(f"{label}:", edit)
+            self.dim_edits[key] = edit
+
+        self._auto_name()
+        self._recalculate()
+
+    def _on_dims_changed(self):
+        self._auto_name()
+        self._schedule_recalc()
+
+    def _schedule_recalc(self):
+        if self._recalc_timer is not None:
+            self._recalc_timer.stop()
+        self._recalc_timer = QTimer()
+        self._recalc_timer.setSingleShot(True)
+        self._recalc_timer.timeout.connect(self._recalculate)
+        self._recalc_timer.start(300)
+
+    def _read_dims(self):
+        dims = {}
+        for key, edit in self.dim_edits.items():
+            txt = edit.text().strip().replace(",", ".")
+            if txt == "":
+                return None
+            dims[key] = float(txt)
+        return dims
+
+    def _auto_name(self):
+        section_type = self.type_combo.currentData()
+        dims = {}
+        for key, edit in self.dim_edits.items():
+            try:
+                dims[key] = float(edit.text().strip().replace(",", "."))
+            except ValueError:
+                return
+
+        if section_type == "W":
+            name = f"W{dims.get('d', 0):g}x{dims.get('bf', 0):g}"
+        elif section_type == "C":
+            name = f"C{dims.get('d', 0):g}x{dims.get('bf', 0):g}"
+        elif section_type == "L":
+            name = f"L{dims.get('d', 0):g}x{dims.get('b', 0):g}x{dims.get('t', 0):g}"
+        elif section_type == "HSS_RECT":
+            name = f"HSS{dims.get('H', 0):g}x{dims.get('B', 0):g}x{dims.get('t', 0):g}"
+        elif section_type == "HSS_ROUND":
+            name = f"HSS_R{dims.get('OD', 0):g}x{dims.get('t', 0):g}"
+        elif section_type == "2L":
+            name = f"2L{dims.get('d', 0):g}x{dims.get('b', 0):g}x{dims.get('t', 0):g}"
+        elif section_type == "2C":
+            name = f"2C{dims.get('d', 0):g}x{dims.get('bf', 0):g}"
+        elif section_type == "WT":
+            name = f"WT{dims.get('d', 0):g}x{dims.get('bf', 0):g}"
+        else:
+            name = ""
+
+        self.name_edit.setText(name)
+
+    def _on_material_source_changed(self, source):
+        self.material_combo.blockSignals(True)
+        self.material_combo.clear()
+
+        if source == "Predefinido":
+            mats = list(STEEL_MATERIALS.keys()) + ["Personalizado"]
+            self.material_combo.addItems(mats)
+            self.material_combo.setEnabled(True)
+            self.material_combo.setCurrentIndex(0)
+        else:
+            mats = self.backend.get_steel_materials()
+            if mats:
+                self.material_combo.addItems(mats)
+                self.material_combo.setEnabled(True)
+            else:
+                self.material_combo.addItem("Sin materiales")
+                self.material_combo.setEnabled(False)
+                self.log_widget.log("No se encontraron materiales de acero en SAP2000.", "WARNING")
+
+        self.material_combo.blockSignals(False)
+        self._on_material_changed(self.material_combo.currentText())
+
+    def _on_material_changed(self, material_name):
+        if self.material_source_combo.currentText() == "Predefinido":
+            if material_name in STEEL_MATERIALS:
+                data = STEEL_MATERIALS[material_name]
+                self.fy_edit.setText(f"{float(data.get('Fy_MPa', 0)):g}")
+                self.e_edit.setText(f"{float(data.get('E_MPa', 0)):g}")
+                self.fu_edit.setText(f"{float(data.get('Fu_MPa', 0)):g}")
+            elif material_name == "Personalizado":
+                self.fy_edit.clear()
+                self.e_edit.clear()
+                self.fu_edit.clear()
+        self._schedule_recalc()
+
+    def _fmt(self, value):
+        if value is None:
+            return "--"
+        try:
+            abs_v = abs(float(value))
+            if abs_v >= 1000:
+                return f"{value:,.2f}"
+            if abs_v >= 1:
+                return f"{value:,.3f}"
+            return f"{value:,.4f}"
+        except Exception:
+            return "--"
+
+    def _clear_outputs(self):
+        for lbl in self.prop_value_labels.values():
+            lbl.setText("--")
+        self.slenderness_table.setRowCount(0)
+        self.overall_label.setText("Clasificación Global - Flexión: -- | Compresión: --")
+        self.overall_label.setStyleSheet(
+            f"padding: 6px; border: 1px solid {COLORS['border']};"
+            f"background-color: {COLORS['bg_base']}; color: {COLORS['text_primary']}; font-weight: bold;"
+        )
+        self.last_props = None
+        self.last_slenderness = None
+
+    def _update_properties(self, props):
+        if not props:
+            for lbl in self.prop_value_labels.values():
+                lbl.setText("--")
+            return
+        for key, lbl in self.prop_value_labels.items():
+            lbl.setText(self._fmt(props.get(key)))
+
+    def _classification_style(self, text):
+        if text in ("Compacto", "No Esbelto"):
+            return QColor("#c8e6c9"), QColor("#2e7d32")
+        if text == "No Compacto":
+            return QColor("#fff9c4"), QColor("#f57f17")
+        return QColor("#ffcdd2"), QColor("#c62828")
+
+    def _set_read_only(self, item):
+        item.setFlags(item.flags() ^ Qt.ItemIsEditable)
+
+    def _update_slenderness(self, data):
+        self.slenderness_table.setRowCount(0)
+        if not data:
+            self.overall_label.setText("Clasificación Global - Flexión: -- | Compresión: --")
+            return
+
+        elements = data.get("elements", [])
+        self.slenderness_table.setRowCount(len(elements))
+        for row, elem in enumerate(elements):
+            values = [
+                elem.get("name", ""),
+                self._fmt(elem.get("lambda_val")),
+                elem.get("formula", ""),
+                self._fmt(elem.get("lambda_p")),
+                self._fmt(elem.get("lambda_r_flex")),
+                elem.get("class_flexure", ""),
+                self._fmt(elem.get("lambda_r_comp")),
+                elem.get("class_compression", ""),
+            ]
+            for col, val in enumerate(values):
+                item = QTableWidgetItem(str(val))
+                self._set_read_only(item)
+                if col in (5, 7):
+                    bg, fg = self._classification_style(str(val))
+                    item.setBackground(bg)
+                    item.setForeground(fg)
+                self.slenderness_table.setItem(row, col, item)
+
+        overall_flex = data.get("overall_flexure", "--")
+        overall_comp = data.get("overall_compression", "--")
+        self.overall_label.setText(
+            f"Clasificación Global - Flexión: {overall_flex} | Compresión: {overall_comp}"
+        )
+
+        worst = "OK"
+        if "Esbelto" in (overall_flex, overall_comp):
+            worst = "ERROR"
+        elif overall_flex == "No Compacto":
+            worst = "WARNING"
+
+        if worst == "ERROR":
+            bg = "#ffcdd2"
+            fg = "#c62828"
+        elif worst == "WARNING":
+            bg = "#fff9c4"
+            fg = "#f57f17"
+        else:
+            bg = "#c8e6c9"
+            fg = "#2e7d32"
+        self.overall_label.setStyleSheet(
+            f"padding: 6px; border: 1px solid {COLORS['border']};"
+            f"background-color: {bg}; color: {fg}; font-weight: bold;"
+        )
+
+    def _recalculate(self):
+        section_type = self.type_combo.currentData()
+        if not section_type:
+            self._clear_outputs()
+            return
+
+        try:
+            dims = self._read_dims()
+            if not dims:
+                self._clear_outputs()
+                self.preview_widget.update_section(section_type, {})
+                return
+
+            props = SteelSectionCalc.calc_properties(section_type, dims)
+            self.last_props = props
+            self._update_properties(props)
+
+            try:
+                fy = float(self.fy_edit.text().strip().replace(",", "."))
+                e_val = float(self.e_edit.text().strip().replace(",", "."))
+            except ValueError:
+                fy = None
+                e_val = None
+
+            slenderness = None
+            if fy and e_val:
+                slenderness = SlendernessClassifier.classify(section_type, dims, fy, e_val)
+            self.last_slenderness = slenderness
+            self._update_slenderness(slenderness)
+            self.preview_widget.update_section(section_type, dims)
+        except Exception:
+            self._clear_outputs()
+            self.preview_widget.update_section(section_type, {})
+
+    def _on_import(self):
+        section_name = self.name_edit.text().strip()
+        material = self.material_combo.currentText().strip()
+        section_type = self.type_combo.currentData()
+
+        if not section_name:
+            self.log_widget.log("Ingrese un nombre de sección válido.", "WARNING")
+            return
+        if not material or material == "Sin materiales":
+            self.log_widget.log("Seleccione un material válido.", "WARNING")
+            return
+
+        try:
+            dims = self._read_dims()
+        except Exception:
+            dims = None
+        if not dims:
+            self.log_widget.log("Dimensiones inválidas para importar.", "ERROR")
+            return
+
+        if self.material_source_combo.currentText() == "Predefinido":
+            self.log_widget.log("Verifique que el nombre de material exista en SAP2000.", "INFO")
+
+        ok = self.backend.create_frame_section(section_type, section_name, material, dims)
+        if ok:
+            self.log_widget.log(f"Sección '{section_name}' importada correctamente.", "SUCCESS")
+        else:
+            self.log_widget.log(f"No se pudo importar la sección '{section_name}'.", "ERROR")
+
+    def _on_copy(self):
+        lines = []
+        lines.append("=== PROPIEDADES DE SECCIÓN ===")
+        lines.append(f"Tipo: {self.type_combo.currentText()}")
+        lines.append(f"Nombre: {self.name_edit.text().strip()}")
+        lines.append(f"Material: {self.material_combo.currentText().strip()}")
+        lines.append("")
+
+        if self.last_props:
+            for key in ["A", "Ix", "Iy", "Sx_top", "Sx_bot", "Sy", "Zx", "Zy", "rx", "ry", "J", "Cw"]:
+                lines.append(f"{key}: {self._fmt(self.last_props.get(key))}")
+        else:
+            lines.append("Sin resultados de propiedades")
+
+        lines.append("")
+        lines.append("=== ESBELTEZ AISC 360-16 ===")
+        if self.last_slenderness and self.last_slenderness.get("elements"):
+            lines.append("Elemento | λ | Fórmula | λp | λr(F) | Clasif. F | λr(C) | Clasif. C")
+            for elem in self.last_slenderness["elements"]:
+                lines.append(
+                    " | ".join([
+                        str(elem.get("name", "")),
+                        self._fmt(elem.get("lambda_val")),
+                        str(elem.get("formula", "")),
+                        self._fmt(elem.get("lambda_p")),
+                        self._fmt(elem.get("lambda_r_flex")),
+                        str(elem.get("class_flexure", "")),
+                        self._fmt(elem.get("lambda_r_comp")),
+                        str(elem.get("class_compression", "")),
+                    ])
+                )
+            lines.append("")
+            lines.append(
+                f"Global - Flexión: {self.last_slenderness.get('overall_flexure', '--')} | "
+                f"Compresión: {self.last_slenderness.get('overall_compression', '--')}"
+            )
+        else:
+            lines.append("Sin resultados de esbeltez")
+
+        QApplication.clipboard().setText("\n".join(lines))
+        self.log_widget.log("Resultados copiados al portapapeles.", "SUCCESS")
+
+    def on_connection_changed(self, connected):
+        if connected:
+            self.backend.SapModel = self.sap_interface.SapModel
+            self.import_btn.setEnabled(True)
+            self.log_widget.log("📡 Conexión establecida", "SUCCESS")
+        else:
+            self.backend.SapModel = None
+            self.import_btn.setEnabled(False)
+            self.log_widget.log("📡 Conexión perdida", "WARNING")
+
+
 class MeshUtilsWidget(QWidget):
     def __init__(self, parent=None, sap_interface=None):
         super().__init__(parent)
@@ -1003,15 +1776,18 @@ class MeshUtilsWidget(QWidget):
         self.tabs = QTabWidget()
         layout.addWidget(self.tabs)
         
+        self.frames_widget = FrameSectionWidget(sap_interface=sap_interface)
         self.rect_mesh_widget = RectangularMeshWidget(sap_interface=sap_interface)
         self.hole_mesh_widget = HoleMeshWidget(sap_interface=sap_interface)
         self.results_widget = ResultsTableWidget(sap_interface=sap_interface)
         self.notes_widget = NotesWidget()
         
+        self.tabs.insertTab(0, self.frames_widget, "Frames")
         self.tabs.addTab(self.rect_mesh_widget, "Malla Rectangular")
         self.tabs.addTab(self.hole_mesh_widget, "Malla con Orificio")
         self.tabs.addTab(self.results_widget, "Tablas de Resultados")
         self.tabs.addTab(self.notes_widget, "Notas y Recomendaciones")
+        self.tabs.setCurrentIndex(0)
 
 
 class MainWindow(QMainWindow):

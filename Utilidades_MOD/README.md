@@ -1,13 +1,14 @@
 # Utilidades de Modelado
 
-Colección de herramientas auxiliares para modelado en SAP2000: generador de **malla rectangular**, generador de **malla con hueco** (transición de formas), visor de **Database Tables** y visor de **notas Markdown**.
+Colección de herramientas auxiliares para modelado en SAP2000: definición de **secciones frame de acero**, generador de **malla rectangular**, generador de **malla con hueco** (transición de formas), visor de **Database Tables** y visor de **notas Markdown**.
 
 ## Descripción
 
-Agrupa 4 utilidades independientes en sub-pestañas:
+Agrupa 5 utilidades independientes en sub-pestañas:
 
 | Sub-tab | Utilidad |
 |---|---|
+| **Frames** | Define secciones de acero por tipo, calcula propiedades, clasifica esbeltez AISC 360-16 e importa a SAP2000 |
 | **Malla Rectangular** | Genera una grilla n×m de shell areas en cualquier plano (XY/XZ/YZ) |
 | **Malla con Hueco** | Crea transiciones geométricas entre formas (circle/square) mediante anillos concéntricos interpolados |
 | **Database Tables** | Consulta y muestra cualquier tabla de la base de datos interna de SAP2000 con filtros por load case/combo |
@@ -18,7 +19,11 @@ Agrupa 4 utilidades independientes en sub-pestañas:
 | Archivo | Clase | Responsabilidad |
 |---|---|---|
 | `utils_backend.py` | `SapUtils` | Backend unificado — mesh generation, coordinate queries, database table extraction |
-| `app_utils_gui.py` | `MeshUtilsWidget` | Container principal con `QTabWidget` de 4 sub-tabs |
+| `utils_backend.py` | `SteelSectionCalc` | Cálculo de propiedades geométricas de secciones de acero (A, Ix, Iy, Sx, Sy, Zx, Zy, rx, ry, J, Cw) |
+| `utils_backend.py` | `SlendernessClassifier` | Clasificación de esbeltez AISC 360-16 (Tabla B4.1) |
+| `app_utils_gui.py` | `MeshUtilsWidget` | Container principal con `QTabWidget` de 5 sub-tabs |
+| `app_utils_gui.py` | `FrameSectionWidget` | Inputs dinámicos de sección, selección de material, cálculo, clasificación e importación a SAP2000 |
+| `app_utils_gui.py` | `SectionPreviewWidget` | Canvas `QPainter` para vista previa en tiempo real de la sección transversal |
 | `app_utils_gui.py` | `RectangularMeshWidget` | Inputs + preview para malla rectangular |
 | `app_utils_gui.py` | `HoleMeshWidget` | Inputs + preview para malla con hueco |
 | `app_utils_gui.py` | `ResultsTableWidget` | Selector de tabla + filtros + `QTableWidget` de resultados |
@@ -31,6 +36,20 @@ Agrupa 4 utilidades independientes en sub-pestañas:
 
 ```mermaid
 flowchart TD
+    subgraph Tab0["Sub-tab: Frames"]
+        F1["Usuario selecciona tipo de sección:<br/>W, C, L, HSS Rect, HSS Round,<br/>2L, 2C, WT"]
+        F2["Inputs dinámicos de dimensiones<br/>según SECTION_TYPES"]
+        F3["Selecciona material:<br/>preset STEEL_MATERIALS o<br/>materiales del modelo SAP2000"]
+        F4["SectionPreviewWidget (QPainter)<br/>muestra sección en tiempo real"]
+        F5["<b>Calcular</b> propiedades"]
+        F6["SteelSectionCalc<br/>A, Ix, Iy, Sx, Sy, Zx, Zy, rx, ry, J, Cw"]
+        F7["SlendernessClassifier<br/>AISC 360-16 Tabla B4.1"]
+        F8["Tabla de clasificación<br/>con codificación por color"]
+        F9["<b>Importar a SAP2000</b>"]
+        F10["SapUtils.create_frame_section()<br/>PropFrame API"]
+        F11["<b>Copiar resultados</b><br/>al portapapeles"]
+    end
+
     subgraph Tab1["Sub-tab: Malla Rectangular"]
         R1["Usuario ingresa:<br/>Width, Length, nx, ny,<br/>Origin (x,y,z), Plane, Prop"]
         R1B["Opcional: <b>Get Coordinates</b><br/>lee punto seleccionado<br/>en SAP2000"]
@@ -67,7 +86,17 @@ flowchart TD
 
     subgraph SAP["SAP2000 API"]
         COORD["SelectObj.GetSelected()<br/>PointObj.GetCoordCartesian()"]
+        MAT["PropMaterial.GetNameList()<br/>+ GetTypeOAPI()"]
+        FRAME["PropFrame.SetISection / SetChannel / SetAngle<br/>SetTube / SetPipe / SetDoubleAngle / SetDoubleChannel / SetTee"]
     end
+
+    F1 --> F2 --> F4
+    F3 --> F4
+    F2 --> F5 --> F6 --> F7 --> F8
+    F3 --> F9 --> F10
+    F10 --> FRAME
+    MAT --> F3
+    F8 --> F11
 
     R1 --> R2
     R1 --> R1B --> COORD
@@ -81,6 +110,7 @@ flowchart TD
 
     N1 --> N2
 
+    style Tab0 fill:#e3f2fd,stroke:#1565C0
     style Tab1 fill:#e8f4f8,stroke:#2196F3
     style Tab2 fill:#e8f5e9,stroke:#4CAF50
     style Tab3 fill:#fff3e0,stroke:#FF9800
@@ -89,6 +119,14 @@ flowchart TD
 ```
 
 ### Detalle por herramienta
+
+#### Frames
+1. El usuario elige el tipo de perfil (`W`, `C`, `L`, `HSS Rect`, `HSS Round`, `2L`, `2C`, `WT`) y el formulario habilita dinámicamente las dimensiones requeridas según `SECTION_TYPES`.
+2. Selecciona material desde presets (`STEEL_MATERIALS`: A36, A572 Gr50, A992, A500 Gr B/C) o desde materiales de acero existentes en SAP2000 mediante `get_steel_materials()`.
+3. `SectionPreviewWidget` renderiza la geometría con `QPainter` en tiempo real conforme cambian las dimensiones.
+4. Al calcular, `SteelSectionCalc` obtiene propiedades seccionales (`A`, `Ix`, `Iy`, `Sx`, `Sy`, `Zx`, `Zy`, `rx`, `ry`, `J`, `Cw`).
+5. `SlendernessClassifier` evalúa esbeltez por elemento según AISC 360-16 Tabla B4.1 y presenta una tabla codificada por color.
+6. El usuario puede importar la sección al modelo usando `create_frame_section()` (API `PropFrame`) y copiar los resultados al portapapeles.
 
 #### Malla Rectangular
 1. El usuario define ancho (`width`), largo (`length`), divisiones (`nx`, `ny`), origen, plano de trabajo y propiedad shell.
@@ -110,12 +148,12 @@ flowchart TD
 
 ## Uso en la GUI
 
-La pestaña **"Utilidades de Modelado"** en `main_app.py` presenta las 4 sub-pestañas. Cada herramienta de mesh incluye un preview en vivo que se actualiza al cambiar los parámetros.
+La pestaña **"Utilidades de Modelado"** en `main_app.py` presenta las 5 sub-pestañas. Cada herramienta de mesh incluye un preview en vivo que se actualiza al cambiar los parámetros.
 
 ## Ejecución Standalone
 
 ```bash
-# GUI con las 4 sub-tabs (conecta vía GetActiveObject)
+# GUI con las 5 sub-tabs (conecta vía GetActiveObject)
 python Utilidades_MOD/app_utils_gui.py
 ```
 
