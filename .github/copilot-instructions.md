@@ -1,6 +1,6 @@
 # Instrucciones para GitHub Copilot - SAP2000 Automation Suite
 
-Proyecto Python que automatiza CSI SAP2000 vía COM (`comtypes`) con GUI PySide6. Incluye integración con Microsoft Word para reportes.
+Proyecto Python que automatiza CSI SAP2000 vía COM (`comtypes`) con GUI PySide6.
 
 ## Arquitectura del Proyecto
 
@@ -13,7 +13,6 @@ sap_interface.py      # Singleton de conexión SAP2000 (emite connectionChanged 
   ├── *_gui.py        # Widget QWidget (recibe sap_interface)
   └── config.py       # Constantes y configuración (opcional)
 API/                  # Documentación de referencia CSI OAPI
-Reportes/library/     # Snippets JSON para generación de memorias
 ```
 
 ## Regla de Oro: Retornos de comtypes
@@ -83,13 +82,6 @@ python Nuevo_Modulo/backend.py
 # GUI como módulo
 python -m Nuevo_Modulo.gui
 ```
-
-## Integración con Word (Reportes)
-
-El módulo `Reportes/` usa `WordService` (comtypes → Word.Application):
-- Ecuaciones: UnicodeMath nativo, no LaTeX. Ver `equation_translator.py`
-- Símbolos: `\alpha` → `α`, `\sum` → `∑` (diccionario `UNICODEMATH_SYMBOLS`)
-- Snippets: JSON en `Reportes/library/` con estructura `{category, snippets: [{id, title, content}]}`
 
 ## Infraestructura Compartida (Step 1)
 
