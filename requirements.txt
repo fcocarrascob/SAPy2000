@@ -1,0 +1,17 @@
+# SAP2000 Automation Suite - Dependencies
+# Python 3.8+
+
+# GUI Framework (Qt6)
+PySide6>=6.6.0
+
+# COM Automation for SAP2000 API
+comtypes>=1.2.0
+
+# Windows COM support (pythoncom)
+pywin32>=306
+
+# Visualización de espectros y gráficos
+matplotlib>=3.7.0
+
+# Renderizado de Markdown para notas
+markdown>=3.4.0

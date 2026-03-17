@@ -7,3 +7,7 @@ __pycache__/
 *.pyd
 
 Placa_Base/placabase_ARA_config.json
+
+.venv/
+.github/
+.API/
