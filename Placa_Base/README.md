@@ -17,6 +17,8 @@ A partir de las dimensiones de una columna tipo I, parámetros de la placa y coo
 - **Área de enlace** (link area) conectando los grupos de pernos
 - **Subdivisión** de alas, alma y link area en los puntos de intersección con pernos
 - **Anchor chairs** opcionales
+- **TC Limits** (compresión = 0) en todos los Frames de pernos — pernos no resisten compresión
+- **Módulo de balasto** (resorte de compresión en cara inferior) asignado a todas las áreas en z=0
 
 ## Arquitectura
 
@@ -24,7 +26,7 @@ A partir de las dimensiones de una columna tipo I, parámetros de la placa y coo
 |---|---|---|
 | `placabase_backend.py` | `PlateConfig` | Dataclass con geometría completa (bolts, columna, placa, anchor, material perno). `from_json()` carga desde JSON |
 | `placabase_backend.py` | `BasePlateBackend` | Lógica de generación: crea puntos, áreas, ring meshes, pernos Frame, Body constraints, Pin restraints y subdivisiones vía API SAP2000 |
-| `app_placabase_gui.py` | `BasePlateWidget` | Formulario con 5 grupos de inputs + log de salida |
+| `app_placabase_gui.py` | `BasePlateWidget` | Formulario con 6 grupos de inputs + log de salida |
 | `app_placabase_gui.py` | `PreviewWidget` | Canvas custom (`paintEvent`) — dibuja sección I, bolt positions y contorno A×A |
 | `placabase_ARA_config.json` | — | Configuración persistida (dimensiones, centros de pernos) |
 
@@ -58,7 +60,9 @@ flowchart TD
         P3NO["<b>SIN SILLA</b><br/>Frame placa→fundación<br/>+ Body (6 DOF)<br/>+ Pin"]
         P4["<b>4. Link area</b><br/>conecta grupos de pernos"]
         P5["<b>5. Subdivisión</b><br/>alas + alma + link"]
-        P7["View.RefreshView()"]
+        P6["<b>6. TC Limits</b><br/>Compresión=0 en pernos"]
+        P7B["<b>7. Balasto</b><br/>Resorte en áreas z=0"]
+        P8["View.RefreshView()"]
     end
 
     A --> A2
@@ -73,7 +77,7 @@ flowchart TD
     P3NO -->|"Siguiente bolt"| P3
     P3YES -->|"Todos procesados"| P4
     P3NO -->|"Todos procesados"| P4
-    P4 --> P5 --> P7
+    P4 --> P5 --> P6 --> P7B --> P8
 
     style GUI fill:#e8f4f8,stroke:#2196F3
     style Config fill:#e8f5e9,stroke:#4CAF50
@@ -96,6 +100,8 @@ flowchart TD
 | 4 | Crear área rectangular que conecta bolt groups | `AreaObj.AddByCoord()` |
 | 5 | Subdividir áreas existentes por puntos de perno | `EditArea.Divide()` con selección |
 | 6 | Placas anchor chair (opcional) | `AreaObj.AddByCoord()` |
+| 7 | Asignar TC Limits: compresión = 0 en pernos Frame | `FrameObj.SetTCLimits()` |
+| 8 | Seleccionar áreas en z=0 y asignar módulo de balasto | `SelectObj.CoordinateRange()` + `AreaObj.SetSpring()` con `ItemType=2` |
 
 ### Preset de posiciones de pernos
 
@@ -116,6 +122,7 @@ El archivo `placabase_ARA_config.json` almacena:
 | `n_pernos` | `int` | Pernos por fila (para preset) |
 | `bolt_centers` | `list` | Coordenadas `[x, y, z]` de cada centro |
 | `flange_thickness`, `web_thickness`, `plate_thickness` | `float?` | Espesores (mm) |
+| `ks_balasto` | `float?` | Módulo de balasto [kgf/cm³] (vacío = sin springs) |
 | `include_anchor_chair` | `bool` | Toggle para silla de anclaje |
 | `anchor_chair_height`, `anchor_chair_thickness` | `float?` | Dimensiones de la silla |
 
@@ -127,8 +134,9 @@ La pestaña **"Diseño Placa Base"** en `main_app.py` presenta:
 2. **Base Plate** — Espesor de la placa
 3. **Bolts** — Diámetro (ComboBox), tabla manual de centros X/Y, o generador preset
 4. **Anchor Chair** — Toggle + dimensiones (opcional)
-5. **Output Log** — Mensajes de ejecución
-6. **Preview** — Visualización en vivo del layout
+5. **Propiedades Adicionales** — Módulo de balasto ks (kgf/cm³)
+6. **Output Log** — Mensajes de ejecución
+7. **Preview** — Visualización en vivo del layout
 
 ## Ejecución Standalone
 

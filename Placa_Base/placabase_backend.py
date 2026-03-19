@@ -25,6 +25,7 @@ class PlateConfig:
     anchor_chair_height: Optional[float] = None
     anchor_chair_thickness: Optional[float] = None
     bolt_material: str = "A36"
+    ks_balasto: Optional[float] = None
 
     @classmethod
     def from_json(cls, json_path: str) -> 'PlateConfig':
@@ -72,6 +73,9 @@ class PlateConfig:
             cfg.anchor_chair_thickness = float(data['anchor_chair_thickness'])
         
         cfg.bolt_material = str(data.get('bolt_material', cfg.bolt_material))
+
+        if 'ks_balasto' in data and data['ks_balasto']:
+            cfg.ks_balasto = float(data['ks_balasto'])
             
         return cfg
 
@@ -418,6 +422,110 @@ class BasePlateBackend:
             p4 = outer[i]
             self.create_area_by_points([p1, p2, p3, p4], prop_name, f"{prefix}_{i+1}")
 
+    # --- TC Limits & Balasto Spring Logic ---
+
+    def set_bolt_tc_limits(self, bolt_frame_names: List[str]) -> int:
+        """Asigna límite de compresión = 0 a los Frames de pernos (no resisten compresión).
+
+        Llama a FrameObj.SetTCLimits con:
+          - LimitCompressionExists = True, LimitCompression = 0.0
+          - LimitTensionExists = False, LimitTension = 0.0
+
+        Args:
+            bolt_frame_names: lista de nombres de Frame objects (pernos)
+
+        Returns:
+            int: número de frames procesados exitosamente
+        """
+        if not self.SapModel or not bolt_frame_names:
+            return 0
+
+        ok_count = 0
+        for name in bolt_frame_names:
+            try:
+                ret = self.SapModel.FrameObj.SetTCLimits(
+                    str(name),  # Name
+                    True,       # LimitCompressionExists
+                    0.0,        # LimitCompression [F]
+                    False,      # LimitTensionExists
+                    0.0,        # LimitTension [F]
+                    0           # ItemType: Object
+                )
+                if self._check_ret(ret):
+                    ok_count += 1
+            except Exception as exc:
+                self.log(f"  [TCLimits] Excepción en frame '{name}': {exc}")
+
+        self.log(f"TC Limits (compresión=0) asignados a {ok_count}/{len(bolt_frame_names)} frames.")
+        return ok_count
+
+    def assign_balasto_to_base_plate(self, ks: float) -> bool:
+        """Selecciona todas las áreas en z=0 y les asigna módulo de balasto como resorte.
+
+        Usa SelectObj.CoordinateRange para seleccionar áreas en z=0, luego aplica
+        AreaObj.SetSpring con ItemType=2 (SelectedObjects) en una sola llamada.
+
+        Args:
+            ks: módulo de balasto en kgf/cm³
+
+        Returns:
+            bool: True si la asignación fue exitosa
+        """
+        if not self.SapModel or not ks or ks <= 0:
+            return False
+
+        current_units = self.SapModel.GetPresentUnits()
+        self.SapModel.SetPresentUnits(14)  # kgf_cm_C
+
+        try:
+            # Seleccionar todas las áreas en z=0
+            self.SapModel.SelectObj.ClearSelection()
+            ok, _ = self.coordinate_range(
+                -1e10, 1e10,    # Xmin, Xmax (todo el modelo)
+                -1e10, 1e10,    # Ymin, Ymax
+                0.0, 0.0,       # Zmin, Zmax (plano z=0)
+                deselect=False,
+                csys="Global",
+                include_intersections=True,
+                point=False, line=False, area=True, solid=False, link=False
+            )
+
+            if not ok:
+                self.log("⚠ No se pudieron seleccionar áreas en z=0 para balasto.")
+                return False
+
+            # Asignar spring a la selección
+            vec = [0.0, 0.0, 0.0]
+            ret = self.SapModel.AreaObj.SetSpring(
+                "ALL",      # Name (ignorado cuando ItemType=2)
+                1,          # MyType: simple spring
+                float(ks),  # s: rigidez por unidad de área [kgf/cm³]
+                2,          # SimpleSpringType: solo compresión
+                "",         # LinkProp
+                -1,         # Face: cara inferior
+                2,          # SpringLocalOneType: normal a la cara
+                1,          # Dir (no aplica cuando SpringLocalOneType=2)
+                True,       # Outward
+                vec,        # Vec (no aplica cuando SpringLocalOneType=2)
+                0.0,        # Ang
+                True,       # Replace
+                "Local",    # CSys
+                2           # ItemType: SelectedObjects
+            )
+
+            if self._check_ret(ret):
+                self.log(f"✅ Módulo de balasto ks={ks} kgf/cm³ asignado a áreas seleccionadas en z=0.")
+                return True
+            else:
+                self.log("⚠ Error al asignar balasto a las áreas seleccionadas.")
+                return False
+
+        except Exception as exc:
+            self.log(f"Error asignando balasto: {exc}")
+            return False
+        finally:
+            self.SapModel.SetPresentUnits(current_units)
+
     # --- Bolt Frame & Body Constraint Logic ---
 
     def create_bolt_section(self) -> Optional[str]:
@@ -549,7 +657,7 @@ class BasePlateBackend:
 
     def create_single_chair(self, idx: int, cx: float, cy: float, z_level: float,
                              circle_radius: float, inner_side: float, B_bolt: float,
-                             prop_name: str) -> Tuple[Optional[str], List[str]]:
+                             prop_name: str) -> Tuple[Optional[str], List[str], List[str]]:
         """Genera la placa de silla para UN perno y retorna los nombres de puntos creados.
         
         Args:
@@ -562,7 +670,7 @@ class BasePlateBackend:
             prop_name: Propiedad shell de la silla.
             
         Returns:
-            (chair_center_name, chair_circle_pts) — nombre del punto central y lista de 16 puntos del círculo.
+            (chair_center_name, chair_circle_pts, chair_outer_pts) — punto central, 16 puntos del círculo y 16 puntos del cuadrado exterior.
         """
         self.log(f"Silla: procesando perno {idx} en ({cx}, {cy}) a z={z_level}...")
         chair_center = self.create_point(cx, cy, z_level, f"CHAIR_CENTER_{idx}")
@@ -574,7 +682,7 @@ class BasePlateBackend:
         self.create_ring_mesh(c_pts, in_pts, (cx, cy), f"CHAIR_ring_in{idx}", prop_name)
         self.create_ring_mesh(in_pts, out_pts, (cx, cy), f"CHAIR_ring_out{idx}", prop_name)
 
-        return chair_center or f"CHAIR_CENTER_{idx}", c_pts
+        return chair_center or f"CHAIR_CENTER_{idx}", c_pts, out_pts
 
     def create_chair_bolt_frame(self, chair_point_name: str, plate_center_name: str,
                                  section_name: str, idx: int) -> Optional[str]:
@@ -669,6 +777,8 @@ class BasePlateBackend:
         inner_side = inner_half * 2.0
         
         outer_square_points_list = []
+        chair_outer_square_points_list = []
+        bolt_frame_names = []
 
         for idx, (cx, cy, cz) in enumerate(cfg.bolt_centers, 1):
             print(f"Procesando perno {idx} en ({cx}, {cy})...")
@@ -693,18 +803,23 @@ class BasePlateBackend:
                 if chair_prop:
                     # --- CON SILLA DE ANCLAJE: perno de 2 tramos ---
                     # 3a-i. Crear geometría de silla para este perno
-                    chair_center, chair_c_pts = self.create_single_chair(
+                    chair_center, chair_c_pts, chair_out_pts = self.create_single_chair(
                         idx, cx, cy, cfg.anchor_chair_height,
                         circle_radius, inner_side, B_bolt, chair_prop
                     )
+                    chair_outer_square_points_list.append(chair_out_pts)
 
                     # 3a-ii. Tramo superior: silla → placa
-                    self.create_chair_bolt_frame(chair_center, center_name, bolt_section_name, idx)
+                    chair_frame = self.create_chair_bolt_frame(chair_center, center_name, bolt_section_name, idx)
+                    if chair_frame:
+                        bolt_frame_names.append(chair_frame)
 
                     # 3a-iii. Tramo inferior: placa → fundación (L=8d)
                     frame_name, bottom_pt = self.create_bolt_frame(
                         center_name, cx, cy, cz, bolt_section_name, idx
                     )
+                    if frame_name:
+                        bolt_frame_names.append(frame_name)
 
                     # 3a-iv. Body Constraint en SILLA: todos los DOF restringidos
                     self.create_bolt_body_constraint(
@@ -728,6 +843,7 @@ class BasePlateBackend:
                         center_name, cx, cy, cz, bolt_section_name, idx
                     )
                     if frame_name:
+                        bolt_frame_names.append(frame_name)
                         # Body Constraint: todos los DOF restringidos
                         self.create_bolt_body_constraint(
                             f"BOLT_BODY_{idx}", center_name, c_pts
@@ -762,6 +878,36 @@ class BasePlateBackend:
             except Exception as e:
                 print(f"No se pudo crear el área de enlace: {e}")
 
+        # 4b. Create Chair Link Area (replica de A_outer_link a nivel de silla)
+        if chair_prop and len(chair_outer_square_points_list) >= 4:
+            try:
+                N = len(cfg.bolt_centers) // 2
+                if 2*N-1 < len(chair_outer_square_points_list):
+                    p1 = chair_outer_square_points_list[N][10]      # (N+1)th center, TL
+                    p2 = chair_outer_square_points_list[2*N-1][14]  # 2Nth center, TR
+                    p3 = chair_outer_square_points_list[N-1][2]     # Nth center, BR
+                    p4 = chair_outer_square_points_list[0][6]       # 1st center, BL
+
+                    chair_link = self.create_area_by_points(
+                        [p1, p2, p3, p4], chair_prop, "A_chair_link"
+                    )
+                    if chair_link:
+                        self.divide_area(chair_link, 4 * cfg.n_pernos)
+                        self.log(f"Área de enlace silla '{chair_link}' creada y dividida.")
+            except Exception as e:
+                print(f"No se pudo crear el área de enlace de silla: {e}")
+
+        # 4c. Create column edge points at chair height (for mesh compatibility)
+        if chair_prop and cfg.anchor_chair_height:
+            z_chair = cfg.anchor_chair_height
+            self.create_point(-B/2, H/2, z_chair, "COL_FT_CHAIR_L")
+            self.create_point( B/2, H/2, z_chair, "COL_FT_CHAIR_R")
+            self.create_point(-B/2, -H/2, z_chair, "COL_FB_CHAIR_L")
+            self.create_point( B/2, -H/2, z_chair, "COL_FB_CHAIR_R")
+            self.create_point(0, H/2, z_chair, "COL_WEB_CHAIR_T")
+            self.create_point(0, -H/2, z_chair, "COL_WEB_CHAIR_B")
+            self.log(f"Puntos de columna creados a z={z_chair} para mesh de silla.")
+
         # 5. Divide Flange by Base Points (New Logic)
         try:
             # Clear selection first
@@ -782,6 +928,14 @@ class BasePlateBackend:
                 include_intersections=True,
                 point=True, line=False, area=False, solid=False, link=False
             )
+            # Also select chair-level points (accumulate selection)
+            if chair_prop and cfg.anchor_chair_height:
+                self.coordinate_range(
+                    -b_col/2, b_col/2, h_col/2, h_col/2,
+                    cfg.anchor_chair_height, cfg.anchor_chair_height,
+                    deselect=False, csys="Global", include_intersections=True,
+                    point=True, line=False, area=False, solid=False, link=False
+                )
             
             if ok:
                 print(f"Puntos seleccionados en la base del ala superior (z={z_target}).")
@@ -801,6 +955,14 @@ class BasePlateBackend:
                 include_intersections=True,
                 point=True, line=False, area=False, solid=False, link=False
             )
+            # Also select chair-level points (accumulate selection)
+            if chair_prop and cfg.anchor_chair_height:
+                self.coordinate_range(
+                    -b_col/2, b_col/2, -h_col/2, -h_col/2,
+                    cfg.anchor_chair_height, cfg.anchor_chair_height,
+                    deselect=False, csys="Global", include_intersections=True,
+                    point=True, line=False, area=False, solid=False, link=False
+                )
             
             if ok_bot:
                 print(f"Puntos seleccionados en la base del ala inferior (z={z_target}).")
@@ -830,6 +992,26 @@ class BasePlateBackend:
             else:
                 print("Fallo la selección de puntos para dividir A_outer_link.")
 
+            # --- A_chair_link Division Logic (Top Flange Line at chair Z) ---
+            if chair_prop and cfg.anchor_chair_height:
+                self.SapModel.SelectObj.ClearSelection()
+                z_chair = cfg.anchor_chair_height
+                ok_chair_link, _ = self.coordinate_range(
+                    -x_limit, x_limit,
+                    h_col/2, h_col/2,
+                    z_chair, z_chair,
+                    deselect=False,
+                    csys="Global",
+                    include_intersections=True,
+                    point=True, line=False, area=False, solid=False, link=False
+                )
+                if ok_chair_link:
+                    print(f"Puntos seleccionados para dividir A_chair_link en z={z_chair}.")
+                    new_areas = self.divide_area_by_selection("A_chair_link")
+                    self.subdivide_areas(new_areas, 1, 2)
+                else:
+                    print("Fallo la selección de puntos para dividir A_chair_link.")
+
             # --- Web Division Logic ---
             self.SapModel.SelectObj.ClearSelection()
             ok_web, ret_web = self.coordinate_range(
@@ -841,6 +1023,14 @@ class BasePlateBackend:
                 include_intersections=True,
                 point=True, line=False, area=False, solid=False, link=False
             )
+            # Also select chair-level points (accumulate selection)
+            if chair_prop and cfg.anchor_chair_height:
+                self.coordinate_range(
+                    0.0, 0.0, -h_col/2, h_col/2,
+                    cfg.anchor_chair_height, cfg.anchor_chair_height,
+                    deselect=False, csys="Global", include_intersections=True,
+                    point=True, line=False, area=False, solid=False, link=False
+                )
             
             if ok_web:
                 print(f"Puntos seleccionados en la base del alma (z={z_target}).")
@@ -851,6 +1041,20 @@ class BasePlateBackend:
                 
         except Exception as e:
             print(f"Error en la lógica de división final: {e}")
+
+        # 6. Asignar TC Limits a pernos (compresión = 0)
+        if bolt_frame_names:
+            self.log(f"6️⃣ Asignando TC Limits (compresión=0) a {len(bolt_frame_names)} frames de pernos...")
+            self.set_bolt_tc_limits(bolt_frame_names)
+        else:
+            self.log("6️⃣ No hay frames de pernos para asignar TC Limits.")
+
+        # 7. Asignar módulo de balasto a placa base (áreas en z=0)
+        if cfg.ks_balasto and cfg.ks_balasto > 0:
+            self.log(f"7️⃣ Asignando módulo de balasto ks={cfg.ks_balasto} kgf/cm³ a áreas en z=0...")
+            self.assign_balasto_to_base_plate(cfg.ks_balasto)
+        else:
+            self.log("7️⃣ Módulo de balasto no especificado; se omite asignación de resortes.")
 
         # Refresh View
         try:

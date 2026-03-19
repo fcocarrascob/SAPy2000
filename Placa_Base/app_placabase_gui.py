@@ -1,6 +1,5 @@
 import sys
 import os
-import json
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QLineEdit,
                                QTextEdit, QPushButton, QVBoxLayout, QHBoxLayout, QMessageBox, QComboBox,
                                QTableWidget, QTableWidgetItem, QGroupBox, QGridLayout, QFormLayout, QScrollArea, QCheckBox)
@@ -13,9 +12,8 @@ from gui_components import StyledButton, LogWidget
 from themes import COLORS
 
 # Import backend
-from .placabase_backend import BasePlateBackend
+from .placabase_backend import BasePlateBackend, PlateConfig
 
-CONFIG_PATH = os.path.join(os.path.dirname(__file__), 'placabase_ARA_config.json')
 
 class BasePlateWidget(QWidget):
     def __init__(self, parent=None, sap_interface=None):
@@ -54,6 +52,10 @@ class BasePlateWidget(QWidget):
         self.chair_height_edit = QLineEdit('')
         self.chair_thickness_edit = QLineEdit('')
 
+        # Módulo de balasto
+        self.edit_balasto = QLineEdit('')
+        self.edit_balasto.setToolTip("Módulo de balasto ks [kgf/cm³] asignado a la cara inferior de shells en z=0. Vacío para omitir.")
+
         self.A_display = QLineEdit('100')
         self.A_display.setReadOnly(True)
         self.B_display = QLineEdit('100')
@@ -84,7 +86,7 @@ class BasePlateWidget(QWidget):
         self.log = LogWidget()
         self.log.setFixedHeight(120)
 
-        self.run_btn = StyledButton('🚀 Guardar y Ejecutar', variant="success")
+        self.run_btn = StyledButton('🚀 Ejecutar', variant="success")
 
         self.run_btn.clicked.connect(self.run_script)
         
@@ -181,8 +183,17 @@ class BasePlateWidget(QWidget):
         grp_chair.setLayout(chair_layout)
         main_form_layout.addWidget(grp_chair)
 
-        # 5. Calcular
-        grp_out = QGroupBox("5. Calcular")
+        # 5. Propiedades Adicionales
+        grp_props = QGroupBox("5. Propiedades Adicionales")
+        props_layout = QHBoxLayout()
+        props_layout.addWidget(QLabel("Módulo Balasto ks (kgf/cm³):"))
+        props_layout.addWidget(self.edit_balasto)
+        props_layout.addStretch()
+        grp_props.setLayout(props_layout)
+        main_form_layout.addWidget(grp_props)
+
+        # 6. Calcular
+        grp_out = QGroupBox("6. Calcular")
         out_layout = QHBoxLayout()
         out_layout.addWidget(self.run_btn)
         out_layout.addStretch()
@@ -206,88 +217,6 @@ class BasePlateWidget(QWidget):
         outer_layout.addLayout(content_layout, 1)
         outer_layout.addWidget(grp_log)
         self.setLayout(outer_layout)
-
-        # load existing config if present
-        if os.path.exists(CONFIG_PATH):
-            try:
-                with open(CONFIG_PATH, 'r', encoding='utf-8') as fh:
-                    cfg = json.load(fh)
-                # seleccionar en combo el diámetro si existe en config
-                cfg_dia = cfg.get('bolt_dia')
-                if cfg_dia is not None:
-                    # buscar índice con userData == cfg_dia
-                    found_idx = -1
-                    for i in range(self.bolt_combo.count()):
-                        if float(self.bolt_combo.itemData(i)) == float(cfg_dia):
-                            found_idx = i
-                            break
-                    if found_idx >= 0:
-                        self.bolt_combo.setCurrentIndex(found_idx)
-                # si no hay centros en config, insertar una fila vacía por defecto
-                if not cfg.get('bolt_centers'):
-                    self.add_row()
-                
-                self.hcol_edit.setText(str(cfg.get('H_col', self.hcol_edit.text())))
-                self.bcol_edit.setText(str(cfg.get('B_col', self.bcol_edit.text())))
-                
-                # Helper to load optional float fields (avoid writing "None" as text)
-                def load_optional_field(edit, key, default=''):
-                    val = cfg.get(key)
-                    if val is not None:
-                        edit.setText(str(val))
-                    else:
-                        edit.setText(default)
-                
-                # cargar espesores si vienen en la config
-                load_optional_field(self.flange_edit, 'flange_thickness')
-                load_optional_field(self.web_edit, 'web_thickness')
-                load_optional_field(self.plate_thickness_edit, 'plate_thickness', '20.0')
-                
-                # Cargar estado de checkbox
-                self.include_chair_chk.setChecked(bool(cfg.get('include_anchor_chair', False)))
-
-                load_optional_field(self.chair_height_edit, 'anchor_chair_height')
-                load_optional_field(self.chair_thickness_edit, 'anchor_chair_thickness')
-                
-                # Cargar material del perno
-                cfg_bolt_mat = cfg.get('bolt_material')
-                if cfg_bolt_mat:
-                    idx_mat = self.bolt_material_combo.findText(cfg_bolt_mat)
-                    if idx_mat >= 0:
-                        self.bolt_material_combo.setCurrentIndex(idx_mat)
-                    else:
-                        self.bolt_material_combo.addItem(cfg_bolt_mat)
-                        self.bolt_material_combo.setCurrentText(cfg_bolt_mat)
-                
-                # restaurar per-row (n_pernos) si existe en config
-                try:
-                    cfg_n = cfg.get('n_pernos')
-                    if cfg_n is not None:
-                        # buscar índice con userData == cfg_n
-                        found_idx = -1
-                        for i in range(self.per_row_combo.count()):
-                            if int(self.per_row_combo.itemData(i)) == int(cfg_n):
-                                found_idx = i
-                                break
-                        if found_idx >= 0:
-                            self.per_row_combo.setCurrentIndex(found_idx)
-                except Exception:
-                    pass
-                centers = cfg.get('bolt_centers')
-                if centers:
-                    # llenar tabla
-                    self.centers_table.setRowCount(0)
-                    for c in centers:
-                        r = self.centers_table.rowCount()
-                        self.centers_table.insertRow(r)
-                        self.centers_table.setItem(r, 0, QTableWidgetItem(str(c[0])))
-                        self.centers_table.setItem(r, 1, QTableWidgetItem(str(c[1])))
-                        self.centers_table.setItem(r, 2, QTableWidgetItem(str(c[2] if len(c) > 2 else 0.0)))
-            except Exception as e:
-                try:
-                    self.log.log(f'No se pudo leer config existente: {e}', level="ERROR")
-                except Exception:
-                    pass
 
         # actualizar A/B según bolt_dia inicial
         self.update_A_B_display()
@@ -342,13 +271,13 @@ class BasePlateWidget(QWidget):
         """Enable/Disable run button based on SAP2000 connection."""
         self.run_btn.setEnabled(connected)
         if connected:
-            self.run_btn.setToolTip("Guardar configuración y ejecutar en SAP2000")
-            self.run_btn.setText("🚀 Guardar y Ejecutar")
+            self.run_btn.setToolTip("Ejecutar en SAP2000")
+            self.run_btn.setText("🚀 Ejecutar")
             # Cargar materiales del modelo al conectar
             self.load_materials_from_model()
         else:
             self.run_btn.setToolTip("Conecte SAP2000 para ejecutar")
-            self.run_btn.setText("🚀 Guardar y Ejecutar (Sin Conexión)")
+            self.run_btn.setText("🚀 Ejecutar (Sin Conexión)")
 
     def load_materials_from_model(self):
         """Lee los materiales definidos en el modelo SAP2000 y los carga en el ComboBox."""
@@ -397,17 +326,17 @@ class BasePlateWidget(QWidget):
         self.chair_height_edit.setEnabled(checked)
         self.chair_thickness_edit.setEnabled(checked)
 
-    def save_config(self):
+    def build_config(self):
+        """Construye un PlateConfig desde los campos del formulario. Retorna (PlateConfig, True) o (None, False)."""
         try:
             bolt_dia = float(self.bolt_combo.currentData())
             H_col = float(self.hcol_edit.text())
             B_col = float(self.bcol_edit.text())
         except ValueError:
             QMessageBox.warning(self, 'Error', 'Valores numéricos inválidos.')
-            return False
+            return None, False
 
         centers = []
-        # leer filas de la tabla
         for r in range(self.centers_table.rowCount()):
             try:
                 itx = self.centers_table.item(r, 0)
@@ -415,53 +344,43 @@ class BasePlateWidget(QWidget):
                 itz = self.centers_table.item(r, 2)
                 if itx is None or ity is None:
                     QMessageBox.warning(self, 'Error', f'Fila {r+1} incompleta')
-                    return False
+                    return None, False
                 x = float(itx.text())
                 y = float(ity.text())
                 z = float(itz.text()) if itz is not None and itz.text().strip() != '' else 0.0
             except ValueError:
                 QMessageBox.warning(self, 'Error', f'Valores inválidos en fila {r+1}')
-                return False
-            centers.append([x, y, z])
+                return None, False
+            centers.append((x, y, z))
 
         def parse_float_field(edit):
-            """Parse float from QLineEdit, return None if empty or 'None'."""
             val = edit.text().strip()
             if val == '' or val.lower() == 'none':
                 return None
             return float(val)
 
-        cfg = {
-            'bolt_dia': bolt_dia,
-            'H_col': H_col,
-            'B_col': B_col,
-            'n_pernos': int(self.per_row_combo.currentData()),
-            'bolt_centers': centers,
-            'bolt_material': self.bolt_material_combo.currentText().strip() or 'A36',
-            'flange_thickness': parse_float_field(self.flange_edit),
-            'web_thickness': parse_float_field(self.web_edit),
-            'plate_thickness': parse_float_field(self.plate_thickness_edit),
-            'include_anchor_chair': self.include_chair_chk.isChecked(),
-            'anchor_chair_height': parse_float_field(self.chair_height_edit),
-            'anchor_chair_thickness': parse_float_field(self.chair_thickness_edit)
-        }
-        try:
-            with open(CONFIG_PATH, 'w', encoding='utf-8') as fh:
-                json.dump(cfg, fh, indent=2)
-            try:
-                self.log.log(f'Config guardada en {CONFIG_PATH}', level="SUCCESS")
-            except Exception:
-                pass
-            # actualizar A/B tras guardar
-            self.update_A_B_display()
-            self.preview.update()
-            return True
-        except Exception as e:
-            QMessageBox.critical(self, 'Error', f'No se pudo guardar config: {e}')
-            return False
+        cfg = PlateConfig(
+            bolt_dia=bolt_dia,
+            H_col=H_col,
+            B_col=B_col,
+            n_pernos=int(self.per_row_combo.currentData()),
+            bolt_centers=centers,
+            bolt_material=self.bolt_material_combo.currentText().strip() or 'A36',
+            flange_thickness=parse_float_field(self.flange_edit),
+            web_thickness=parse_float_field(self.web_edit),
+            plate_thickness=parse_float_field(self.plate_thickness_edit),
+            include_anchor_chair=self.include_chair_chk.isChecked(),
+            anchor_chair_height=parse_float_field(self.chair_height_edit),
+            anchor_chair_thickness=parse_float_field(self.chair_thickness_edit),
+            ks_balasto=parse_float_field(self.edit_balasto),
+        )
+
+        self.update_A_B_display()
+        self.preview.update()
+        return cfg, True
 
     def run_script(self):
-        ok = self.save_config()
+        cfg, ok = self.build_config()
         if not ok:
             return
         
@@ -478,7 +397,7 @@ class BasePlateWidget(QWidget):
 
         try:
             backend = BasePlateBackend(sap_model=model, logger=self.log_message)
-            backend.load_config_from_file(CONFIG_PATH)
+            backend.config = cfg
             backend.run_process()
             self.log_message("✅ Ejecución finalizada correctamente.")
 
@@ -487,7 +406,6 @@ class BasePlateWidget(QWidget):
                 self.log.log(f"❌ Error durante la ejecución: {str(e)}", level="ERROR")
             except Exception:
                 pass
-            # Solo mostrar traceback si NO es el error de conexión conocido (por si acaso)
             if "No hay conexión" not in str(e):
                 import traceback
                 try:
