@@ -38,11 +38,11 @@ class BasePlateWidget(QWidget):
         ]
         for label, mm in dia_items:
             self.bolt_combo.addItem(label, mm)
-        self.hcol_edit = QLineEdit('300.0')
-        self.bcol_edit = QLineEdit('250.0')
+        self.hcol_edit = QLineEdit('200.0')
+        self.bcol_edit = QLineEdit('200.0')
         # nuevos campos: espesor de ala (flange) y alma (web) en mm
-        self.flange_edit = QLineEdit('')
-        self.web_edit = QLineEdit('')
+        self.flange_edit = QLineEdit('12')
+        self.web_edit = QLineEdit('5')
         # espesor de placa base (mm)
         self.plate_thickness_edit = QLineEdit('20.0')
         
