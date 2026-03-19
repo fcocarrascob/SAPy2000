@@ -9,6 +9,7 @@ Provee widgets estandarizados:
 """
 
 from datetime import datetime
+from html import escape
 from PySide6.QtWidgets import (
     QPushButton, QGroupBox, QVBoxLayout, QHBoxLayout,
     QProgressBar, QLabel, QTextEdit, QWidget, QSizePolicy,
@@ -78,7 +79,7 @@ class LogWidget(QTextEdit):
         prefixes = {"INFO": "ℹ️", "SUCCESS": "✅", "WARNING": "⚠️", "ERROR": "❌"}
         prefix = prefixes.get(level, "")
         color = self._LEVEL_COLORS.get(level, COLORS["text_primary"])
-        html = f'<span style="color:{color}">[{ts}] {prefix} {message}</span>'
+        html = f'<span style="color:{color}">[{ts}] {prefix} {escape(message)}</span>'
         self.append(html)
         # Auto-scroll al final
         self.moveCursor(QTextCursor.End)

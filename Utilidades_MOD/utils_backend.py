@@ -914,7 +914,7 @@ class SapUtils:
         # Refrescar vista
         try:
             self.SapModel.View.RefreshView(0, False)
-        except:
+        except Exception:
             pass
         
         return created_areas
@@ -1139,7 +1139,7 @@ class SapUtils:
         self.logger.success(f"Se crearon {len(created_areas)} áreas con orificio.")
         try:
             self.SapModel.View.RefreshView(0, False)
-        except:
+        except Exception:
             pass
             
         return created_areas
@@ -1239,7 +1239,7 @@ class SapUtils:
             ret = self.SapModel.LoadCases.GetNameList_1()
             if ret[-1] == 0:
                 return ret[1] if ret[0] > 0 else []
-        except:
+        except Exception:
             pass
         return []
 
@@ -1251,7 +1251,7 @@ class SapUtils:
             ret = self.SapModel.RespCombo.GetNameList()
             if ret[-1] == 0:
                 return ret[1] if ret[0] > 0 else []
-        except:
+        except Exception:
             pass
         return []
 

@@ -332,7 +332,7 @@ class FundacionesBackend:
             self.logger.error(f"Error obteniendo dimensiones de sección {section_name}: {e}")
             try:
                 self.SapModel.SetPresentUnits(current_units)
-            except:
+            except Exception:
                 pass
             return None
     
@@ -457,7 +457,7 @@ class FundacionesBackend:
             # Intentar restaurar unidades en caso de error
             try:
                 self.SapModel.SetPresentUnits(current_units)
-            except:
+            except Exception:
                 pass
             return False
     
@@ -601,7 +601,7 @@ class FundacionesBackend:
             # Intentar restaurar unidades en caso de error
             try:
                 self.SapModel.SetPresentUnits(current_units)
-            except:
+            except Exception:
                 pass
             return False
     
@@ -687,7 +687,7 @@ class FundacionesBackend:
             traceback.print_exc()
             try:
                 self.SapModel.SetPresentUnits(current_units)
-            except:
+            except Exception:
                 pass
             return None, None, None
     
@@ -822,7 +822,7 @@ class FundacionesBackend:
             traceback.print_exc()
             try:
                 self.SapModel.SetPresentUnits(current_units)
-            except:
+            except Exception:
                 pass
             return None, None, None
     
@@ -911,7 +911,7 @@ class FundacionesBackend:
             # Refrescar vista
             try:
                 self.SapModel.View.RefreshView(0, False)
-            except:
+            except Exception:
                 pass
             
             # Restaurar unidades originales
@@ -925,7 +925,7 @@ class FundacionesBackend:
             traceback.print_exc()
             try:
                 self.SapModel.SetPresentUnits(current_units)
-            except:
+            except Exception:
                 pass
             return []
 
@@ -1012,7 +1012,7 @@ class FundacionesBackend:
 
             try:
                 self.SapModel.View.RefreshView(0, False)
-            except:
+            except Exception:
                 pass
 
             self.SapModel.SetPresentUnits(current_units)
@@ -1024,7 +1024,7 @@ class FundacionesBackend:
             traceback.print_exc()
             try:
                 self.SapModel.SetPresentUnits(current_units)
-            except:
+            except Exception:
                 pass
             return []
 
@@ -1099,7 +1099,7 @@ if __name__ == "__main__":
         try:
             SapObject = helper.GetObject("CSI.SAP2000.API.SapObject")
             print("✓ Conectado a instancia activa de SAP2000")
-        except:
+        except Exception:
             print("✗ No se encontró instancia activa de SAP2000")
             SapObject = None
         
