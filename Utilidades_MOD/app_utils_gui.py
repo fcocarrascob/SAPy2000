@@ -5,9 +5,19 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QLabel, QLine
                                QTextEdit, QPushButton, QVBoxLayout, QHBoxLayout, 
                                QComboBox, QGroupBox, QGridLayout, QFormLayout, QTabWidget,
                                QTextBrowser, QTableWidget, QTableWidgetItem, QHeaderView,
-                               QListWidget, QAbstractItemView, QListWidgetItem, QScrollArea)
+                               QListWidget, QAbstractItemView, QListWidgetItem, QScrollArea,
+                               QPlainTextEdit, QSplitter, QMessageBox)
 from PySide6.QtGui import QPainter, QPen, QColor, QBrush, QFont
 from PySide6.QtCore import Qt, QUrl, QTimer
+
+# Importar matplotlib para gráficos de Section Designer
+try:
+    from matplotlib.backends.backend_qtagg import FigureCanvasQTAgg as FigureCanvas
+    from matplotlib.backends.backend_qtagg import NavigationToolbar2QT as NavigationToolbar
+    from matplotlib.figure import Figure
+    MATPLOTLIB_AVAILABLE = True
+except ImportError:
+    MATPLOTLIB_AVAILABLE = False
 
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
@@ -24,6 +34,145 @@ except ImportError:
         # Fallback si se ejecuta desde otro directorio
         sys.path.append(os.path.dirname(__file__))
         from utils_backend import SapUtils, SteelSectionCalc, SlendernessClassifier, SECTION_TYPES, STEEL_MATERIALS
+
+
+def parse_pasted_data(text):
+    """
+    Parsea datos tabulados pegados por el usuario (CSV/TSV).
+    
+    Args:
+        text: String con datos tabulados (separados por tab o coma)
+    
+    Returns:
+        dict con:
+            - 'headers': list de nombres de columnas
+            - 'data': dict {column_name: [values_as_float]}
+            - 'error': str con mensaje de error si falla el parsing
+    """
+    try:
+        lines = [l.strip() for l in text.strip().split('\n') if l.strip()]
+        if len(lines) < 2:
+            return {'error': 'Se requieren al menos 2 líneas (encabezados + datos)'}
+        
+        # Detectar separador (tab vs coma)
+        first_line = lines[0]
+        separator = '\t' if '\t' in first_line else ','
+        
+        # Parsear encabezados
+        headers = [h.strip() for h in first_line.split(separator)]
+        
+        # Parsear datos
+        data = {h: [] for h in headers}
+        for i, line in enumerate(lines[1:], start=2):
+            values = line.split(separator)
+            if len(values) != len(headers):
+                return {'error': f'Línea {i}: número de columnas inconsistente (esperadas {len(headers)}, encontradas {len(values)})'}
+            
+            for header, val in zip(headers, values):
+                # Convertir comas decimales a puntos (formato europeo)
+                val_clean = val.strip().replace(',', '.')
+                try:
+                    data[header].append(float(val_clean))
+                except ValueError:
+                    return {'error': f'Línea {i}, columna "{header}": valor no numérico "{val}"'}
+        
+        return {'headers': headers, 'data': data, 'error': None}
+    
+    except Exception as e:
+        return {'error': f'Error inesperado al parsear: {str(e)}'}
+
+
+def parse_interaction_curves(text):
+    """
+    Parsea el formato especial de múltiples curvas de interacción de SAP2000.
+    
+    Formato esperado:
+    - Línea 1: headers alternando entre "Curve N", "X degrees", empty, ...
+    - Línea 2: vacía
+    - Líneas siguientes: índice + tríos de valores (P, M2, M3) para cada curva
+    
+    Returns:
+        dict con:
+            - 'curves': dict {curve_num: {'name': str, 'angle': str, 'P': [...], 'M2': [...], 'M3': [...]}}
+            - 'error': str si hay error
+    """
+    try:
+        lines = [l for l in text.strip().split('\n')]
+        if len(lines) < 3:
+            return {'error': 'Formato inválido: se requieren al menos 3 líneas'}
+        
+        # Parsear encabezados de la primera línea
+        header_line = lines[0]
+        if '\t' not in header_line:
+            return {'error': 'Formato inválido: no se detectaron tabs en los encabezados'}
+        
+        headers = header_line.split('\t')
+        
+        # Detectar curvas (buscar "Curve N" en los encabezados)
+        curves_info = []
+        i = 0
+        while i < len(headers):
+            if 'Curve' in headers[i]:
+                curve_num = int(headers[i].replace('Curve', '').strip())
+                angle = headers[i+1] if i+1 < len(headers) else ""
+                curves_info.append({'num': curve_num, 'angle': angle, 'col_start': i})
+                i += 3  # Saltar "Curve N", "X degrees", vacío
+            else:
+                i += 1
+        
+        if not curves_info:
+            return {'error': 'No se encontraron curvas en el formato esperado'}
+        
+        # Inicializar estructura de datos para cada curva
+        curves = {}
+        for curve in curves_info:
+            curves[curve['num']] = {
+                'name': f"Curve {curve['num']}",
+                'angle': curve['angle'],
+                'P': [],
+                'M2': [],
+                'M3': []
+            }
+        
+        # Parsear datos (empezando desde línea 2, índice 1, saltando línea vacía)
+        data_start = 2
+        for line_idx in range(data_start, len(lines)):
+            line = lines[line_idx].strip()
+            if not line:
+                continue
+            
+            values = line.split('\t')
+            if len(values) < 2:
+                continue
+            
+            # Primer valor es el índice de fila, lo saltamos
+            # Luego vienen tríos (P, M2, M3) para cada curva
+            val_idx = 1
+            for curve_info in curves_info:
+                curve_num = curve_info['num']
+                if val_idx + 2 < len(values):
+                    try:
+                        p_val = float(values[val_idx].replace(',', '.'))
+                        m2_val = float(values[val_idx + 1].replace(',', '.'))
+                        m3_val = float(values[val_idx + 2].replace(',', '.'))
+                        
+                        curves[curve_num]['P'].append(p_val)
+                        curves[curve_num]['M2'].append(m2_val)
+                        curves[curve_num]['M3'].append(m3_val)
+                        val_idx += 3
+                    except (ValueError, IndexError):
+                        break
+        
+        # Validar que al menos una curva tenga datos
+        valid_curves = {k: v for k, v in curves.items() if len(v['P']) > 0}
+        if not valid_curves:
+            return {'error': 'No se pudieron parsear datos numéricos de las curvas'}
+        
+        return {'curves': valid_curves, 'error': None}
+    
+    except Exception as e:
+        return {'error': f'Error al parsear curvas múltiples: {str(e)}'}
+
 
 class PreviewWidget(QWidget):
     def __init__(self, parent=None):
@@ -1768,6 +1917,393 @@ class FrameSectionWidget(QWidget):
             self.log_widget.log("📡 Conexión perdida", "WARNING")
 
 
+class MomentoCurvaturaWidget(QWidget):
+    """Widget para graficar curvas Momento-Curvatura de Section Designer."""
+    
+    def __init__(self, parent=None, sap_interface=None):
+        super().__init__(parent)
+        self.sap_interface = sap_interface
+        self.parsed_data = None
+        self.init_ui()
+    
+    def init_ui(self):
+        main_layout = QVBoxLayout(self)
+        
+        # Splitter horizontal (datos | gráfico)
+        splitter = QSplitter(Qt.Horizontal)
+        main_layout.addWidget(splitter)
+        
+        # --- Panel Izquierdo: Entrada de datos ---
+        left_widget = QWidget()
+        left_layout = QVBoxLayout(left_widget)
+        
+        # Área de texto para pegar datos
+        grp_input = QGroupBox("Datos del Section Designer")
+        input_layout = QVBoxLayout(grp_input)
+        
+        lbl_instrucciones = QLabel(
+            "📋 Pegar datos tabulados de SAP2000 Section Designer\n"
+            "Se requieren columnas 'Curvature' y 'Moment'"
+        )
+        lbl_instrucciones.setWordWrap(True)
+        input_layout.addWidget(lbl_instrucciones)
+        
+        self.txt_input = QPlainTextEdit()
+        self.txt_input.setPlaceholderText(
+            "Conc. Strain\tNeutral Axis\tSteel Strain\t...\tCurvature\tMoment\n"
+            "0\t0\t0\t...\t0\t0\n"
+            "-1,175E-05\t0,1409\t3,585E-05\t...\t1,077E-04\t0,2414"
+        )
+        self.txt_input.setMinimumHeight(150)
+        input_layout.addWidget(self.txt_input)
+        
+        btn_process = StyledButton("📊 Procesar y Graficar", variant="primary")
+        btn_process.clicked.connect(self.process_and_plot)
+        input_layout.addWidget(btn_process)
+        
+        left_layout.addWidget(grp_input)
+        
+        # Momento Último
+        grp_momento_ultimo = QGroupBox("Momento Último")
+        momento_layout = QHBoxLayout(grp_momento_ultimo)
+        
+        lbl_mu = QLabel("Mu:")
+        momento_layout.addWidget(lbl_mu)
+        
+        self.txt_momento_ultimo = QLineEdit()
+        self.txt_momento_ultimo.setPlaceholderText("Ej: 20.5")
+        self.txt_momento_ultimo.textChanged.connect(self.on_momento_ultimo_changed)
+        momento_layout.addWidget(self.txt_momento_ultimo)
+        
+        left_layout.addWidget(grp_momento_ultimo)
+        left_layout.addStretch()
+        
+        splitter.addWidget(left_widget)
+        
+        # --- Panel Derecho: Gráfico ---
+        right_widget = QWidget()
+        right_layout = QVBoxLayout(right_widget)
+        
+        if MATPLOTLIB_AVAILABLE:
+            self.figure = Figure(figsize=(8, 6), dpi=100)
+            self.canvas = FigureCanvas(self.figure)
+            self.toolbar = NavigationToolbar(self.canvas, self)
+            
+            right_layout.addWidget(self.toolbar)
+            right_layout.addWidget(self.canvas)
+        else:
+            lbl_no_mpl = QLabel(
+                "⚠️ Matplotlib no instalado.\n\n"
+                "Para habilitar gráficos, ejecute:\n"
+                "pip install matplotlib"
+            )
+            lbl_no_mpl.setAlignment(Qt.AlignCenter)
+            lbl_no_mpl.setStyleSheet(f"color: {COLORS['warning']}; font-size: 12pt;")
+            right_layout.addWidget(lbl_no_mpl)
+        
+        splitter.addWidget(right_widget)
+        
+        # Proporciones 40% izquierda, 60% derecha
+        splitter.setSizes([400, 600])
+    
+    def process_and_plot(self):
+        """Procesa los datos pegados y genera el gráfico."""
+        text = self.txt_input.toPlainText().strip()
+        if not text:
+            QMessageBox.warning(self, "Sin Datos", "Por favor pegue los datos del Section Designer.")
+            return
+        
+        # Parsear datos
+        result = parse_pasted_data(text)
+        if result.get('error'):
+            QMessageBox.critical(self, "Error de Parsing", f"Error al procesar datos:\n\n{result['error']}")
+            return
+        
+        self.parsed_data = result
+        headers = result['headers']
+        data = result['data']
+        
+        # Validar columnas requeridas
+        if 'Curvature' not in headers or 'Moment' not in headers:
+            QMessageBox.critical(
+                self, "Columnas Faltantes",
+                f"Se requieren las columnas 'Curvature' y 'Moment'.\n\nColumnas encontradas:\n{', '.join(headers)}"
+            )
+            return
+        
+        # Graficar
+        if MATPLOTLIB_AVAILABLE:
+            self.plot_moment_curvature(data)
+    
+    def on_momento_ultimo_changed(self):
+        """Redibuja el gráfico cuando cambia el momento último."""
+        if self.parsed_data and MATPLOTLIB_AVAILABLE:
+            self.plot_moment_curvature(self.parsed_data['data'])
+    
+    def plot_moment_curvature(self, data):
+        """Genera el gráfico Momento vs Curvatura."""
+        self.figure.clear()
+        ax = self.figure.add_subplot(111)
+        
+        curvature = data['Curvature']
+        moment = data['Moment']
+        
+        ax.plot(curvature, moment, 'b-', linewidth=2, label='M vs φ')
+        
+        # Dibujar línea de momento último si está especificado
+        momento_ultimo_text = self.txt_momento_ultimo.text().strip()
+        if momento_ultimo_text:
+            try:
+                momento_ultimo = float(momento_ultimo_text.replace(',', '.'))
+                ax.axhline(y=momento_ultimo, color='r', linestyle='--', linewidth=2, label=f'Mu = {momento_ultimo}')
+            except ValueError:
+                pass  # Si no es un número válido, no dibujamos la línea
+        
+        ax.grid(True, linestyle='--', alpha=0.6)
+        ax.set_xlabel('Curvatura φ [1/unit]', fontsize=11)
+        ax.set_ylabel('Momento M [unit]', fontsize=11)
+        ax.set_title('Curva Momento-Curvatura (Section Designer)', fontsize=12, fontweight='bold')
+        ax.legend()
+        
+        self.figure.tight_layout()
+        self.canvas.draw()
+
+
+class PMWidget(QWidget):
+    """Widget para graficar diagramas de interacción P-M2-M3."""
+    
+    def __init__(self, parent=None, sap_interface=None):
+        super().__init__(parent)
+        self.sap_interface = sap_interface
+        self.parsed_data = None
+        self.multi_curve_mode = False
+        self.curves_data = None
+        self.init_ui()
+    
+    def init_ui(self):
+        main_layout = QVBoxLayout(self)
+        
+        # Splitter horizontal (datos | gráfico)
+        splitter = QSplitter(Qt.Horizontal)
+        main_layout.addWidget(splitter)
+        
+        # --- Panel Izquierdo: Entrada de datos ---
+        left_widget = QWidget()
+        left_layout = QVBoxLayout(left_widget)
+        
+        # Área de texto para pegar datos
+        grp_input = QGroupBox("Datos del Section Designer")
+        input_layout = QVBoxLayout(grp_input)
+        
+        lbl_instrucciones = QLabel(
+            "📋 Pegar datos tabulados de SAP2000 Section Designer\n"
+            "Se requieren columnas con 'P', 'M2' y/o 'M3'"
+        )
+        lbl_instrucciones.setWordWrap(True)
+        input_layout.addWidget(lbl_instrucciones)
+        
+        self.txt_input = QPlainTextEdit()
+        self.txt_input.setPlaceholderText(
+            "Formato simple: P\tM2\tM3\n"
+            "O formato múltiples curvas: Curve 1\t0 degrees\t..."
+        )
+        self.txt_input.setMinimumHeight(150)
+        input_layout.addWidget(self.txt_input)
+        
+        # Selector de tipo de gráfico (P-M2 o P-M3)
+        tipo_layout = QHBoxLayout()
+        tipo_layout.addWidget(QLabel("Seleccionar Curva a Graficar:"))
+        self.combo_tipo = QComboBox()
+        self.combo_tipo.addItems(["P-M2", "P-M3"])
+        tipo_layout.addWidget(self.combo_tipo)
+        tipo_layout.addStretch()
+        input_layout.addLayout(tipo_layout)
+        
+        btn_process = StyledButton("📊 Procesar y Graficar", variant="primary")
+        btn_process.clicked.connect(self.process_and_plot)
+        input_layout.addWidget(btn_process)
+        
+        left_layout.addWidget(grp_input)
+        left_layout.addStretch()
+        
+        splitter.addWidget(left_widget)
+        
+        # --- Panel Derecho: Gráfico ---
+        right_widget = QWidget()
+        right_layout = QVBoxLayout(right_widget)
+        
+        if MATPLOTLIB_AVAILABLE:
+            self.figure = Figure(figsize=(8, 6), dpi=100)
+            self.canvas = FigureCanvas(self.figure)
+            self.toolbar = NavigationToolbar(self.canvas, self)
+            
+            right_layout.addWidget(self.toolbar)
+            right_layout.addWidget(self.canvas)
+        else:
+            lbl_no_mpl = QLabel(
+                "⚠️ Matplotlib no instalado.\n\n"
+                "Para habilitar gráficos, ejecute:\n"
+                "pip install matplotlib"
+            )
+            lbl_no_mpl.setAlignment(Qt.AlignCenter)
+            lbl_no_mpl.setStyleSheet(f"color: {COLORS['warning']}; font-size: 12pt;")
+            right_layout.addWidget(lbl_no_mpl)
+        
+        splitter.addWidget(right_widget)
+        
+        # Proporciones 40% izquierda, 60% derecha
+        splitter.setSizes([400, 600])
+    
+    def process_and_plot(self):
+        """Procesa los datos pegados y genera el gráfico."""
+        text = self.txt_input.toPlainText().strip()
+        if not text:
+            QMessageBox.warning(self, "Sin Datos", "Por favor pegue los datos del Section Designer.")
+            return
+        
+        tipo = self.combo_tipo.currentText()  # "P-M2" o "P-M3"
+        
+        # Intentar primero parsear como formato de múltiples curvas
+        multi_result = parse_interaction_curves(text)
+        
+        if not multi_result.get('error'):
+            # Es formato de múltiples curvas - seleccionar automáticamente según tipo
+            self.multi_curve_mode = True
+            self.curves_data = multi_result['curves']
+            
+            # Seleccionar curvas según tipo
+            if tipo == "P-M3":
+                target_curves = [1, 13]  # 0° y 180°
+            else:  # P-M2
+                target_curves = [7, 19]  # 90° y 270°
+            
+            # Graficar las curvas seleccionadas
+            if MATPLOTLIB_AVAILABLE:
+                self.plot_multi_curves(tipo, target_curves)
+        else:
+            # No es formato múltiple, intentar formato simple
+            simple_result = parse_pasted_data(text)
+            if simple_result.get('error'):
+                QMessageBox.critical(self, "Error de Parsing", 
+                    f"No se pudo parsear como formato múltiple ni simple:\n\n"
+                    f"Múltiples curvas: {multi_result['error']}\n"
+                    f"Formato simple: {simple_result['error']}")
+                return
+            
+            self.multi_curve_mode = False
+            self.parsed_data = simple_result
+            headers = simple_result['headers']
+            data = simple_result['data']
+            
+            # Validar columnas según tipo de gráfico
+            required_cols = ['P', 'M2'] if tipo == "P-M2" else ['P', 'M3']
+            missing = [c for c in required_cols if c not in headers]
+            
+            if missing:
+                QMessageBox.critical(
+                    self, "Columnas Faltantes",
+                    f"Para el gráfico '{tipo}' se requieren las columnas: {', '.join(required_cols)}\n\n"
+                    f"Columnas faltantes: {', '.join(missing)}\n\n"
+                    f"Columnas encontradas: {', '.join(headers)}"
+                )
+                return
+            
+            # Graficar formato simple
+            if MATPLOTLIB_AVAILABLE:
+                self.plot_simple(data, tipo)
+    
+    def plot_multi_curves(self, tipo, target_curves):
+        """Grafica múltiples curvas de interacción en el mismo gráfico."""
+        if not self.curves_data:
+            return
+        
+        self.figure.clear()
+        ax = self.figure.add_subplot(111)
+        
+        # Colores para las diferentes curvas
+        colors = ['#1f77b4', '#ff7f0e']
+        
+        for idx, curve_num in enumerate(target_curves):
+            if curve_num not in self.curves_data:
+                continue
+            
+            curve_data = self.curves_data[curve_num]
+            color = colors[idx % len(colors)]
+            label = f"{curve_data['name']} ({curve_data['angle']})"
+            
+            if tipo == "P-M2":
+                ax.plot(curve_data['M2'], curve_data['P'], '-o', 
+                       color=color, linewidth=2, markersize=4, label=label)
+                ax.set_xlabel('M2', fontsize=11)
+                ax.set_ylabel('P', fontsize=11)
+                title = 'Diagrama de Interacción P vs M2'
+            else:  # P-M3
+                ax.plot(curve_data['M3'], curve_data['P'], '-o', 
+                       color=color, linewidth=2, markersize=4, label=label)
+                ax.set_xlabel('M3', fontsize=11)
+                ax.set_ylabel('P', fontsize=11)
+                title = 'Diagrama de Interacción P vs M3'
+        
+        ax.grid(True, linestyle='--', alpha=0.6)
+        ax.set_title(title, fontsize=12, fontweight='bold')
+        ax.legend(fontsize=9)
+        ax.axhline(0, color='black', linewidth=0.5, alpha=0.3)
+        ax.axvline(0, color='black', linewidth=0.5, alpha=0.3)
+        
+        self.figure.tight_layout()
+        self.canvas.draw()
+    
+    def plot_simple(self, data, tipo):
+        """Genera el gráfico para formato simple."""
+        self.figure.clear()
+        ax = self.figure.add_subplot(111)
+        
+        if tipo == "P-M2":
+            x_data, y_data = data['M2'], data['P']
+            x_label, y_label = 'M2', 'P'
+            title = 'Diagrama de Interacción P vs M2'
+        else:  # P-M3
+            x_data, y_data = data['M3'], data['P']
+            x_label, y_label = 'M3', 'P'
+            title = 'Diagrama de Interacción P vs M3'
+        
+        ax.plot(x_data, y_data, 'ro-', linewidth=2, markersize=5)
+        ax.grid(True, linestyle='--', alpha=0.6)
+        ax.set_xlabel(x_label, fontsize=11)
+        ax.set_ylabel(y_label, fontsize=11)
+        ax.set_title(title, fontsize=12, fontweight='bold')
+        ax.axhline(0, color='black', linewidth=0.5, alpha=0.3)
+        ax.axvline(0, color='black', linewidth=0.5, alpha=0.3)
+        
+        self.figure.tight_layout()
+        self.canvas.draw()
+
+
+class SDGraficosWidget(QWidget):
+    """Contenedor para gráficos de Section Designer (Momento-Curvatura y P-M2-M3)."""
+    
+    def __init__(self, parent=None, sap_interface=None):
+        super().__init__(parent)
+        self.sap_interface = sap_interface
+        self.init_ui()
+    
+    def init_ui(self):
+        main_layout = QVBoxLayout(self)
+        
+        # TabWidget interno con dos sub-pestañas
+        self.tab_widget = QTabWidget()
+        
+        # Sub-pestaña 1: Momento Curvatura
+        self.mc_widget = MomentoCurvaturaWidget(sap_interface=self.sap_interface)
+        self.tab_widget.addTab(self.mc_widget, "Momento Curvatura")
+        
+        # Sub-pestaña 2: P-M2-M3
+        self.pm_widget = PMWidget(sap_interface=self.sap_interface)
+        self.tab_widget.addTab(self.pm_widget, "P-M2-M3")
+        
+        main_layout.addWidget(self.tab_widget)
+
+
 class MeshUtilsWidget(QWidget):
     def __init__(self, parent=None, sap_interface=None):
         super().__init__(parent)
@@ -1781,12 +2317,14 @@ class MeshUtilsWidget(QWidget):
         self.hole_mesh_widget = HoleMeshWidget(sap_interface=sap_interface)
         self.results_widget = ResultsTableWidget(sap_interface=sap_interface)
         self.notes_widget = NotesWidget()
+        self.sd_graficos_widget = SDGraficosWidget(sap_interface=sap_interface)
         
         self.tabs.insertTab(0, self.frames_widget, "Frames")
         self.tabs.addTab(self.rect_mesh_widget, "Malla Rectangular")
         self.tabs.addTab(self.hole_mesh_widget, "Malla con Orificio")
         self.tabs.addTab(self.results_widget, "Tablas de Resultados")
         self.tabs.addTab(self.notes_widget, "Notas y Recomendaciones")
+        self.tabs.addTab(self.sd_graficos_widget, "SD Graficos")
         self.tabs.setCurrentIndex(0)
 
 

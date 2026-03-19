@@ -1,10 +1,10 @@
 # Utilidades de Modelado
 
-Colección de herramientas auxiliares para modelado en SAP2000: definición de **secciones frame de acero**, generador de **malla rectangular**, generador de **malla con hueco** (transición de formas), visor de **Database Tables** y visor de **notas Markdown**.
+Colección de herramientas auxiliares para modelado en SAP2000: definición de **secciones frame de acero**, generador de **malla rectangular**, generador de **malla con hueco** (transición de formas), visor de **Database Tables**, visor de **notas Markdown** y **graficador de resultados del Section Designer**.
 
 ## Descripción
 
-Agrupa 5 utilidades independientes en sub-pestañas:
+Agrupa 6 utilidades independientes en sub-pestañas:
 
 | Sub-tab | Utilidad |
 |---|---|
@@ -13,6 +13,7 @@ Agrupa 5 utilidades independientes en sub-pestañas:
 | **Malla con Hueco** | Crea transiciones geométricas entre formas (circle/square) mediante anillos concéntricos interpolados |
 | **Database Tables** | Consulta y muestra cualquier tabla de la base de datos interna de SAP2000 con filtros por load case/combo |
 | **Notas** | Renderiza el archivo `Notas/Notas.md` como referencia técnica rápida |
+| **SD Graficos** | Grafica datos del Section Designer: curvas Momento-Curvatura y diagramas de interacción P-M2-M3 (2D/3D) |
 
 ## Arquitectura
 
@@ -21,13 +22,17 @@ Agrupa 5 utilidades independientes en sub-pestañas:
 | `utils_backend.py` | `SapUtils` | Backend unificado — mesh generation, coordinate queries, database table extraction |
 | `utils_backend.py` | `SteelSectionCalc` | Cálculo de propiedades geométricas de secciones de acero (A, Ix, Iy, Sx, Sy, Zx, Zy, rx, ry, J, Cw) |
 | `utils_backend.py` | `SlendernessClassifier` | Clasificación de esbeltez AISC 360-16 (Tabla B4.1) |
-| `app_utils_gui.py` | `MeshUtilsWidget` | Container principal con `QTabWidget` de 5 sub-tabs |
+| `app_utils_gui.py` | `parse_pasted_data()` | Helper para parsear datos tabulados (CSV/TSV) con conversión de decimales europeas |
+| `app_utils_gui.py` | `MeshUtilsWidget` | Container principal con `QTabWidget` de 6 sub-tabs |
 | `app_utils_gui.py` | `FrameSectionWidget` | Inputs dinámicos de sección, selección de material, cálculo, clasificación e importación a SAP2000 |
 | `app_utils_gui.py` | `SectionPreviewWidget` | Canvas `QPainter` para vista previa en tiempo real de la sección transversal |
 | `app_utils_gui.py` | `RectangularMeshWidget` | Inputs + preview para malla rectangular |
 | `app_utils_gui.py` | `HoleMeshWidget` | Inputs + preview para malla con hueco |
 | `app_utils_gui.py` | `ResultsTableWidget` | Selector de tabla + filtros + `QTableWidget` de resultados |
 | `app_utils_gui.py` | `NotesWidget` | `QTextBrowser` con rendering Markdown |
+| `app_utils_gui.py` | `SDGraficosWidget` | Container con QTabWidget de graficadores (Momento-Curvatura y P-M2-M3) |
+| `app_utils_gui.py` | `MomentoCurvaturaWidget` | Graficador Momento vs Curvatura con matplotlib (QSplitter: input | plot) |
+| `app_utils_gui.py` | `PMWidget` | Graficador P-M2-M3 2D/3D con matplotlib (selector de tipo de gráfico) |
 | `app_utils_gui.py` | `PreviewWidget` | Canvas custom — `draw_rect()` y `draw_hole()` con dimensiones |
 | `app_utils_gui.py` | `BaseMeshWidget` | Clase base con UI común (botón generate + log) |
 | `app_utils_gui.py` | `CheckableListGroup` | Widget reutilizable — `QListWidget` con checkboxes + Select All/None |
@@ -84,6 +89,18 @@ flowchart TD
         N2["QTextBrowser.setMarkdown()"]
     end
 
+    subgraph Tab5["Sub-tab: SD Graficos"]
+        SD1["Usuario pega datos tabulados<br/>desde Section Designer"]
+        SD2["parse_pasted_data()<br/>detecta separador (tab/coma)<br/>convierte decimales europeas"]
+        SD3{"Tipo de datos"}
+        SD4["MomentoCurvaturaWidget<br/>Requiere: Curvature, Moment"]
+        SD5["PMWidget<br/>Requiere: P, M2, M3"]
+        SD6["Seleccionar tipo de gráfico:<br/>P vs M2, P vs M3,<br/>M2 vs M3, 3D P-M2-M3"]
+        SD7["matplotlib FigureCanvas<br/>plot 2D o 3D"]
+        SD8["NavigationToolbar<br/>zoom, pan, save PNG"]
+        SD9["QTableWidget muestra<br/>datos parseados"]
+    end
+
     subgraph SAP["SAP2000 API"]
         COORD["SelectObj.GetSelected()<br/>PointObj.GetCoordCartesian()"]
         MAT["PropMaterial.GetNameList()<br/>+ GetTypeOAPI()"]
@@ -110,12 +127,19 @@ flowchart TD
 
     N1 --> N2
 
+    SD1 --> SD2 --> SD3
+    SD3 -->|"Momento-Curvatura"| SD4 --> SD7
+    SD3 -->|"P-M2-M3"| SD5 --> SD6 --> SD7
+    SD7 --> SD8
+    SD2 --> SD9
+
     style Tab0 fill:#e3f2fd,stroke:#1565C0
     style Tab1 fill:#e8f4f8,stroke:#2196F3
     style Tab2 fill:#e8f5e9,stroke:#4CAF50
     style Tab3 fill:#fff3e0,stroke:#FF9800
     style Tab4 fill:#f3e5f5,stroke:#9C27B0
-    style SAP fill:#fce4ec,stroke:#E91E63
+    style Tab5 fill:#fce4ec,stroke:#E91E63
+    style SAP fill:#ffebee,stroke:#C62828
 ```
 
 ### Detalle por herramienta
@@ -146,9 +170,30 @@ flowchart TD
 #### Notas
 - Carga y renderiza `Notas/Notas.md` (actualmente contiene referencia AISC 360 Chapter J) en un `QTextBrowser`.
 
+#### SD Graficos
+
+Visualiza resultados del Section Designer de SAP2000 mediante gráficos interactivos con matplotlib.
+
+**Momento-Curvatura:**
+1. El usuario copia datos tabulados desde SAP2000 Section Designer (menú contextual → Copy Table).
+2. Pega los datos en el campo de texto del widget.
+3. `parse_pasted_data()` detecta automáticamente el separador (tab o coma), convierte decimales europeas (`,` → `.`) y valida columnas.
+4. Se requieren las columnas `Curvature` y `Moment`.
+5. Los datos se muestran en una tabla para validación visual.
+6. El gráfico renderiza la curva Momento vs Curvatura con matplotlib (ejes, grid, labels).
+7. NavigationToolbar permite zoom, pan y guardar como PNG.
+
+**P-M2-M3:**
+1. Proceso similar, pero requiere columnas `P`, `M2` y/o `M3`.
+2. Selector de tipo de gráfico: "P vs M2", "P vs M3", "M2 vs M3" (2D), "3D P-M2-M3" (3D).
+3. Para gráfico 3D, matplotlib usa `projection='3d'` con visualización interactiva.
+4. Útil para verificar diagramas de interacción y capacidad de secciones.
+
+**Archivo de ejemplo:** `M_Curvatura.txt` contiene datos de referencia para testing.
+
 ## Uso en la GUI
 
-La pestaña **"Utilidades de Modelado"** en `main_app.py` presenta las 5 sub-pestañas. Cada herramienta de mesh incluye un preview en vivo que se actualiza al cambiar los parámetros.
+La pestaña **"Utilidades de Modelado"** en `main_app.py` presenta las 6 sub-pestañas. Cada herramienta de mesh incluye un preview en vivo que se actualiza al cambiar los parámetros. La pestaña **SD Graficos** permite visualizar resultados del Section Designer sin necesidad de conexión activa a SAP2000.
 
 ## Ejecución Standalone
 
@@ -174,5 +219,6 @@ python -m Utilidades_MOD.app_utils_gui
 
 - `comtypes` (API SAP2000)
 - `PySide6` (GUI)
+- `matplotlib` (gráficos Section Designer — opcional pero recomendado)
 - `math` (geometría)
 - `os` (paths)
